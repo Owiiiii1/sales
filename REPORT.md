@@ -157,8 +157,13 @@ Nothing omitted. `.env`, `.env.testing`, SQL backups, and nginx backups are not 
 * branch: `main`
 * remote: `https://github.com/Owiiiii1/sales.git`
 * implementation commit: `c4a7ea707f7e523f8decdd17e75424328266d631`
-* REPORT SHA/files commit: *(this commit)*
-* push result: *(recorded after push)*
+* REPORT SHA/files commit: `1c4f1f80c0fdcbaaf655d9a615abc9cdc248511a`
+* first successful push: `779f3a7..1c4f1f8  main -> main`
+* commit messages:
+  * `Isolate PHPUnit from production MySQL and raise the upload cap.`
+  * `Record Phase 2.2 commit SHA and changed files in REPORT.md.`
+  * `Record Phase 2.2 GitHub push result in REPORT.md.`
+* push result: **PASS** — `To https://github.com/Owiiiii1/sales.git` `779f3a7..1c4f1f8  HEAD -> main`
 
 ## Problems / Warnings
 
