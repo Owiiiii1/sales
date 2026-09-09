@@ -129,7 +129,7 @@ Command:
 git diff --name-status 779f3a7769a20b905d00db4cefc6e4e388977147..HEAD
 ```
 
-Result after the implementation commit (later REPORT-only commits only rewrite this file):
+Result after implementation commit `c4a7ea707f7e523f8decdd17e75424328266d631` (later REPORT-only commits only rewrite this file):
 
 ```
 A	.env.testing.example
@@ -144,13 +144,11 @@ M	docs/STATUS.md
 M	docs/WORKFLOW.md
 M	phpunit.xml
 M	public/.user.ini
-M	tests/Feature/TestingDatabaseIsolationTest.php
+A	tests/Feature/TestingDatabaseIsolationTest.php
 M	tests/TestCase.php
-M	tests/Unit/TestingDatabaseGuardTest.php
+A	tests/Unit/TestingDatabaseGuardTest.php
 M	tests/bootstrap.php
 ```
-
-(Exact A/M letters for the two new test files will match `git diff --name-status` after commit: they are added.)
 
 Nothing omitted. `.env`, `.env.testing`, SQL backups, and nginx backups are not in the list. `public/build` was not rebuilt (no frontend product changes).
 
@@ -158,7 +156,8 @@ Nothing omitted. `.env`, `.env.testing`, SQL backups, and nginx backups are not 
 
 * branch: `main`
 * remote: `https://github.com/Owiiiii1/sales.git`
-* implementation commit: *(recorded after commit)*
+* implementation commit: `c4a7ea707f7e523f8decdd17e75424328266d631`
+* REPORT SHA/files commit: *(this commit)*
 * push result: *(recorded after push)*
 
 ## Problems / Warnings
