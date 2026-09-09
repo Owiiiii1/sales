@@ -238,7 +238,52 @@ Command:
 git diff --name-status 65d74ba52c980cada46f685b9698358f0d7c7c66..HEAD
 ```
 
-Recorded after the implementation commit (see Git). Working tree at the end of coding included all of the paths below plus `REPORT.md`.
+Result after the implementation commit `8316abc0c91d22623e6a09dc8b47d8f8094473d8` (REPORT.md later commits only rewrite this file):
+
+```
+M	README.md
+M	REPORT.md
+A	app/Http/Controllers/CallsController.php
+A	app/Http/Controllers/CompaniesController.php
+A	app/Http/Controllers/DashboardController.php
+A	app/Http/Controllers/EmployeesController.php
+A	app/Http/Requests/CallRequest.php
+A	app/Http/Requests/CompanyRequest.php
+A	app/Http/Requests/EmployeeRequest.php
+A	app/Models/Call.php
+A	app/Models/Company.php
+A	app/Models/Employee.php
+M	app/Models/User.php
+A	database/factories/CallFactory.php
+A	database/factories/CompanyFactory.php
+A	database/factories/EmployeeFactory.php
+A	database/migrations/2026_09_09_120000_create_companies_table.php
+A	database/migrations/2026_09_09_120100_create_employees_table.php
+A	database/migrations/2026_09_09_120200_create_calls_table.php
+A	database/seeders/SalesAnalyzerDemoSeeder.php
+M	docs/ARCHITECTURE.md
+M	docs/DATA_MODEL.md
+M	docs/DECISIONS.md
+M	docs/PRODUCT.md
+M	docs/PROJECT.md
+M	docs/ROADMAP.md
+M	docs/STATUS.md
+M	phpunit.xml
+M	resources/js/Layouts/AdminLayout.jsx
+A	resources/js/Pages/Calls/Index.jsx
+A	resources/js/Pages/Companies/Index.jsx
+M	resources/js/Pages/Dashboard.jsx
+A	resources/js/Pages/Employees/Index.jsx
+M	resources/js/Pages/Settings/Index.jsx
+M	routes/owl-admin-pages.php
+A	tests/Feature/CallsTest.php
+A	tests/Feature/CompaniesTest.php
+A	tests/Feature/EmployeesTest.php
+A	tests/Feature/NavigationRoutesTest.php
+M	tests/TestCase.php
+```
+
+Nothing omitted. `public/build` is gitignored and is not in this list. `.env` is not in this list. The SQL backup is not in this list.
 
 ## Security
 
@@ -252,8 +297,10 @@ Recorded after the implementation commit (see Git). Working tree at the end of c
 
 * branch: `main`
 * baseline: `65d74ba52c980cada46f685b9698358f0d7c7c66`
-* final commit SHA: pending (filled after commit)
-* commit messages: pending
+* implementation commit: `8316abc0c91d22623e6a09dc8b47d8f8094473d8`
+* commit messages:
+  * `Adapt the admin foundation for companies, employees, and calls.`
+  * (this REPORT SHA commit, recorded next)
 * push result: pending
 
 ## Problems / Warnings
