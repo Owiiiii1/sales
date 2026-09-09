@@ -220,53 +220,99 @@ DEC-007 (STT provider) is **Superseded**.
 
 ## Changed Files
 
-Full diff vs baseline `81b5b92506208317d09685e783a7517f3734fc46` is recorded in the follow-up Git section after commit.
-
-Working tree for this phase (implementation + docs + this report):
+`git diff --stat 81b5b92506208317d09685e783a7517f3734fc46..f29786dc09f699783da302f90d4cde1023def4a5`
 
 ```
-.env.example
-README.md
-REPORT.md
-app/Exceptions/Transcription/PermanentTranscriptionException.php
-app/Exceptions/Transcription/TranscriptionException.php
-app/Exceptions/Transcription/TransientTranscriptionException.php
-app/Http/Controllers/CallsController.php
-app/Http/Controllers/PublicAnalyzerController.php
-app/Jobs/TranscribeCall.php
-app/Models/Call.php
-app/Models/Transcript.php
-app/Models/TranscriptSegment.php
-app/Providers/AppServiceProvider.php
-app/Services/Calls/CallProcessingPipeline.php
-app/Services/Transcription/DTO/TranscriptionResult.php
-app/Services/Transcription/DTO/TranscriptionSegment.php
-app/Services/Transcription/ElevenLabsTranscriptionClient.php
-app/Services/Transcription/TranscriptWriter.php
-app/Services/Transcription/TranscriptionProvider.php
-app/Support/LanguageCode.php
-app/Support/TranscriptPresenter.php
-config/queue.php
-config/sales-analyzer.php
-database/migrations/2026_09_09_160000_create_transcripts_tables.php
-docs/AI_ANALYSIS.md
-docs/ARCHITECTURE.md
-docs/DATA_MODEL.md
-docs/DECISIONS.md
-docs/PRODUCT.md
-docs/ROADMAP.md
-docs/STATUS.md
-resources/js/Components/Public/AnalysisReport.jsx
-resources/js/Components/Public/CallTranscript.jsx
-resources/js/Pages/Calls/Index.jsx
-resources/js/Pages/Calls/Show.jsx
-resources/js/Pages/Public/Home.jsx
-routes/owl-admin-pages.php
-tests/Feature/CallsTest.php
-tests/Feature/PublicAnalyzerTest.php
-tests/Feature/TranscriptionTest.php
-tests/TestCase.php
-tests/Unit/LanguageCodeTest.php
+ .env.example                                       |   3 +
+ README.md                                          |   4 +-
+ REPORT.md                                          | 337 ++++++++++++++-------
+ .../PermanentTranscriptionException.php            |  19 ++
+ .../Transcription/TranscriptionException.php       |  13 +
+ .../TransientTranscriptionException.php            |   7 +
+ app/Http/Controllers/CallsController.php           |  19 +-
+ app/Http/Controllers/PublicAnalyzerController.php  |  28 +-
+ app/Jobs/TranscribeCall.php                        | 113 +++++++
+ app/Models/Call.php                                |   7 +
+ app/Models/Transcript.php                          |  48 +++
+ app/Models/TranscriptSegment.php                   |  43 +++
+ app/Providers/AppServiceProvider.php               |   4 +-
+ app/Services/Calls/CallProcessingPipeline.php      |  11 +-
+ .../Transcription/DTO/TranscriptionResult.php      |  22 ++
+ .../Transcription/DTO/TranscriptionSegment.php     |  14 +
+ .../ElevenLabsTranscriptionClient.php              | 288 ++++++++++++++++++
+ app/Services/Transcription/TranscriptWriter.php    |  54 ++++
+ .../Transcription/TranscriptionProvider.php        |  11 +
+ app/Support/LanguageCode.php                       |  41 +++
+ app/Support/TranscriptPresenter.php                |  96 ++++++
+ config/queue.php                                   |   2 +-
+ config/sales-analyzer.php                          |  11 +
+ ...2026_09_09_160000_create_transcripts_tables.php |  49 +++
+ docs/AI_ANALYSIS.md                                |  14 +-
+ docs/ARCHITECTURE.md                               |  33 +-
+ docs/DATA_MODEL.md                                 |  58 ++--
+ docs/DECISIONS.md                                  |  94 +++++-
+ docs/PRODUCT.md                                    |   2 +-
+ docs/ROADMAP.md                                    |  15 +-
+ docs/STATUS.md                                     |  24 +-
+ resources/js/Components/Public/AnalysisReport.jsx  |  19 +-
+ resources/js/Components/Public/CallTranscript.jsx  |  44 +++
+ resources/js/Pages/Calls/Index.jsx                 |   2 +-
+ resources/js/Pages/Calls/Show.jsx                  |  49 ++-
+ resources/js/Pages/Public/Home.jsx                 |  25 +-
+ routes/owl-admin-pages.php                         |   1 +
+ tests/Feature/CallsTest.php                        |   3 +
+ tests/Feature/PublicAnalyzerTest.php               |   5 +
+ tests/Feature/TranscriptionTest.php                | 269 ++++++++++++++++
+ tests/TestCase.php                                 |   1 +
+ tests/Unit/LanguageCodeTest.php                    |  24 ++
+ 42 files changed, 1711 insertions(+), 215 deletions(-)
+```
+
+`git diff --name-status` vs the same baseline:
+
+```
+M	.env.example
+M	README.md
+M	REPORT.md
+A	app/Exceptions/Transcription/PermanentTranscriptionException.php
+A	app/Exceptions/Transcription/TranscriptionException.php
+A	app/Exceptions/Transcription/TransientTranscriptionException.php
+M	app/Http/Controllers/CallsController.php
+M	app/Http/Controllers/PublicAnalyzerController.php
+A	app/Jobs/TranscribeCall.php
+M	app/Models/Call.php
+A	app/Models/Transcript.php
+A	app/Models/TranscriptSegment.php
+M	app/Providers/AppServiceProvider.php
+M	app/Services/Calls/CallProcessingPipeline.php
+A	app/Services/Transcription/DTO/TranscriptionResult.php
+A	app/Services/Transcription/DTO/TranscriptionSegment.php
+A	app/Services/Transcription/ElevenLabsTranscriptionClient.php
+A	app/Services/Transcription/TranscriptWriter.php
+A	app/Services/Transcription/TranscriptionProvider.php
+A	app/Support/LanguageCode.php
+A	app/Support/TranscriptPresenter.php
+M	config/queue.php
+M	config/sales-analyzer.php
+A	database/migrations/2026_09_09_160000_create_transcripts_tables.php
+M	docs/AI_ANALYSIS.md
+M	docs/ARCHITECTURE.md
+M	docs/DATA_MODEL.md
+M	docs/DECISIONS.md
+M	docs/PRODUCT.md
+M	docs/ROADMAP.md
+M	docs/STATUS.md
+M	resources/js/Components/Public/AnalysisReport.jsx
+A	resources/js/Components/Public/CallTranscript.jsx
+M	resources/js/Pages/Calls/Index.jsx
+M	resources/js/Pages/Calls/Show.jsx
+M	resources/js/Pages/Public/Home.jsx
+M	routes/owl-admin-pages.php
+M	tests/Feature/CallsTest.php
+M	tests/Feature/PublicAnalyzerTest.php
+A	tests/Feature/TranscriptionTest.php
+M	tests/TestCase.php
+A	tests/Unit/LanguageCodeTest.php
 ```
 
 Secret scan: no API key values in Git paths. `.env` and `.env.testing` are not staged. `.env.example` contains empty `ELEVENLABS_API_KEY=`.
@@ -274,7 +320,8 @@ Secret scan: no API key values in Git paths. `.env` and `.env.testing` are not s
 ## Git
 
 * branch: `main`
-* commit SHA: pending (recorded after commit)
+* implementation commit: `f29786dc09f699783da302f90d4cde1023def4a5`
+* message: `Add async ElevenLabs Scribe v2 transcription with diarized segments.`
 * push: pending
 
 ## Problems / Warnings
