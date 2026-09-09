@@ -55,6 +55,14 @@ Remaining later: object storage, processing UI beyond stubs, public analysis eng
 * polling UI prepared; no fake AI results
 * no public audio streaming
 
+## Phase 2.2 — Test isolation & upload limits
+
+**Status: COMPLETED**
+
+* dedicated MySQL user `sales_testing` (privileges only on `sales_testing.*`)
+* hard-fail if tests would use production database `sales`
+* nginx `client_max_body_size 210M` on `sales.owlsolutions.net` only
+
 ## Phase 3 — Transcription
 
 **Status: Planned**

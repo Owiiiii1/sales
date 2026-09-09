@@ -8,6 +8,7 @@ Factual state of the running project. Update this file when reality changes.
 * **Phase 1 — Adapt Admin Foundation:** COMPLETED
 * **Phase 2 — Audio upload foundation:** COMPLETED
 * **Phase 2.1 — Public Analyzer Shell:** COMPLETED
+* **Phase 2.2 — Test isolation & upload limits:** COMPLETED
 * **Next planned work:** Phase 3 transcription (provider still Open)
 
 ## Product vs running app
@@ -27,7 +28,7 @@ Admins sign in at `/login` and use the existing Companies / Employees / Calls ad
 | Branch | `main` |
 | PHP | 8.5.8 FPM |
 | Laravel | 13.31.0 |
-| Database | MySQL 8 — `sales` |
+| Database | MySQL 8 — production `sales`; tests `sales_testing` (user `sales_testing`) |
 | Audio disk | `calls` → `storage/app/private/calls` |
 
 ## Routes
@@ -43,12 +44,21 @@ Admins sign in at `/login` and use the existing Companies / Employees / Calls ad
 
 ## Known issues (non-critical)
 
-* nginx `client_max_body_size` for this vhost is still **64M**. PHP-FPM via `public/.user.ini` is **upload_max_filesize=200M**, **post_max_size=210M**. Effective HTTP cap is therefore **64M** until nginx is raised with sudo. Application config remains 200 MB.
 * ffprobe/ffmpeg not installed; duration often null.
 * Vite optional `fontaine` warning.
 * `/owl-admin/health` reports preset `core`.
 * CAPTCHA is not implemented; public upload is rate-limited instead.
-* PHPUnit uses `tests/bootstrap.php` so feature tests always target `sales_testing`, even when the shell has `APP_ENV=production`.
+* Production MySQL user `sales` still has grants on `sales_testing.*` (unchanged by this phase). Tests do not use that user.
+
+## Upload limits (effective)
+
+| Layer | Value |
+|---|---|
+| Laravel `SALES_AUDIO_MAX_MB` | 200 MB |
+| PHP-FPM `upload_max_filesize` | 200M |
+| PHP-FPM `post_max_size` | 210M |
+| nginx `client_max_body_size` (`sales.owlsolutions.net` only) | 210M |
+| Effective HTTP cap | **200 MB** (application validation) |
 
 ## What is explicitly not done
 

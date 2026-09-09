@@ -1,226 +1,173 @@
-# Sales Analyzer — Phase 2.1 Public Analyzer Shell Report
+# Sales Analyzer — Phase 2.2 Test Isolation & Upload Limits Report
 
 ## Baseline
 
-* accepted baseline SHA (Phase 2 on `main`): `5b555cf6d69dcd9f9b2b6d31ff4efc039d333f73`
-* HEAD before work: `5b555cf6d69dcd9f9b2b6d31ff4efc039d333f73`
+* accepted baseline SHA (Phase 2.1 on `main`): `779f3a7769a20b905d00db4cefc6e4e388977147`
+* HEAD before work: `779f3a7769a20b905d00db4cefc6e4e388977147`
 * working tree before work: clean
+* branch: `main` tracking `origin/main`
 * unpushed commits before work: none
-* HEAD matched the last Technical Lead accepted Phase 2 state. No extra Git changes existed before this phase.
+* HEAD matched the last Technical Lead accepted Phase 2.1 state.
 
-## Route Structure
+## Test DB Isolation
 
-| Method | Path | Who | Result |
-|---|---|---|---|
-| GET | `/` | guest | public Inertia `Public/Home` |
-| GET | `/login` | guest | admin Inertia `Auth/Login` |
-| POST | `/login` | guest | existing admin authentication |
-| POST | `/logout` | auth | existing logout → `/login` |
-| GET | `/dashboard` | guest | 302 `/login` |
-| GET | `/companies`, `/employees`, `/calls`, `/settings` | guest | 302 `/login` |
-| POST | `/analyze` | guest | public upload JSON (`201`) |
-| GET | `/analysis/{public_token}` | guest | safe status + `report: null` |
-| GET | `/analysis/{public_token}/status` | guest | safe status JSON |
-| GET | `/calls/{id}/audio`, `/calls/{id}/download` | guest | 302 `/login` |
-| admin CRUD | existing paths | auth | unchanged |
+* database name: `sales_testing`
+* testing DB user: `sales_testing`@`localhost`
+* production DB user `sales`@`localhost`: **unchanged**
 
-Guests are no longer sent to `/` for login. `bootstrap/app.php` uses `redirectGuestsTo('/login')` and `redirectUsersTo('/dashboard')`.
+Grants summary (`SHOW GRANTS`):
 
-## Public UI
+* `sales_testing`@`localhost`: `USAGE` on `*.*`; `ALL PRIVILEGES` on `sales_testing.*` only
+* `sales`@`localhost` (unchanged): `USAGE` on `*.*`; `ALL PRIVILEGES` on `sales.*`; `ALL PRIVILEGES` on `sales_testing.*`
 
-* Separate `PublicLayout`: brand `Sales Analyzer` left, unobtrusive `Admin` → `/login` right.
-* `resources/js/Pages/Public/Home.jsx`: hero “Analyze your sales call”, drag-and-drop + file picker, no extra UI library.
-* Upload states: `uploading`, `uploaded`, `processing`, `completed`, `failed`. Spinner during `uploading` / `processing`.
-* After a successful save with no AI pipeline, the page shows the honest copy: `Call uploaded successfully. Analysis engine is not connected yet.`
-* Polling starts only if status is `processing` (3s interval), stops on `completed` / `failed`, and is cleared on unmount.
-* `AnalysisReport` already has the structured section shells. Empty/null values are not rendered as fake scores.
+Confirmation: PDO as `sales_testing` opens `sales_testing` and is **denied** opening production `sales`. Feature test `test_testing_user_can_use_sales_testing_but_not_production_sales` covers this using runtime config (password is not in the test source).
 
-## Public Upload
+Credentials live only in gitignored `.env.testing` (mode `600`). Repository has `.env.testing.example` with an empty password.
 
-* `POST /analyze` → `PublicAnalyzerController@store` + `PublicAnalyzeRequest`.
-* Reuses Phase 2 `CallAudioStorage`, `AudioMetadataService`, `CallAudioRules`, and cleanup-on-DB-failure in `CallUploadService`.
-* Public payload is forced server-side: `company_id` null, `employee_id` null, `uploaded_by` null, `source = public`, `status = uploaded`.
-* Request body cannot inject `company_id`, `employee_id`, `uploaded_by`, or `source`.
-* Audio path on the private disk: `public/{Y}/{m}/{uuid}.ext`.
-* JSON `201` returns `public_token`, `status`, filename, `report: null`. It does not return id, `storage_path`, or `uploaded_by`.
+## Guards
 
-## Public Token
+Implementation:
 
-* Column `calls.public_token` UUID, unique, indexed, generated in `Call::creating` if empty.
-* Public routes match `[0-9a-fA-F-]{36}`. Sequential `/analysis/1` is 404.
-* Admin routes still use numeric ids.
+* `App\Support\TestingDatabaseGuard` — throws `RuntimeException`, not a warning
+* `tests/bootstrap.php` — loads `.env.testing`, forces `APP_ENV=testing`, `DB_DATABASE=sales_testing`, `DB_USERNAME=sales_testing`, then runs the guard (missing `.env.testing` exits 1)
+* `tests/TestCase::setUp` — guard from environment **before** `parent::setUp()`, then from Laravel config after boot
+* `AppServiceProvider::boot` — guard when `runningUnitTests()` so RefreshDatabase cannot start on production
 
-## Security
+If `DB_DATABASE=sales`:
 
-* CSRF via Laravel web middleware (meta token + cookie on the public fetch).
-* Named throttles: `public-analyze` default 10/min/IP, `public-analysis-status` default 60/min/IP (`SALES_PUBLIC_UPLOAD_PER_MINUTE`, `SALES_PUBLIC_STATUS_PER_MINUTE`).
-* Same MIME / extension / size validation as admin upload.
-* No public audio stream or download.
-* Failed analysis errors are replaced with a generic public message.
-* CAPTCHA is not implemented; documented as a possible later control (DEC-020).
-* `tests/bootstrap.php` forces `APP_ENV=testing` and `DB_DATABASE=sales_testing` before Laravel boots, because this host’s shell often has `APP_ENV=production`.
+```
+Refusing to run tests: DB_DATABASE is the production database "sales".
+```
 
-## Server Upload Limits
+Also rejects `APP_ENV !== testing` and `DB_USERNAME=sales`.
 
-Measured on `sales.owlsolutions.net` after this phase:
+Unit tests in `tests/Unit/TestingDatabaseGuardTest.php` assert those cases without touching MySQL.
+
+## Production Sentinel
+
+Recorded with production connection `database=sales` immediately before and after `php artisan test`.
+
+| Metric | Before | After |
+|---|---|---|
+| users | 1 | 1 |
+| companies | 0 | 0 |
+| employees | 0 | 0 |
+| calls | 0 | 0 |
+| admin | id `1`, `admin@admin.com` | id `1`, `admin@admin.com` |
+
+No production writes during the suite.
+
+## Upload Limits
 
 | Layer | Effective value |
 |---|---|
-| Application (`SALES_AUDIO_MAX_MB`) | **200 MB** |
+| Laravel `SALES_AUDIO_MAX_MB` / `config('sales-analyzer.max_audio_size_mb')` | **200 MB** |
 | PHP-FPM `upload_max_filesize` (`public/.user.ini`) | **200M** |
 | PHP-FPM `post_max_size` (`public/.user.ini`) | **210M** |
-| nginx `client_max_body_size` (`sales.owlsolutions.net` vhost only) | **64M** |
-| Effective HTTP upload cap | **64M** |
+| nginx `client_max_body_size` (`sales.owlsolutions.net` only) | **210M** |
+| Effective product max | **200 MB** (app validation; HTTP layers allow 210M) |
 
-`sudo nginx -t` / `sudo systemctl reload nginx` could not be run: passwordless sudo is not available, and no sudo password was written anywhere. Other vhosts were not edited. PHP-FPM pool globals were not changed.
+Live probes:
 
-## Database
+* small WAV `POST /analyze` → `201`
+* synthetic **70 MiB** multipart `POST /analyze` → Laravel **422** (invalid audio), **not** nginx `413` (would have been the old 64M cap)
+* both leftovers removed (`calls=0`, private disk empty)
 
-* Pre-migration backup (outside git): `/home/deploy/backups/sales/sales-pre-phase21-20260909-144606.sql`
-* Additive migration: `2026_09_09_150000_make_calls_company_nullable_and_add_public_token`
-  * `calls.company_id` nullable, FK retained
-  * `calls.public_token` UUID unique not null
-* Existing admin rows (none at backup time besides schema) received generated tokens.
-* **Incident:** a PHPUnit run without the testing bootstrap RefreshDatabase’d production `sales` while the shell had `APP_ENV=production`. Production was restored from the pre-phase21 dump, then the additive migration was re-applied. `users` restored to `admin@admin.com`. Isolation is now enforced by `tests/bootstrap.php`. After the final suite, production still has 1 user and 0 calls.
+## Nginx Changes
 
-## Admin Changes
-
-* Login moved back to `/login` (`routes/owl-admin-auth.php`). Root is no longer the login page.
-* `AdminLayout` header and sidebar footer: `Back to Sales Analyzer` → `/`.
-* Login screen also has `Back to Sales Analyzer`.
-* Dashboard / Companies / Employees / Calls screens were not redesigned.
+* vhost file: `/etc/nginx/sites-available/sales.owlsolutions.net`
+* backup: `/home/deploy/backups/sales/sales.owlsolutions.net.nginx-pre-phase22-20260909-151547` (outside Git)
+* diff vs backup: only `client_max_body_size 64M;` → `client_max_body_size 210M;`
+* `sudo nginx -t`: syntax ok, test successful
+* `sudo systemctl reload nginx` (not restart): success
+* MD5 of every other file in `/etc/nginx/sites-available/` unchanged (`jarvis`, `wow-cleaning`, `shifthappens`, etc.)
+* global `nginx.conf` not edited
 
 ## Tests
 
 Command: `php artisan test`
 
-Result: **42 passed**, 0 failed, **247 assertions**.
+* tests: **48**
+* passed: **48**
+* failed: **0**
+* assertions: **262**
 
-Coverage added/updated:
+Includes existing Phase 1 / 2 / 2.1 tests plus:
 
-* guest `/` → `Public/Home`; guest `/login` → `Auth/Login`
-* protected admin routes redirect `/login`
-* public upload creates Call with null company/employee/uploader, `source=public`, unique UUID token, `status=uploaded`
-* invalid / oversized audio rejected
-* cannot inject company/employee/uploader/source
-* status payload is safe; invalid token 404; `/analysis/1` 404
-* admin audio endpoints still require auth
-* public upload rate limit returns 429 when the named limiter is 2/min
-* Phase 1 + Phase 2 admin tests still pass
+* guard unit tests (production DB name, non-testing env, production username)
+* isolation feature tests (config points at `sales_testing` / user `sales_testing`; PDO denied on `sales`)
 
-## Live Verification
+## Security
 
-Guest:
+Not in Git:
 
-* `GET /` → 200, Inertia component `Public/Home`
-* `GET /login` → 200, Inertia component `Auth/Login`
-* `GET /dashboard` → 302 `https://sales.owlsolutions.net/login`
-* `GET /companies|/employees|/calls|/settings` → 302 `/login`
-* `GET /calls/1/audio` → 302 `/login`
+* sudo password
+* MySQL testing password
+* production DB password
+* `.env.testing` (gitignored; confirmed `git check-ignore`)
+* DB dumps / nginx backup (under `/home/deploy/backups/sales`)
 
-Public upload (synthetic WAV `phase21-live.wav`):
-
-* `POST /analyze` → 201
-* `public_token` returned
-* DB: `source=public`, `company_id` null, `employee_id` null, `uploaded_by` null, `status=uploaded`
-* injecting `company_id=999` did not attach a company
-* `GET /analysis/{token}/status` → `{status: uploaded, progress: null, error: null, report_available: false}`
-* `GET /analysis/{token}` → `report: null`, no id / storage_path
-* Test Call and audio were deleted after the check (`calls=0`, disk empty)
-
-`npm run build` succeeded (Home chunk emitted). `php artisan optimize:clear` and `php artisan migrate --force` were run.
-
-Browser MCP tools were not available in this session; live checks used HTTP + Inertia JSON + DB inspection.
+`git status` before commit showed `.env.testing` as ignored. Project tree has no sudo password string.
 
 ## Documentation
 
 Updated:
 
-* `docs/PROJECT.md`
-* `docs/PRODUCT.md`
-* `docs/ARCHITECTURE.md`
-* `docs/DATA_MODEL.md`
-* `docs/ROADMAP.md` — Phase 2.1 COMPLETED
-* `docs/STATUS.md`
-* `docs/DECISIONS.md` — DEC-017 … DEC-020
-* `README.md`
+* `docs/ARCHITECTURE.md` — testing isolation; upload limits closed
+* `docs/STATUS.md` — Phase 2.2 COMPLETED; effective 200 MB
+* `docs/DECISIONS.md` — DEC-021, DEC-022, DEC-023
+* `docs/WORKFLOW.md` — tests vs production database
+* `docs/ROADMAP.md` — Phase 2.2 COMPLETED
+
+No public/admin UI product files changed.
 
 ## Changed Files
 
 Command:
 
 ```
-git diff --name-status 5b555cf6d69dcd9f9b2b6d31ff4efc039d333f73..HEAD
+git diff --name-status 779f3a7769a20b905d00db4cefc6e4e388977147..HEAD
 ```
 
-Result after implementation commit `3baedde9f61caea6a3520f39d5b1033cc90c89ab` (later REPORT-only commits only rewrite this file):
+Result after the implementation commit (later REPORT-only commits only rewrite this file):
 
 ```
-M	.env.example
-M	README.md
+A	.env.testing.example
+M	.gitignore
 M	REPORT.md
-A	app/Http/Controllers/PublicAnalyzerController.php
-A	app/Http/Requests/PublicAnalyzeRequest.php
-M	app/Http/Requests/StoreCallRequest.php
-M	app/Models/Call.php
 M	app/Providers/AppServiceProvider.php
-M	app/Services/Calls/CallAudioStorage.php
-M	app/Services/Calls/CallUploadService.php
-A	app/Support/CallAudioRules.php
-M	bootstrap/app.php
-M	config/sales-analyzer.php
-M	database/factories/CallFactory.php
-A	database/migrations/2026_09_09_150000_make_calls_company_nullable_and_add_public_token.php
+A	app/Support/TestingDatabaseGuard.php
 M	docs/ARCHITECTURE.md
-M	docs/DATA_MODEL.md
 M	docs/DECISIONS.md
-M	docs/PRODUCT.md
-M	docs/PROJECT.md
 M	docs/ROADMAP.md
 M	docs/STATUS.md
+M	docs/WORKFLOW.md
 M	phpunit.xml
-A	resources/js/Components/Public/AnalysisReport.jsx
-M	resources/js/Layouts/AdminLayout.jsx
-A	resources/js/Layouts/PublicLayout.jsx
-M	resources/js/Pages/Auth/Login.jsx
-A	resources/js/Pages/Public/Home.jsx
-M	routes/owl-admin-auth.php
-A	routes/public.php
-M	routes/web.php
-M	tests/Feature/CallsTest.php
-M	tests/Feature/CompaniesTest.php
-M	tests/Feature/EmployeesTest.php
-M	tests/Feature/NavigationRoutesTest.php
-A	tests/Feature/PublicAnalyzerTest.php
-A	tests/bootstrap.php
+M	public/.user.ini
+M	tests/Feature/TestingDatabaseIsolationTest.php
+M	tests/TestCase.php
+M	tests/Unit/TestingDatabaseGuardTest.php
+M	tests/bootstrap.php
 ```
 
-Nothing omitted. `.env` is not in the list. `public/build` is gitignored. The SQL backup and live audio files are not in the list.
+(Exact A/M letters for the two new test files will match `git diff --name-status` after commit: they are added.)
+
+Nothing omitted. `.env`, `.env.testing`, SQL backups, and nginx backups are not in the list. `public/build` was not rebuilt (no frontend product changes).
 
 ## Git
 
 * branch: `main`
 * remote: `https://github.com/Owiiiii1/sales.git`
-* implementation commit: `3baedde9f61caea6a3520f39d5b1033cc90c89ab`
-* REPORT SHA/files commit: `ccf6b152e7f2f6817ff9ff4d753165166534527e`
-* first successful push: `5b555cf..ccf6b15  main -> main`
-* commit messages:
-  * `Add public analyzer homepage with anonymous upload shell.`
-  * `Record Phase 2.1 commit SHA and changed files in REPORT.md.`
-  * `Record Phase 2.1 GitHub push result in REPORT.md.`
-* push result: **PASS** — `To https://github.com/Owiiiii1/sales.git` `5b555cf..ccf6b15  HEAD -> main`
+* implementation commit: *(recorded after commit)*
+* push result: *(recorded after push)*
 
 ## Problems / Warnings
 
-* nginx `client_max_body_size` remains **64M** on this vhost. PHP-FPM honors 200M/210M via `public/.user.ini`. Application limit is 200 MB. Large HTTP uploads will still fail at nginx until an operator with sudo raises only this vhost and reloads nginx (`nginx -t` then `systemctl reload nginx`, not restart).
-* Production `sales` was briefly emptied by PHPUnit `RefreshDatabase` when `APP_ENV=production` was already in the environment. Restored from `/home/deploy/backups/sales/sales-pre-phase21-20260909-144606.sql`. `tests/bootstrap.php` now forces the testing database before Laravel boots.
-* CAPTCHA not added.
-* ffprobe/ffmpeg still not installed; duration often null.
+* Production MySQL user `sales` still has `ALL PRIVILEGES` on `sales_testing.*`. That user was not modified (task constraint). Tests no longer use it.
+* ffprobe/ffmpeg still not installed.
 * Vite optional `fontaine` warning (pre-existing).
-* `/owl-admin/health` still reports preset `core` (pre-existing).
-* www-data can still create private audio directories that deploy cannot list until an authenticated cleanup; `CallAudioStorage` now `chmod 0775`s parent dirs after store. No `777`.
-* No fake AI report is shown.
+* No 200 MB binary was uploaded; 70 MiB nginx acceptance plus config alignment is the proof.
 
 ## Final Status
 
-`PHASE 2.1 PASSED`
+`PHASE 2.2 PASSED`

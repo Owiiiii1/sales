@@ -118,10 +118,22 @@ This project must not affect other sites on the same host.
 Constraints (accepted operationally during deploy):
 
 * project files only under `/var/www/sales`;
-* dedicated MySQL database `sales`;
+* dedicated MySQL database `sales` (production) and `sales_testing` (PHPUnit only, isolated MySQL user);
 * dedicated nginx vhost `sales.owlsolutions.net`;
 * no edits to other nginx sites, other `.env` files, or other databases;
 * nginx `reload` after `nginx -t`, not a casual `restart`.
+
+## Testing isolation
+
+PHPUnit must never be able to open production `sales`.
+
+* database name: `sales_testing`
+* MySQL user: `sales_testing` (privileges only on `sales_testing.*`)
+* credentials: local `.env.testing` (gitignored); `.env.testing.example` has no password
+* `App\Support\TestingDatabaseGuard` hard-fails if `APP_ENV` is not `testing` or `DB_DATABASE` is `sales`
+* bootstrap: `tests/bootstrap.php` loads `.env.testing` and forces the testing database/user before Laravel boots
+
+See DEC-021 and DEC-022.
 
 ## What not to do yet
 
@@ -135,5 +147,4 @@ Constraints (accepted operationally during deploy):
 * Queue driver for production audio jobs.
 * Audio object storage.
 * Whether kit AI settings screens will wrap the product’s LLM/STT keys or a separate config will be used.
-* Duration limits (application max size is 200 MB; nginx vhost may still cap lower — see STATUS.md).
 * Idempotency and retry policy for provider calls.

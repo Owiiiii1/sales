@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Support\TestingDatabaseGuard;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -22,6 +23,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        if ($this->app->runningUnitTests()) {
+            TestingDatabaseGuard::enforceFromApplication($this->app);
+        }
+
         RateLimiter::for('public-analyze', function (Request $request) {
             return Limit::perMinute((int) config('sales-analyzer.public_upload_per_minute', 10))
                 ->by($request->ip());

@@ -300,10 +300,52 @@ Status values: `Accepted` | `Open` | `Superseded` | `Rejected`.
 
 ---
 
+## DEC-021
+
+**Title:** Testing DB uses isolated MySQL credentials  
+**Status:** Accepted  
+**Date:** 2026-09-09
+
+**Decision:** PHPUnit uses MySQL database `sales_testing` and MySQL user `sales_testing`. That user has privileges only on `sales_testing.*`. The production user `sales` is unchanged.
+
+**Reason:** The production user also had grants on `sales_testing`. A test process using that user could still open `sales` if `DB_DATABASE` was wrong. A dedicated user removes that capability.
+
+**Consequences:** `.env.testing` holds the testing password and is gitignored. `.env.testing.example` is committed without a password. Tests fail closed if `.env.testing` is missing.
+
+---
+
+## DEC-022
+
+**Title:** Tests hard-fail on production database  
+**Status:** Accepted  
+**Date:** 2026-09-09
+
+**Decision:** If Laravel tests see `DB_DATABASE=sales`, or `APP_ENV` is not `testing`, or the DB username is the production `sales` user, the suite aborts with an exception / non-zero exit before `RefreshDatabase`.
+
+**Reason:** Phase 2.1 wiped production `sales` when the shell had `APP_ENV=production`. Environment overrides are not enough.
+
+**Consequences:** Guard lives in `App\Support\TestingDatabaseGuard`, `tests/bootstrap.php`, `tests/TestCase`, and `AppServiceProvider` during `runningUnitTests()`. There is no warning-only path.
+
+---
+
+## DEC-023
+
+**Title:** Upload limits aligned to 200 MB  
+**Status:** Accepted  
+**Date:** 2026-09-09
+
+**Decision:** For `sales.owlsolutions.net` only: application max 200 MB, PHP-FPM `upload_max_filesize=200M` / `post_max_size=210M`, nginx `client_max_body_size 210M`.
+
+**Reason:** nginx previously capped uploads at 64M while the product advertised 200 MB.
+
+**Consequences:** Other vhosts keep their own limits. Global `nginx.conf` is unchanged.
+
+---
+
 ## Template for new entries
 
 ```
-## DEC-021
+## DEC-024
 
 **Title:**  
 **Status:** Open | Accepted  

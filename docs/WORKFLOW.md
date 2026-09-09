@@ -60,6 +60,17 @@ Do not change other vhosts, other databases, global PHP/Node/Composer/MySQL vers
 
 After nginx edits: `sudo nginx -t`, then `sudo systemctl reload nginx` (not `restart` unless required).
 
+## Tests vs production database
+
+PHPUnit on this host:
+
+* database: `sales_testing`
+* MySQL user: `sales_testing` (no privileges on `sales`)
+* credentials: `.env.testing` (never commit; copy from `.env.testing.example`)
+* hard guard: abort if `DB_DATABASE=sales` (DEC-022)
+
+Do not run tests against production `sales`. Do not put testing or production DB passwords in Git, `REPORT.md`, or `docs/`.
+
 ## Documentation rules
 
 * Use `TBD`, `Open question`, `Planned` when something is not decided.
