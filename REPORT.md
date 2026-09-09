@@ -153,24 +153,24 @@ Command:
 git diff --name-status 5b555cf6d69dcd9f9b2b6d31ff4efc039d333f73..HEAD
 ```
 
-Result after the implementation commit (later REPORT-only commits only rewrite this file):
+Result after implementation commit `3baedde9f61caea6a3520f39d5b1033cc90c89ab` (later REPORT-only commits only rewrite this file):
 
 ```
 M	.env.example
 M	README.md
 M	REPORT.md
+A	app/Http/Controllers/PublicAnalyzerController.php
+A	app/Http/Requests/PublicAnalyzeRequest.php
 M	app/Http/Requests/StoreCallRequest.php
 M	app/Models/Call.php
 M	app/Providers/AppServiceProvider.php
 M	app/Services/Calls/CallAudioStorage.php
 M	app/Services/Calls/CallUploadService.php
-A	app/Http/Controllers/PublicAnalyzerController.php
-A	app/Http/Requests/PublicAnalyzeRequest.php
 A	app/Support/CallAudioRules.php
 M	bootstrap/app.php
 M	config/sales-analyzer.php
-A	database/migrations/2026_09_09_150000_make_calls_company_nullable_and_add_public_token.php
 M	database/factories/CallFactory.php
+A	database/migrations/2026_09_09_150000_make_calls_company_nullable_and_add_public_token.php
 M	docs/ARCHITECTURE.md
 M	docs/DATA_MODEL.md
 M	docs/DECISIONS.md
@@ -180,8 +180,8 @@ M	docs/ROADMAP.md
 M	docs/STATUS.md
 M	phpunit.xml
 A	resources/js/Components/Public/AnalysisReport.jsx
-A	resources/js/Layouts/PublicLayout.jsx
 M	resources/js/Layouts/AdminLayout.jsx
+A	resources/js/Layouts/PublicLayout.jsx
 M	resources/js/Pages/Auth/Login.jsx
 A	resources/js/Pages/Public/Home.jsx
 M	routes/owl-admin-auth.php
@@ -201,7 +201,8 @@ Nothing omitted. `.env` is not in the list. `public/build` is gitignored. The SQ
 
 * branch: `main`
 * remote: `https://github.com/Owiiiii1/sales.git`
-* implementation commit: *(recorded after commit)*
+* implementation commit: `3baedde9f61caea6a3520f39d5b1033cc90c89ab`
+* REPORT SHA/files commit: *(this commit)*
 * push result: *(recorded after push)*
 
 ## Problems / Warnings
