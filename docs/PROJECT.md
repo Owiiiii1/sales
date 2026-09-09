@@ -59,9 +59,9 @@ Basic first-version flow:
 
 ## What this repository is today
 
-This repository currently hosts a **deployed Laravel 13 application** with **OwlSolutions Custom Admin Kit v0.5.0** plus Sales Analyzer admin foundation (Companies, Employees, Calls) and **private audio upload**.
+This repository currently hosts a **deployed Laravel 13 application** with **OwlSolutions Custom Admin Kit v0.5.0**, a **public analyzer homepage** at `/`, and an admin at `/login` (Companies, Employees, Calls, private audio).
 
-Transcription, AI scoring, and public upload are **not** built yet.
+Transcription and AI scoring are **not** built yet. Public upload stores audio privately and waits for the analysis engine.
 
 See:
 

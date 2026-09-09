@@ -71,6 +71,11 @@ export default function Login({ status, canResetPassword }) {
     return (
         <AuthLayout>
             <Head title={t.title} />
+            <div className="mb-6">
+                <Link href={route('home')} className="text-sm font-medium text-indigo-700 hover:text-indigo-600">
+                    Back to Sales Analyzer
+                </Link>
+            </div>
             <div className="absolute right-6 top-6 sm:right-10 sm:top-10">
                 <label htmlFor="language" className="sr-only">Language</label>
                 <div className="relative">

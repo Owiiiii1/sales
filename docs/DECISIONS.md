@@ -244,10 +244,66 @@ Status values: `Accepted` | `Open` | `Superseded` | `Rejected`.
 
 ---
 
+## DEC-017
+
+**Title:** Root domain is public product  
+**Status:** Accepted  
+**Date:** 2026-09-09
+
+**Decision:** `https://sales.owlsolutions.net/` is the public Sales Analyzer homepage and does not require authentication. Admin login is `/login`. After login, admins land on `/dashboard`.
+
+**Reason:** The primary user journey is upload-and-analyze, not the admin kit.
+
+**Consequences:** Guests hitting protected admin routes redirect to `/login`, not `/`. Authenticated users hitting `/login` go to `/dashboard`.
+
+---
+
+## DEC-018
+
+**Title:** Public Calls may have no Company  
+**Status:** Accepted  
+**Date:** 2026-09-09
+
+**Decision:** `calls.company_id` is nullable. Anonymous/public uploads store `company_id = null`, `employee_id = null`, `uploaded_by = null`. Admin uploads still require a Company.
+
+**Reason:** Public users are not tenants. Inventing a dummy “Public” company would pollute the admin company list.
+
+**Consequences:** Public audio is stored under `public/{year}/{month}/` on the private disk. Admin UI still requires company on create.
+
+---
+
+## DEC-019
+
+**Title:** Public Calls use opaque token  
+**Status:** Accepted  
+**Date:** 2026-09-09
+
+**Decision:** Anonymous status and report access uses a unique, server-generated UUID `public_token`, not the database id.
+
+**Reason:** Sequential `/calls/1` would let anyone enumerate recordings.
+
+**Consequences:** Admin routes keep numeric ids. Public routes are `/analysis/{public_token}` and `/analysis/{public_token}/status`.
+
+---
+
+## DEC-020
+
+**Title:** Public upload reuses private audio storage  
+**Status:** Accepted  
+**Date:** 2026-09-09
+
+**Decision:** Public `POST /analyze` uses the same private `calls` disk, validation, and cleanup as admin upload. There is no public audio stream or download.
+
+**Reason:** Making the file fetchable by token would leak recordings. Status/report can be public; the bytes stay private until a later product decision.
+
+**Consequences:** Phase 2 admin `calls.audio` / `calls.download` remain auth-only. CAPTCHA is a possible future control; rate limits are the current public-upload throttle.
+
+---
+
 ## Template for new entries
 
 ```
-## DEC-017
+## DEC-021
 
 **Title:**  
 **Status:** Open | Accepted  

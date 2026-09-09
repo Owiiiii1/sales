@@ -47,4 +47,8 @@ return [
         'application/ogg',
     ],
 
+    'public_upload_per_minute' => (int) env('SALES_PUBLIC_UPLOAD_PER_MINUTE', 10),
+
+    'public_status_per_minute' => (int) env('SALES_PUBLIC_STATUS_PER_MINUTE', 60),
+
 ];

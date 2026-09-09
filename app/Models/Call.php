@@ -6,6 +6,7 @@ use Database\Factories\CallFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Str;
 
 class Call extends Model
 {
@@ -20,10 +21,15 @@ class Call extends Model
         'failed',
     ];
 
+    protected $hidden = [
+        'storage_path',
+    ];
+
     protected $fillable = [
         'company_id',
         'employee_id',
         'source',
+        'public_token',
         'external_id',
         'original_filename',
         'storage_path',
@@ -50,6 +56,15 @@ class Call extends Model
             'file_size' => 'integer',
             'duration_seconds' => 'integer',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (Call $call): void {
+            if (! filled($call->public_token)) {
+                $call->public_token = (string) Str::uuid();
+            }
+        });
     }
 
     public function company(): BelongsTo

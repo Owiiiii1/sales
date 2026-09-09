@@ -20,18 +20,19 @@ class CallUploadService
      * Store the audio first, then persist the Call. If the database write
      * fails, the stored file is deleted so it cannot remain orphaned.
      *
-     * @param  array{company_id:int, employee_id?:int|null, recorded_at?:string|null, source?:string}  $payload
+     * @param  array{company_id?:int|null, employee_id?:int|null, recorded_at?:string|null, source?:string}  $payload
      */
-    public function upload(User $user, array $payload, UploadedFile $file): Call
+    public function upload(?User $user, array $payload, UploadedFile $file): Call
     {
-        $path = $this->storage->store((int) $payload['company_id'], $file);
+        $companyId = isset($payload['company_id']) ? (int) $payload['company_id'] : null;
+        $path = $this->storage->store($companyId, $file);
 
         try {
             $absolutePath = $this->storage->absolutePath($path);
             $mimeType = $file->getMimeType() ?: $file->getClientMimeType();
 
             $call = Call::query()->create([
-                'company_id' => $payload['company_id'],
+                'company_id' => $companyId,
                 'employee_id' => $payload['employee_id'] ?? null,
                 'source' => $payload['source'] ?? 'manual',
                 'original_filename' => $file->getClientOriginalName(),
@@ -41,7 +42,7 @@ class CallUploadService
                 'duration_seconds' => $this->metadata->durationSeconds($absolutePath, $mimeType),
                 'status' => 'uploaded',
                 'recorded_at' => $payload['recorded_at'] ?? null,
-                'uploaded_by' => $user->id,
+                'uploaded_by' => $user?->id,
             ]);
 
             $this->pipeline->dispatch($call);

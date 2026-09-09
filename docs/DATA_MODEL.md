@@ -112,12 +112,13 @@ Relations: `belongsTo` company, `hasMany` calls.
 
 An uploaded or imported conversation.
 
-**Implemented table `calls`:** (no Phase 2 schema change; Phase 1 columns were enough)
+**Implemented table `calls`:**
 
 * id
-* company_id → companies (restrict)
+* public_token unique UUID (DEC-019) — public status/report identifier
+* company_id → companies nullable (DEC-018); **required** for admin uploads, **null** for public uploads
 * employee_id → employees nullable (restrict)
-* source string default `manual`
+* source string (`manual` for admin, `public` for anonymous upload)
 * external_id nullable
 * original_filename — client name only; not used as the physical filename
 * storage_path — relative path on the private `calls` disk
@@ -125,13 +126,13 @@ An uploaded or imported conversation.
 * duration_seconds nullable (ffprobe is not installed; WAV headers may be parsed)
 * status string (DEC-011 / DEC-015): after a successful file upload the status is `uploaded`
 * recorded_at nullable
-* uploaded_by → users nullable (`nullOnDelete`)
+* uploaded_by → users nullable (`nullOnDelete`); null for public uploads
 * processing_started_at, processing_completed_at, error_message nullable
 * timestamps
 
-Physical files live on disk `calls` (`storage/app/private/calls`), never under `public/`. Authenticated stream/download routes serve bytes. Deleting a Call deletes its file after the DB row is removed (DEC-016).
+Physical files live on disk `calls` (`storage/app/private/calls`), never under `public/`. Admin stream/download remain authenticated. There is **no** public audio URL (DEC-020). Deleting a Call deletes its file after the DB row is removed (DEC-016).
 
-A call’s employee must belong to the same company (backend validation). The frontend never receives `storage_path`.
+A call’s employee must belong to the selected company when both are present. Public JSON never includes `storage_path` or internal ids.
 
 ## Transcript
 

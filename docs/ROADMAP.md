@@ -41,7 +41,19 @@ No Sales Analyzer product features in this phase.
 * status after upload: `uploaded` (no STT/AI)
 * file deleted with the Call
 
-Remaining later: public upload flow, object storage, processing UI beyond stubs.
+Remaining later: object storage, processing UI beyond stubs, public analysis engine.
+
+## Phase 2.1 — Public Analyzer Shell
+
+**Status: COMPLETED**
+
+* `/` is the public analyzer homepage (no auth)
+* `/login` is admin login; guests on admin routes redirect to `/login`
+* public `POST /analyze` reuses private audio storage
+* `calls.company_id` nullable for public uploads
+* opaque `public_token` for anonymous status/report
+* polling UI prepared; no fake AI results
+* no public audio streaming
 
 ## Phase 3 — Transcription
 
@@ -88,14 +100,13 @@ MVP may use a simpler context form before this phase.
 
 ## Phase 7 — User Product
 
-**Status: Planned**
+**Status: Planned** (public upload shell shipped in Phase 2.1)
 
-* public upload flow;
 * accounts;
 * personal cabinet;
 * history.
 
-**The order between public upload and accounts may change.** A very small public Upload Call might ship before full accounts (see [PRODUCT.md](PRODUCT.md) Phase 1).
+The anonymous upload/status/report shell is live. Remaining work is persistence of a user’s own analyses behind an account.
 
 ## Phase 8 — Management Analytics
 

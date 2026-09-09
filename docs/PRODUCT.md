@@ -2,7 +2,7 @@
 
 This document describes the product we intend to build. It is not a description of the current UI.
 
-The live admin now has Companies, Employees, and **private Call audio upload** (list, upload, detail, stream, download). Transcription, scoring, and public upload are not built yet. See [STATUS.md](STATUS.md).
+The live site has a **public homepage** at `/` for uploading a sales call, plus an admin at `/login`. Transcription and scoring are not built yet. See [STATUS.md](STATUS.md).
 
 ## Problem
 
@@ -70,7 +70,7 @@ Which of those is **TBD**.
 
 A person can upload one call, optionally give company/product context, and receive a structured sales analysis they can act on.
 
-Exact public URL, branding, and whether analysis is behind a gate (email, waitlist, payment) are **Open questions**.
+Exact public URL, branding, and whether analysis is behind a gate (email, waitlist, payment) are **Open questions**. The live public homepage is `https://sales.owlsolutions.net/` (DEC-017); analysis itself is not connected yet.
 
 ## Phase 2
 

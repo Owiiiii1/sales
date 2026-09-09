@@ -27,12 +27,12 @@ class CallsTest extends TestCase
     {
         $call = Call::factory()->create();
 
-        $this->get('/calls')->assertRedirect('/');
-        $this->get('/calls/create')->assertRedirect('/');
-        $this->get("/calls/{$call->id}")->assertRedirect('/');
-        $this->get("/calls/{$call->id}/audio")->assertRedirect('/');
-        $this->get("/calls/{$call->id}/download")->assertRedirect('/');
-        $this->post('/calls', [])->assertRedirect('/');
+        $this->get('/calls')->assertRedirect('/login');
+        $this->get('/calls/create')->assertRedirect('/login');
+        $this->get("/calls/{$call->id}")->assertRedirect('/login');
+        $this->get("/calls/{$call->id}/audio")->assertRedirect('/login');
+        $this->get("/calls/{$call->id}/download")->assertRedirect('/login');
+        $this->post('/calls', [])->assertRedirect('/login');
     }
 
     public function test_authenticated_admin_can_access_calls_list(): void
@@ -65,7 +65,7 @@ class CallsTest extends TestCase
         $this->post('/calls', [
             'company_id' => $company->id,
             'audio' => $this->fakeAudio(),
-        ])->assertRedirect('/');
+        ])->assertRedirect('/login');
 
         $this->assertDatabaseCount('calls', 0);
     }

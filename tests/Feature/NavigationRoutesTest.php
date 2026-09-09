@@ -13,12 +13,23 @@ class NavigationRoutesTest extends TestCase
 
     public function test_guest_is_redirected_from_protected_routes(): void
     {
-        $this->get('/dashboard')->assertRedirect('/');
-        $this->get('/companies')->assertRedirect('/');
-        $this->get('/employees')->assertRedirect('/');
-        $this->get('/calls')->assertRedirect('/');
-        $this->get('/calls/create')->assertRedirect('/');
-        $this->get('/settings')->assertRedirect('/');
+        $this->get('/dashboard')->assertRedirect('/login');
+        $this->get('/companies')->assertRedirect('/login');
+        $this->get('/employees')->assertRedirect('/login');
+        $this->get('/calls')->assertRedirect('/login');
+        $this->get('/calls/create')->assertRedirect('/login');
+        $this->get('/settings')->assertRedirect('/login');
+    }
+
+    public function test_public_home_and_login_are_available_to_guests(): void
+    {
+        $this->get('/')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->component('Public/Home', false));
+
+        $this->get('/login')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->component('Auth/Login', false));
     }
 
     public function test_authenticated_user_can_open_product_routes(): void
@@ -37,6 +48,7 @@ class NavigationRoutesTest extends TestCase
         $this->actingAs($user)->get('/calls')->assertOk();
         $this->actingAs($user)->get('/calls/create')->assertOk();
         $this->actingAs($user)->get('/settings')->assertOk();
+        $this->actingAs($user)->get('/login')->assertRedirect('/dashboard');
     }
 
     public function test_legacy_kit_routes_remain_available_but_are_not_required_in_nav(): void

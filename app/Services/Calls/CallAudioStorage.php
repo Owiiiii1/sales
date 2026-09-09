@@ -14,7 +14,7 @@ class CallAudioStorage
         return (string) config('sales-analyzer.storage_disk', 'calls');
     }
 
-    public function store(int $companyId, UploadedFile $file): string
+    public function store(?int $companyId, UploadedFile $file): string
     {
         $extension = strtolower($file->getClientOriginalExtension());
         $allowed = config('sales-analyzer.allowed_audio_extensions', []);
@@ -23,7 +23,8 @@ class CallAudioStorage
             $extension = 'bin';
         }
 
-        $directory = $companyId.'/'.now()->format('Y').'/'.now()->format('m');
+        $prefix = $companyId !== null ? (string) $companyId : 'public';
+        $directory = $prefix.'/'.now()->format('Y').'/'.now()->format('m');
         $filename = Str::uuid()->toString().'.'.$extension;
 
         $path = $file->storeAs($directory, $filename, [
@@ -35,7 +36,24 @@ class CallAudioStorage
             throw new RuntimeException('Call audio could not be stored.');
         }
 
+        $this->relaxDirectoryPermissions($path);
+
         return $path;
+    }
+
+    /**
+     * PHP-FPM often creates directories with umask 0077. Relax them so the
+     * deploy user can manage files on the private disk without 777.
+     */
+    private function relaxDirectoryPermissions(string $path): void
+    {
+        $root = rtrim($this->absolutePath(''), DIRECTORY_SEPARATOR);
+        $directory = dirname($this->absolutePath($path));
+
+        while ($directory !== $root && str_starts_with($directory, $root.DIRECTORY_SEPARATOR)) {
+            @chmod($directory, 0775);
+            $directory = dirname($directory);
+        }
     }
 
     public function exists(?string $path): bool

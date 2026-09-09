@@ -23,6 +23,7 @@ class CallFactory extends Factory
             'company_id' => Company::factory(),
             'employee_id' => null,
             'source' => 'manual',
+            'public_token' => (string) fake()->unique()->uuid(),
             'external_id' => null,
             'original_filename' => fake()->optional()->lexify('call-????.mp3'),
             'storage_path' => null,

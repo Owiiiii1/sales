@@ -3,8 +3,8 @@
 namespace App\Http\Requests;
 
 use App\Http\Requests\Concerns\ValidatesEmployeeCompany;
+use App\Support\CallAudioRules;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rules\File;
 use Illuminate\Validation\Validator;
 
 class StoreCallRequest extends FormRequest
@@ -34,20 +34,12 @@ class StoreCallRequest extends FormRequest
      */
     public function rules(): array
     {
-        $maxKb = (int) config('sales-analyzer.max_audio_size_kb');
-        $extensions = config('sales-analyzer.allowed_audio_extensions');
-        $mimes = config('sales-analyzer.allowed_audio_mime_types');
-
         return [
             'company_id' => ['required', 'integer', 'exists:companies,id'],
             'employee_id' => ['nullable', 'integer', 'exists:employees,id'],
             'recorded_at' => ['nullable', 'date'],
             'source' => ['nullable', 'string', 'max:50'],
-            'audio' => [
-                'required',
-                File::types($extensions)->max($maxKb),
-                'mimetypes:'.implode(',', $mimes),
-            ],
+            'audio' => CallAudioRules::file(),
         ];
     }
 
@@ -56,39 +48,17 @@ class StoreCallRequest extends FormRequest
      */
     public function messages(): array
     {
-        $maxMb = (int) config('sales-analyzer.max_audio_size_mb');
-
-        return [
+        return array_merge(CallAudioRules::messages(), [
             'company_id.required' => 'Please select a company.',
-            'audio.required' => 'Please choose an audio file.',
-            'audio.file' => 'Please choose an audio file.',
-            'audio.max' => "The audio file is too large. Maximum size is {$maxMb} MB.",
-            'audio.mimes' => 'This audio format is not supported.',
-            'audio.mimetypes' => 'This audio format is not supported.',
-        ];
+        ]);
     }
 
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator): void {
             $this->validateEmployeeBelongsToCompany($validator);
-            $this->validateAudioExtension($validator);
+            CallAudioRules::validateExtension($validator, $this->file('audio'));
         });
-    }
-
-    private function validateAudioExtension(Validator $validator): void
-    {
-        $file = $this->file('audio');
-        if ($file === null) {
-            return;
-        }
-
-        $extension = strtolower($file->getClientOriginalExtension());
-        $allowed = config('sales-analyzer.allowed_audio_extensions', []);
-
-        if ($extension === '' || ! in_array($extension, $allowed, true)) {
-            $validator->errors()->add('audio', 'This audio format is not supported.');
-        }
     }
 
     /**

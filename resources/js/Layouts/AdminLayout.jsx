@@ -98,6 +98,7 @@ export default function AdminLayout({ title, children }) {
             adminPanel: 'Admin Panel',
             profile: 'Profile',
             language: 'Language',
+            backToPublic: 'Back to Sales Analyzer',
         },
         ru: {
             dashboard: 'Dashboard',
@@ -111,6 +112,7 @@ export default function AdminLayout({ title, children }) {
             adminPanel: 'Панель администратора',
             profile: 'Профиль',
             language: 'Язык',
+            backToPublic: 'Back to Sales Analyzer',
         },
         uk: {
             dashboard: 'Dashboard',
@@ -124,6 +126,7 @@ export default function AdminLayout({ title, children }) {
             adminPanel: 'Панель адміністратора',
             profile: 'Профіль',
             language: 'Мова',
+            backToPublic: 'Back to Sales Analyzer',
         },
     };
 
@@ -235,6 +238,12 @@ export default function AdminLayout({ title, children }) {
 
     const poweredBy = (
         <div className="mt-auto border-t border-white/10 pt-4">
+            <Link
+                href={route('home')}
+                className="mb-3 block px-3 text-sm font-medium text-slate-300 transition hover:text-white"
+            >
+                {t.backToPublic}
+            </Link>
             <p className="px-3 text-xs text-slate-500">
                 Powered by{' '}
                 <a
@@ -323,6 +332,12 @@ export default function AdminLayout({ title, children }) {
                                 <div className="text-sm font-semibold uppercase tracking-wide text-slate-700">
                                     {t.adminPanel}
                                 </div>
+                                <Link
+                                    href={route('home')}
+                                    className="text-sm font-medium text-indigo-700 hover:text-indigo-600"
+                                >
+                                    {t.backToPublic}
+                                </Link>
                             </div>
 
                             <div className="flex items-center gap-3">

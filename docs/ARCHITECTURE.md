@@ -27,19 +27,20 @@ See [STATUS.md](STATUS.md) for operational detail.
 
 ## Current application shape
 
-Laravel 13 + Custom Admin Kit, with a **Sales Analyzer admin foundation** on top:
+Laravel 13 + Custom Admin Kit, with a public product surface and an admin foundation:
 
-* guest `/` → admin login;
-* `/login` → redirect to `/`;
-* authenticated `/` → dashboard;
+* guest `/` → public Sales Analyzer homepage (upload + future report);
+* `/login` → admin login;
+* authenticated `/dashboard` → admin;
 * product admin routes: `/companies`, `/employees`, `/calls`;
 * kit CRM routes still exist but are not in primary navigation.
 
-Domain models **Company**, **Employee**, and **Call** exist. Administrators can upload call audio to a **private** Laravel disk (`calls` → `storage/app/private/calls`). Playback and download go through authenticated routes. There is still **no** transcription or LLM pipeline.
+Domain models **Company**, **Employee**, and **Call** exist. Audio is stored on a **private** Laravel disk (`calls` → `storage/app/private/calls`). Public uploads reuse that disk and are **not** streamed to anonymous users. There is still **no** transcription or LLM pipeline.
 
 Audio path pattern on the `calls` disk:
 
-`{company_id}/{year}/{month}/{uuid}.{ext}`
+* admin: `{company_id}/{year}/{month}/{uuid}.{ext}`
+* public: `public/{year}/{month}/{uuid}.{ext}`
 
 Original filename is metadata only (DEC-014). Successful upload sets status `uploaded`, not `completed` (DEC-015). `CallProcessingPipeline` exists as a no-op hook; it is not dispatched into processing in this phase.
 
@@ -98,15 +99,17 @@ Analysis is expected to be **several structured LLM calls**, not a mandatory mul
 | Data | Current | Planned |
 |---|---|---|
 | Relational records | MySQL `sales` | Keep MySQL for users, companies, calls, scores |
-| Audio files | Not implemented | Local disk vs S3-compatible object storage. **TBD** |
+| Audio files | Private local disk `calls` (`storage/app/private/calls`) | Object storage (S3-compatible) **TBD** |
 | Transcripts | Not implemented | Table vs JSON. **TBD** — [DATA_MODEL.md](DATA_MODEL.md) |
 | Company knowledge | Not implemented | Documents + optional RAG. **TBD** |
 
 ## Frontend architecture
 
-Current: Inertia React pages from the admin kit, Vite build, Ziggy routes.
+Current: Inertia React + Vite + Ziggy.
 
-Public Upload Call UI is **Planned**. Whether it lives in the same Inertia app or a separate public layout is **TBD**. Preference: same Laravel/Inertia app unless there is a reason to split.
+* Public product UI uses `PublicLayout` and `Pages/Public/Home` (upload + report shell). It is not the admin panel.
+* Admin UI remains Custom Admin Kit layouts (`AdminLayout`, `/dashboard`, CRUD).
+* Same Laravel/Inertia app; no separate frontend.
 
 ## Isolation on the server
 
@@ -132,5 +135,5 @@ Constraints (accepted operationally during deploy):
 * Queue driver for production audio jobs.
 * Audio object storage.
 * Whether kit AI settings screens will wrap the product’s LLM/STT keys or a separate config will be used.
-* Max upload size / duration limits.
+* Duration limits (application max size is 200 MB; nginx vhost may still cap lower — see STATUS.md).
 * Idempotency and retry policy for provider calls.

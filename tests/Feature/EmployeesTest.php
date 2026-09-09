@@ -15,7 +15,7 @@ class EmployeesTest extends TestCase
 
     public function test_guest_is_redirected_from_employees(): void
     {
-        $this->get('/employees')->assertRedirect('/');
+        $this->get('/employees')->assertRedirect('/login');
     }
 
     public function test_authenticated_admin_can_access_employees_list(): void
