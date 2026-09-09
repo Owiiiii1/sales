@@ -220,12 +220,68 @@ Accepted:
 
 ## Changed Files
 
-Full `git diff --stat` vs baseline is recorded after commit in the Git section.
+`git diff --stat d9f143be418a64f96eb32be240121d8463fbb8fc..83023a7b8843e16aabff8572b4d2c4655db89d46`
+
+```
+ README.md                                          |   4 +-
+ REPORT.md                                          | 395 +++++++----------
+ app/Exceptions/Analysis/AnalysisException.php      |  13 +
+ .../Analysis/PermanentAnalysisException.php        |  19 +
+ .../Analysis/TransientAnalysisException.php        |  11 +
+ app/Http/Controllers/CallsController.php           |  30 +-
+ app/Http/Controllers/PublicAnalyzerController.php  |  14 +-
+ app/Jobs/AnalyzeCall.php                           | 125 ++++++
+ app/Jobs/TranscribeCall.php                        |   4 +-
+ app/Models/Call.php                                |   7 +
+ app/Models/SalesAnalysis.php                       |  45 ++
+ app/Models/Transcript.php                          |   4 +
+ app/Models/TranscriptSegment.php                   |   4 +
+ app/Providers/AppServiceProvider.php               |   3 +
+ app/Services/Ai/ActiveAiProvider.php               |  27 ++
+ app/Services/Ai/AiProviderManager.php              |  15 +
+ app/Services/Ai/Clients/AnthropicClient.php        |  48 +++
+ app/Services/Ai/Clients/GeminiClient.php           |  45 ++
+ app/Services/Ai/Clients/OpenAiClient.php           |  46 ++
+ app/Services/Ai/Contracts/AiProviderClient.php     |  14 +
+ app/Services/Ai/JsonPayloadParser.php              |  28 ++
+ app/Services/Ai/ProviderHttp.php                   |  61 +++
+ .../Analysis/ConfiguredSalesAnalysisProvider.php   |  58 +++
+ app/Services/Analysis/DTO/AnalysisContext.php      |  11 +
+ app/Services/Analysis/DTO/SalesAnalysisResult.php  |  18 +
+ .../Analysis/SalesAnalysisPromptBuilder.php        |  83 ++++
+ app/Services/Analysis/SalesAnalysisProvider.php    |  14 +
+ .../Analysis/SalesAnalysisResultValidator.php      | 253 +++++++++++
+ app/Services/Analysis/SalesAnalysisSchema.php      | 149 +++++++
+ app/Services/Analysis/SalesAnalysisWriter.php      |  33 ++
+ app/Support/SalesAnalysisPresenter.php             | 190 +++++++++
+ app/Support/TranscriptPresenter.php                |   8 +-
+ database/factories/SalesAnalysisFactory.php        | 103 +++++
+ database/factories/TranscriptFactory.php           |  40 ++
+ database/factories/TranscriptSegmentFactory.php    |  31 ++
+ ...26_09_09_170000_create_sales_analyses_table.php |  31 ++
+ docs/AI_ANALYSIS.md                                |  13 +-
+ docs/ARCHITECTURE.md                               |  23 +-
+ docs/DATA_MODEL.md                                 |  31 +-
+ docs/DECISIONS.md                                  |  88 +++-
+ docs/PRODUCT.md                                    |   4 +-
+ docs/ROADMAP.md                                    |  14 +-
+ docs/STATUS.md                                     |  43 +-
+ resources/js/Components/Public/AnalysisReport.jsx  | 193 +++++++--
+ resources/js/Pages/Calls/Index.jsx                 |   6 +-
+ resources/js/Pages/Calls/Show.jsx                  |  58 ++-
+ resources/js/Pages/Public/Home.jsx                 |  18 +-
+ routes/owl-admin-pages.php                         |   1 +
+ tests/Feature/SalesAnalysisTest.php                | 466 +++++++++++++++++++++
+ tests/Unit/SalesAnalysisResultValidatorTest.php    |  62 +++
+ 50 files changed, 2638 insertions(+), 366 deletions(-)
+```
 
 ## Git
 
 * branch: `main`
-* commit SHA: pending (recorded after commit)
+* remote: `https://github.com/Owiiiii1/sales.git`
+* implementation commit: `83023a7b8843e16aabff8572b4d2c4655db89d46`
+* message: `Add generic structured AI sales analysis after transcription.`
 * push: pending
 
 ## Problems / Warnings
