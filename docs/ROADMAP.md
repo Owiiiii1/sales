@@ -20,27 +20,28 @@ No Sales Analyzer product features in this phase.
 
 ## Phase 1 — Adapt Admin Foundation
 
-**Status: Planned (next)**
+**Status: COMPLETED**
 
-* study standard kit modules;
-* decide what to reuse (auth, layout, settings, …);
-* remove or hide CRM entities that do not belong (Customers, Orders, Services, Staff, Calendar — **unless** a later decision maps them);
-* adapt navigation to Sales Analyzer;
-* prepare information architecture;
-* **do not** connect AI or transcription yet.
+* navigation: Dashboard, Companies, Employees, Calls, Settings, Statistics/Logs
+* kit CRM items hidden from primary nav (Customers, Orders, Services, Staff, Calendar)
+* Telegram tab hidden from Settings navigation; route still works
+* domain tables `companies`, `employees`, `calls`
+* admin CRUD without audio upload or AI
+* Dashboard cards from real DB counts
+* Feature tests on isolated `sales_testing` MySQL database
 
 ## Phase 2 — Core Domain
 
 **Status: Planned**
 
-* Companies
-* Employees
-* Calls
-* upload
-* statuses
-* file storage
+Phase 1 already created Company / Employee / Call records and admin CRUD.
 
-May overlap with a thin MVP upload in Phase 1/7. Exact split **TBD**.
+Remaining core-domain work:
+
+* audio upload
+* file storage
+* richer call statuses / processing timestamps in the UI
+* public or operator upload flow
 
 ## Phase 3 — Transcription
 

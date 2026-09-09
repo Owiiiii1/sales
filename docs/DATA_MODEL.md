@@ -1,22 +1,41 @@
 # Sales Analyzer — Data Model
 
-This document describes the **intended domain model**.
+This document describes the **domain model**.
 
-It is **not** implemented. **Do not create migrations in this phase.**
+Phase 1 implemented `companies`, `employees`, and `calls`. Transcript, Analysis, Scorecard, and knowledge tables are still **Planned**.
+
+**Do not** treat kit CRM tables as Sales Analyzer domain.
 
 ## What exists in the database today
 
-MySQL database `sales` currently has **admin kit + Laravel** tables, including:
+MySQL database `sales` has Laravel + admin kit tables **and** Phase 1 domain tables:
 
 * `users`, `sessions`, `cache`, `jobs`, …
-* `customers`, `orders`, `services`, `staff`, `order_staff`
+* **legacy kit CRM:** `customers`, `orders`, `services`, `staff`, `order_staff` (DEC-012 — retained, hidden from nav)
 * `ai_provider_settings`, `telegram_bot_settings`
+* **Sales Analyzer:** `companies`, `employees`, `calls`
 
-Those CRM tables are **kit starter modules**. They are **not** Sales Analyzer `Company` / `Employee` / `Call`.
+## Implemented domain (Phase 1)
 
-Do **not** delete kit tables in this documentation phase. Whether they are later removed, ignored, or mapped is **Open question** (Phase 1).
+```
+User
+  └── uploaded Calls (nullable uploaded_by)
 
-## Conceptual model (planned)
+Company
+  ├── Employee
+  └── Call
+
+Employee
+  └── Call
+```
+
+Delete rules:
+
+* Company cannot be deleted while it has employees or calls (`restrictOnDelete` + application check).
+* Employee cannot be deleted while it has calls.
+* `uploaded_by` is nullified if the User is deleted.
+
+## Conceptual model (later)
 
 ```
 User
@@ -54,50 +73,63 @@ Do not assume Employee = User.
 
 ## Company
 
-Organization / tenant whose calls are analyzed and whose knowledge/scorecard apply.
+Organization / tenant whose calls are analyzed.
 
-Planned ideas (fields not final):
+**Implemented table `companies`:**
 
-* name
-* owner / billing user **TBD**
-* default scorecard
-* locale **TBD**
+* id
+* name (required)
+* legal_name nullable
+* website nullable
+* industry nullable
+* description nullable
+* country, city, phone, email nullable
+* is_active boolean default true
+* timestamps
 
-MVP may not persist Company as a first-class tenant (context pasted into a form). Phase 2 expects stored companies.
+No slug in Phase 1.
+
+Relations: `hasMany` employees, `hasMany` calls.
 
 ## Employee
 
-A sales manager or other person **whose calls are analyzed**.
+A sales manager or other person **whose calls are analyzed**. Not a User.
 
-Not the same as User.
+**Implemented table `employees`:**
 
-* An employee does **not** necessarily have a login.
-* Link to User is optional. **TBD.**
-* Fields (preliminary): name, role/title, company_id, external ids **TBD**.
+* id
+* company_id → companies.id (restrict on delete)
+* first_name (required)
+* last_name, email, phone, position, external_id nullable
+* is_active boolean default true
+* timestamps
 
-Do not assume kit `staff` is this entity.
+Indexes: company_id (FK), is_active, external_id.
+
+Relations: `belongsTo` company, `hasMany` calls.
 
 ## Call
 
-An uploaded or imported conversation.
+An uploaded or imported conversation. Phase 1 is a **record stub** (no file upload, no processing).
 
-Preliminary fields:
+**Implemented table `calls`:**
 
-* `company_id`
-* `employee_id` (nullable if unknown)
-* `source` (upload, telephony, CRM, …)
-* `original_filename`
-* `storage_path`
-* `mime_type`
-* `duration`
-* `status`
-* `recorded_at`
-* `uploaded_by` (User, nullable for public MVP)
-* processing timestamps (`transcribed_at`, `analyzed_at`, `failed_at`, …)
+* id
+* company_id → companies (restrict)
+* employee_id → employees nullable (restrict)
+* source string default `manual`
+* external_id nullable
+* original_filename, storage_path, mime_type nullable
+* file_size, duration_seconds nullable
+* status string (DEC-011): `pending`, `uploaded`, `processing`, `completed`, `failed`
+* recorded_at nullable
+* uploaded_by → users nullable (`nullOnDelete`)
+* processing_started_at, processing_completed_at, error_message nullable
+* timestamps
 
-Also likely: error message, provider job ids. **TBD.**
+Indexes: company_id, employee_id, uploaded_by (FKs), status, recorded_at, source, external_id.
 
-**No migration now.**
+A call’s employee must belong to the same company (backend validation).
 
 ## Transcript
 
@@ -212,12 +244,11 @@ Versioning of knowledge used in an analysis should be traceable (`company_contex
 | Analysis | Criterion Result | 1:N |
 | Criterion Result | Criterion | Logical link; snapshot recommended |
 
-## What we will not do in this phase
+## What we will not do yet
 
-* no new migrations
-* no Eloquent models for the domain
-* no deletion of kit tables
-* no assuming `staff` = Employee or `customers` = clients on calls
+* no deletion of kit CRM tables (DEC-012)
+* no assuming `staff` = Employee or `customers` = Company
+* no transcript / analysis / scorecard tables in this phase
 
 ## Open questions
 

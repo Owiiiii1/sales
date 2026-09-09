@@ -5,14 +5,15 @@ Factual state of the running project. Update this file when reality changes.
 ## Current phase
 
 * **Phase 0 — Infrastructure:** COMPLETED
-* **Documentation bootstrap:** COMPLETED after this documentation stage
-* **Next planned work:** Phase 1 — Adapt Admin Foundation (see [ROADMAP.md](ROADMAP.md))
+* **Documentation bootstrap:** COMPLETED
+* **Phase 1 — Adapt Admin Foundation:** COMPLETED
+* **Next planned work:** Phase 2 remaining items — audio upload, storage, processing UI (see [ROADMAP.md](ROADMAP.md))
 
 ## Product vs running app
 
-Sales Analyzer as a **product** is specified in `docs/`.
+The live admin is now a **Sales Analyzer foundation**: Companies, Employees, Calls, Dashboard stats.
 
-The **running application** is still the stock Custom Admin Kit. There is no Upload Call flow, no transcription, no analysis reports.
+There is still **no** public Upload Call, transcription, or AI scoring.
 
 ## Infrastructure
 
@@ -26,64 +27,52 @@ The **running application** is still the stock Custom Admin Kit. There is no Upl
 | OS | Ubuntu 24.04.4 LTS |
 | PHP | 8.5.8 (FPM `unix:/run/php/php8.5-fpm.sock`) |
 | Laravel | 13.31.0 |
-| Composer | 2.7.1 |
-| Node / npm | v24.14.0 / 11.9.0 |
-| nginx | 1.24.0 — `/etc/nginx/sites-available/sales.owlsolutions.net` |
-| SSL | Let’s Encrypt for `sales.owlsolutions.net` only (no `www`) |
 | Database | MySQL 8.0.46 — DB `sales`, user `sales`@`localhost` |
+| Test DB | MySQL `sales_testing` (phpunit only; not production data) |
 | Admin kit | `owlsolutions/custom-admin-kit` **v0.5.0** |
-| Nutgram | 4.50.0 (installed; Telegram **not** configured) |
 
-Admin login: guest `GET /` → login. `GET /login` redirects to `/`. Authenticated `/` redirects to dashboard.
+Admin login: guest `GET /` → login. Protected product routes redirect guests to `/`.
 
 ## Current UI
 
-Standard admin kit screens:
+Primary navigation:
 
 * Dashboard
-* Customers
-* Orders
-* Services
-* Staff
-* Calendar
-* Settings (General, Users, AI, App, Telegram)
-* Profile
+* Companies
+* Employees
+* Calls
+* Settings
 * Statistics / Logs
 
-Header includes AI status badge, Bot status badge, language switcher, avatar menu, “Powered by OwlSolutions”.
+Settings tabs in the hub: General, Users, AI, App. Telegram remains available at `/settings?tab=telegram` but is **not** in the tab bar.
 
-AI and Telegram are **not** configured (`AI: not connected`, `Bot: not connected`).
+**Hidden from nav (legacy kit, still routed):** Customers, Orders, Services, Staff, Calendar.
 
-**These CRM modules are stock Custom Admin Kit modules. They do not reflect the final Sales Analyzer architecture.**
+Dashboard cards (live counts): Companies, Active Employees, Total Calls, Calls Completed, Calls Processing, Calls Failed, plus Recent Calls empty state.
 
-## Database (kit)
+## Database
 
-Ran migrations include Laravel users/cache/jobs plus kit:
+Phase 1 tables: `companies`, `employees`, `calls`.
 
-* `ai_provider_settings`
-* `telegram_bot_settings`
-* `customers`, `services`, `staff`, `orders`, `order_staff`
-
-No Sales Analyzer domain migrations.
+Legacy kit tables retained: `customers`, `services`, `staff`, `orders`, `order_staff`.
 
 ## Known issues (non-critical)
 
-From deploy:
-
-* `/owl-admin/health` JSON reports `"preset":"core"` while the installed preset is `admin` (kit health payload). Smoke still passed.
-* Composer 2.7.1 prints PHP 8.5 deprecation notices (`E_STRICT`, `curl_close`). Composer was not upgraded globally.
-* Vite build warns that optional `fontaine` is missing for optimized font fallbacks. Build succeeds.
-* Weak admin credentials were created on purpose for the install stage (`admin@admin.com`). Treat as a known security hygiene item for later.
-* Database engine is MySQL, not MariaDB.
+* `/owl-admin/health` JSON reports `"preset":"core"` while the installed preset is `admin`.
+* Composer 2.7.1 PHP 8.5 deprecation notices.
+* Vite optional `fontaine` warning.
+* Weak install-stage admin credentials (`admin@admin.com`).
+* PHPUnit uses MySQL `sales_testing` because the server has no SQLite PDO driver.
+* Inertia `assertInertia()->component()` file finder defaults to `resources/js/pages` (lowercase); tests pass `shouldExist = false` and still assert the component name.
 
 ## What is explicitly not done
 
-* no product navigation
-* no Call / Company / Employee product modules
-* no STT / LLM integration
+* no STT / LLM / embeddings
 * no public Upload Call
+* no audio storage pipeline
 * no scorecards in DB
+* no deletion of kit CRM modules
 
 ## Next planned work
 
-**Adapt Admin Foundation** (Phase 1): inventory kit modules, decide reuse vs remove, adapt navigation, still without AI/transcription.
+Audio upload and call processing (Phase 2 remainder / Phase 3), still without choosing providers until DEC-006 / DEC-007 close.

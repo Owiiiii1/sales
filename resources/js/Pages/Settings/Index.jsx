@@ -49,9 +49,8 @@ export default function SettingsIndex() {
             { id: 'users', label: t.users },
             { id: 'ai', label: t.ai },
             { id: 'app', label: t.app },
-            { id: 'telegram', label: t.telegram },
         ],
-        [t.ai, t.app, t.general, t.telegram, t.users],
+        [t.ai, t.app, t.general, t.users],
     );
 
     const switchTab = (nextTab) => {

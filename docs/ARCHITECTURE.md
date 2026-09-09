@@ -27,14 +27,15 @@ See [STATUS.md](STATUS.md) for operational detail.
 
 ## Current application shape
 
-The app is a standard Laravel 13 project with kit routes:
+Laravel 13 + Custom Admin Kit, with a **Sales Analyzer admin foundation** on top:
 
 * guest `/` → admin login;
 * `/login` → redirect to `/`;
 * authenticated `/` → dashboard;
-* kit CRM and settings routes as published by the admin preset.
+* product admin routes: `/companies`, `/employees`, `/calls`;
+* kit CRM routes still exist but are not in primary navigation.
 
-There is **no** Sales Analyzer domain layer yet (no Call, Company, Employee, Analysis models beyond kit CRM).
+Domain models **Company**, **Employee**, and **Call** exist. There is still **no** transcription, LLM, or file upload pipeline.
 
 ## Target runtime shape (planned)
 

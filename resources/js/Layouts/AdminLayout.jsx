@@ -1,18 +1,16 @@
 import { Link, router, usePage } from '@inertiajs/react';
 import {
     ChevronDown,
-    CalendarDays,
+    Building2,
     ChartColumn,
-    Contact,
     FileText,
     Globe,
     Home,
-    LayoutGrid,
     LogOut,
+    Phone,
     Settings,
     UserCircle2,
     Users,
-    Wrench,
     Menu,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -32,11 +30,9 @@ import {
 
 const primaryNavItems = [
     { route: 'dashboard', icon: Home },
-    { route: 'customers.index', icon: Contact, activePattern: 'customers.*' },
-    { route: 'orders.index', icon: LayoutGrid, activePattern: 'orders.*' },
-    { route: 'calendar.index', icon: CalendarDays },
-    { route: 'staff.index', icon: Users },
-    { route: 'services.index', icon: Wrench, activePattern: 'services.*' },
+    { route: 'companies.index', icon: Building2, activePattern: 'companies.*' },
+    { route: 'employees.index', icon: Users, activePattern: 'employees.*' },
+    { route: 'calls.index', icon: Phone, activePattern: 'calls.*' },
 ];
 
 const languageLabels = {
@@ -46,12 +42,10 @@ const languageLabels = {
 };
 
 function navLabel(routeName, t) {
-    if (routeName === 'dashboard') return t.home;
-    if (routeName === 'customers.index') return t.customers;
-    if (routeName === 'orders.index') return t.orders;
-    if (routeName === 'calendar.index') return t.calendar;
-    if (routeName === 'staff.index') return t.staff;
-    if (routeName === 'services.index') return t.services;
+    if (routeName === 'dashboard') return t.dashboard;
+    if (routeName === 'companies.index') return t.companies;
+    if (routeName === 'employees.index') return t.employees;
+    if (routeName === 'calls.index') return t.calls;
     return routeName;
 }
 
@@ -93,12 +87,10 @@ export default function AdminLayout({ title, children }) {
 
     const uiText = {
         en: {
-            home: 'Home',
-            customers: 'Customers',
-            orders: 'Orders',
-            calendar: 'Calendar',
-            staff: 'Staff',
-            services: 'Services',
+            dashboard: 'Dashboard',
+            companies: 'Companies',
+            employees: 'Employees',
+            calls: 'Calls',
             settings: 'Settings',
             logout: 'Logout',
             statistics: 'Statistics',
@@ -108,12 +100,10 @@ export default function AdminLayout({ title, children }) {
             language: 'Language',
         },
         ru: {
-            home: 'Главная',
-            customers: 'Клиенты',
-            orders: 'Заказы',
-            calendar: 'Календарь',
-            staff: 'Персонал',
-            services: 'Услуги',
+            dashboard: 'Dashboard',
+            companies: 'Companies',
+            employees: 'Employees',
+            calls: 'Calls',
             settings: 'Настройки',
             logout: 'Выход',
             statistics: 'Статистика',
@@ -123,12 +113,10 @@ export default function AdminLayout({ title, children }) {
             language: 'Язык',
         },
         uk: {
-            home: 'Головна',
-            customers: 'Клієнти',
-            orders: 'Замовлення',
-            calendar: 'Календар',
-            staff: 'Персонал',
-            services: 'Послуги',
+            dashboard: 'Dashboard',
+            companies: 'Companies',
+            employees: 'Employees',
+            calls: 'Calls',
             settings: 'Налаштування',
             logout: 'Вийти',
             statistics: 'Статистика',

@@ -2,7 +2,11 @@
 
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\CalendarController;
+use App\Http\Controllers\CallsController;
+use App\Http\Controllers\CompaniesController;
 use App\Http\Controllers\CustomersController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\EmployeesController;
 use App\Http\Controllers\OrdersController;
 use App\Http\Controllers\ServicesController;
 use App\Http\Controllers\StaffController;
@@ -29,9 +33,24 @@ Route::post('/telegram/webhook', TelegramWebhookController::class)
     ->name('telegram.webhook');
 
 Route::middleware(AdminRouteMiddleware::stack())->group(function () {
-    Route::get('/dashboard', function () {
-        return Inertia::render('Dashboard');
-    })->name('dashboard');
+    Route::get('/dashboard', DashboardController::class)->name('dashboard');
+
+    Route::get('/companies', [CompaniesController::class, 'index'])->name('companies.index');
+    Route::post('/companies', [CompaniesController::class, 'store'])->name('companies.store');
+    Route::patch('/companies/{company}', [CompaniesController::class, 'update'])->name('companies.update');
+    Route::patch('/companies/{company}/toggle', [CompaniesController::class, 'toggle'])->name('companies.toggle');
+    Route::delete('/companies/{company}', [CompaniesController::class, 'destroy'])->name('companies.destroy');
+
+    Route::get('/employees', [EmployeesController::class, 'index'])->name('employees.index');
+    Route::post('/employees', [EmployeesController::class, 'store'])->name('employees.store');
+    Route::patch('/employees/{employee}', [EmployeesController::class, 'update'])->name('employees.update');
+    Route::patch('/employees/{employee}/toggle', [EmployeesController::class, 'toggle'])->name('employees.toggle');
+    Route::delete('/employees/{employee}', [EmployeesController::class, 'destroy'])->name('employees.destroy');
+
+    Route::get('/calls', [CallsController::class, 'index'])->name('calls.index');
+    Route::post('/calls', [CallsController::class, 'store'])->name('calls.store');
+    Route::patch('/calls/{call}', [CallsController::class, 'update'])->name('calls.update');
+    Route::delete('/calls/{call}', [CallsController::class, 'destroy'])->name('calls.destroy');
 
     Route::get('/customers', [CustomersController::class, 'index'])->name('customers.index');
     Route::post('/customers', [CustomersController::class, 'store'])->name('customers.store');

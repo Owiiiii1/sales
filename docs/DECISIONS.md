@@ -146,10 +146,52 @@ Status values: `Accepted` | `Open` | `Superseded` | `Rejected`.
 
 ---
 
+## DEC-010
+
+**Title:** Separate Company and Employee domain  
+**Status:** Accepted  
+**Date:** 2026-09-09
+
+**Decision:** `Company` is the tenant/business domain entity. `Employee` is the person whose calls are analyzed and is **not** a system `User`. Employees do not need login access.
+
+**Reason:** Call quality is scored per company and per salesperson. Mixing kit `customers`/`staff` or equating Employee with User would blur tenancy and coaching.
+
+**Consequences:** New tables `companies` and `employees`. Kit CRM tables remain but are legacy. User remains the login account (`uploaded_by` on calls is optional).
+
+---
+
+## DEC-011
+
+**Title:** Call status stored as string  
+**Status:** Accepted  
+**Date:** 2026-09-09
+
+**Decision:** `calls.status` is a string, not a MySQL ENUM. Current allowed application values: `pending`, `uploaded`, `processing`, `completed`, `failed`.
+
+**Reason:** The processing pipeline will grow. Strings are easier to evolve than DB enums.
+
+**Consequences:** Validation uses `Rule::in(Call::STATUSES)`. New statuses require a code change, not a schema rewrite.
+
+---
+
+## DEC-012
+
+**Title:** Legacy Admin Kit CRM tables retained temporarily  
+**Status:** Accepted  
+**Date:** 2026-09-09
+
+**Decision:** Keep kit tables/models/controllers/routes for `customers`, `services`, `staff`, `orders`, `order_staff`, and Calendar. Hide them from primary navigation. Do not use them in new Sales Analyzer code.
+
+**Reason:** Removing working starter modules before the new domain is stable risks kit upgrades and unnecessary production risk.
+
+**Consequences:** Direct URLs to legacy screens still work. They are not product IA. Deletion is a later decision.
+
+---
+
 ## Template for new entries
 
 ```
-## DEC-010
+## DEC-013
 
 **Title:**  
 **Status:** Open | Accepted  

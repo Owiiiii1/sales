@@ -8,9 +8,9 @@ This repository is **not** a generic Laravel demo. Product intent is in [`docs/P
 
 ## Current status
 
-**Phase 0 (infrastructure) is complete.** The live site is a stock **OwlSolutions Custom Admin Kit v0.5.0** admin panel.
+**Phase 0 (infrastructure) and Phase 1 (admin foundation) are complete.** The live admin has Companies, Employees, Calls, and a stats Dashboard.
 
-Sales Analyzer domain features (upload, transcription, scoring) are **not built yet**. Kit CRM screens are **not** the product model.
+Sales Analyzer AI analysis and public upload are **not built yet**. Kit CRM screens still exist as hidden legacy routes.
 
 Details: [`docs/STATUS.md`](docs/STATUS.md) · roadmap: [`docs/ROADMAP.md`](docs/ROADMAP.md)
 

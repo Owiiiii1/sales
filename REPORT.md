@@ -1,77 +1,273 @@
-# Sales Analyzer — Documentation Bootstrap Report
+# Sales Analyzer — Phase 1 Adapt Admin Foundation Report
 
-## Created documentation
+## Baseline
 
-| Path | Role |
-|---|---|
-| `docs/PROJECT.md` | Product name, idea, value, current vs intended |
-| `docs/ARCHITECTURE.md` | Running stack, Laravel-first orchestration, AI providers Open |
-| `docs/PRODUCT.md` | MVP Upload Call, Phase 2 accounts, later capabilities (non-final) |
-| `docs/AI_ANALYSIS.md` | Pipeline, categories, multi-pass LLM calls, knowledge, scorecards |
-| `docs/DATA_MODEL.md` | Planned User/Company/Employee/Call/Transcript/Analysis/Scorecard; kit tables unchanged |
-| `docs/ROADMAP.md` | Phase 0 COMPLETED through Phase 9; working roadmap |
-| `docs/DECISIONS.md` | DEC-001 … DEC-009 |
-| `docs/STATUS.md` | Factual infrastructure and stock admin UI |
-| `docs/WORKFLOW.md` | TL / Cursor / PM cycle, GitHub as source of truth |
+* baseline accepted commit: `65d74ba52c980cada46f685b9698358f0d7c7c66`
+* HEAD before work: `65d74ba52c980cada46f685b9698358f0d7c7c66`
+* working tree before work: clean
+* unpushed commits before work: none
+* HEAD matched the last Technical Lead accepted state. No extra Git changes existed before this phase.
 
-## Updated files
+## Implemented
 
-* `README.md` — replaced Laravel marketing README with a compact project entry point
-* `REPORT.md` — this stage report (overwritten)
+Adapted the stock OwlSolutions Custom Admin Kit into a Sales Analyzer admin foundation. No LLM, STT, transcription, embeddings, vector DB, audio processing, or public upload.
 
-No other project files were intended to change.
+* Primary navigation: Dashboard, Companies, Employees, Calls, Settings, Statistics/Logs
+* Hidden from primary nav (code and routes kept): Customers, Orders, Services, Staff, Calendar, Telegram
+* Domain tables and Eloquent models: `Company`, `Employee`, `Call`
+* Admin CRUD for companies, employees, and calls (manual records only; no file field)
+* Company/employee activate-deactivate via `toggle`
+* Delete safety: company blocked if employees or calls exist; employee blocked if calls exist; FKs `restrictOnDelete`
+* Call employee must belong to the selected company (backend `CallRequest` + UI filter)
+* Dashboard cards from live DB counts; Recent Calls (last 10) with empty state
+* Settings hub tabs: General, Users, AI, App. Telegram still renders at `/settings?tab=telegram`
+* Factories and `SalesAnalyzerDemoSeeder` (not run on production)
+* Feature tests on MySQL `sales_testing`
+* phpunit forced to MySQL `sales_testing` because this server has no SQLite PDO driver
 
-## Product scope captured
+## Database
 
-* Analyze sales phone calls, not generic transcription
-* MVP: simple Upload Call + optional company context + analysis page; no required personal cabinet
-* Company context required for quality analysis
-* Scorecards are company-specific, not one universal score
-* LLM + structured prompts for MVP; no custom trained model
-* Later: accounts, knowledge/RAG, scorecard builder, team analytics, CRM/telephony ingest (illustrative, not committed)
+### Backup
 
-## Architecture
+Performed before Phase 1 migrations.
 
-**Fixed as current fact:** Laravel 13, MySQL 8, Inertia/React/Vite, Custom Admin Kit v0.5.0, nginx, Ubuntu 24.04, PHP 8.5, domain `sales.owlsolutions.net`.
+* path (outside Git): `/home/deploy/backups/sales/sales-pre-phase1-20260909-140123.sql`
+* tool: `mysqldump --no-tablespaces` of database `sales`
+* not committed
 
-**Accepted direction:** orchestrate in Laravel; queues for heavy audio; no premature microservices.
+### Migrations added
 
-**Left TBD / Open:** LLM provider, STT/diarization provider, embeddings, vector store, queue driver for production audio, object storage for files, transcript vs JSON storage, public vs accounts-first order.
+* `database/migrations/2026_09_09_120000_create_companies_table.php`
+* `database/migrations/2026_09_09_120100_create_employees_table.php`
+* `database/migrations/2026_09_09_120200_create_calls_table.php`
 
-## Decisions
+Batch **3**. Kit CRM migrations were not rolled back, dropped, or refreshed.
 
-| ID | Title | Status |
+`php artisan migrate --force` after implementation: **Nothing to migrate.**
+
+No `migrate:fresh`, reset, truncate, or drop of existing kit tables.
+
+### Tables
+
+`companies`
+
+* id, name, legal_name, website, industry, description, country, city, phone, email, is_active (default true), timestamps
+* no slug
+
+`employees`
+
+* id, company_id, first_name, last_name, email, phone, position, external_id, is_active (default true), timestamps
+
+`calls`
+
+* id, company_id, employee_id nullable, source default `manual`, external_id, original_filename, storage_path, mime_type, file_size, duration_seconds, status string default `pending`, recorded_at, uploaded_by, processing_started_at, processing_completed_at, error_message, timestamps
+* status values in application code: `pending`, `uploaded`, `processing`, `completed`, `failed` (not a DB enum)
+
+Production row counts at report time: companies 0, employees 0, calls 0.
+
+A company named `HTTP Check Co` was created during live HTTP POST verification and then deleted. Production is empty again.
+
+### Foreign keys
+
+* `employees.company_id` → `companies.id` ON DELETE RESTRICT
+* `calls.company_id` → `companies.id` ON DELETE RESTRICT
+* `calls.employee_id` → `employees.id` ON DELETE RESTRICT
+* `calls.uploaded_by` → `users.id` ON DELETE SET NULL
+
+### Indexes
+
+`companies`
+
+* primary `id`
+* `companies_is_active_index` (`is_active`)
+
+`employees`
+
+* primary `id`
+* `employees_company_id_foreign` (`company_id`)
+* `employees_is_active_index` (`is_active`)
+* `employees_external_id_index` (`external_id`)
+
+`calls`
+
+* primary `id`
+* `calls_company_id_foreign` (`company_id`)
+* `calls_employee_id_foreign` (`employee_id`)
+* `calls_uploaded_by_foreign` (`uploaded_by`)
+* `calls_status_index` (`status`)
+* `calls_recorded_at_index` (`recorded_at`)
+* `calls_source_index` (`source`)
+* `calls_external_id_index` (`external_id`)
+
+No extra composite indexes.
+
+## Routes
+
+Added in `routes/owl-admin-pages.php` (auth middleware group already wrapping kit pages):
+
+| Method | Path | Name |
 |---|---|---|
-| DEC-001 | Laravel backend | Accepted |
-| DEC-002 | Custom Admin Kit, not Filament | Accepted |
-| DEC-003 | MySQL as current RDBMS | Accepted |
-| DEC-004 | No custom trained model in MVP | Accepted |
-| DEC-005 | Company context required | Accepted |
-| DEC-006 | LLM provider | Open |
-| DEC-007 | STT provider | Open |
-| DEC-008 | Avoid premature microservices | Accepted |
-| DEC-009 | GitHub + `готово` workflow | Accepted |
+| GET | `/dashboard` | `dashboard` (now `DashboardController`) |
+| GET | `/companies` | `companies.index` |
+| POST | `/companies` | `companies.store` |
+| PATCH | `/companies/{company}` | `companies.update` |
+| PATCH | `/companies/{company}/toggle` | `companies.toggle` |
+| DELETE | `/companies/{company}` | `companies.destroy` |
+| GET | `/employees` | `employees.index` |
+| POST | `/employees` | `employees.store` |
+| PATCH | `/employees/{employee}` | `employees.update` |
+| PATCH | `/employees/{employee}/toggle` | `employees.toggle` |
+| DELETE | `/employees/{employee}` | `employees.destroy` |
+| GET | `/calls` | `calls.index` |
+| POST | `/calls` | `calls.store` |
+| PATCH | `/calls/{call}` | `calls.update` |
+| DELETE | `/calls/{call}` | `calls.destroy` |
 
-## Functional changes
+Employees list accepts optional `?company_id=` filter.
 
-`None`
+Legacy kit routes (`/customers`, `/orders`, `/services`, `/staff`, calendar, settings telegram) remain registered.
+
+## UI
+
+* `resources/js/Layouts/AdminLayout.jsx` — `primaryNavItems` is Dashboard / Companies / Employees / Calls. Statistics/Logs and Settings remain. English labels for the new product items.
+* `resources/js/Pages/Dashboard.jsx` — six real-count cards + Recent Calls empty state. No charts.
+* `resources/js/Pages/Companies/Index.jsx` — kit-style list, create, edit modal, toggle, delete
+* `resources/js/Pages/Employees/Index.jsx` — list with company name, company filter, create/edit, toggle, delete
+* `resources/js/Pages/Calls/Index.jsx` — list columns ID, company, employee, source, filename, status, duration, recorded_at, created_at; manual create/edit form without file upload; employee dropdown filtered by company
+* `resources/js/Pages/Settings/Index.jsx` — Telegram removed from tab bar; panel still mounts when `tab=telegram`
+
+Header still shows the kit Telegram **status badge**. That is not a sidebar/nav item.
+
+## Legacy modules
+
+Physically retained (DEC-012):
+
+* tables: `customers`, `services`, `staff`, `orders`, `order_staff`
+* kit models/controllers/Inertia pages/routes
+* Calendar route
+* Telegram settings code and `?tab=telegram`
+
+Hidden from primary navigation and Settings tabs.
+
+New domain code does not use kit CRM models.
+
+## Tests
+
+Command:
+
+```
+php artisan test
+```
+
+Result: **22 passed**, **0 failed**, 99 assertions, ~2.0s.
+
+Environment: PHPUnit `APP_ENV=testing`, `DB_CONNECTION=mysql` `force=true`, `DB_DATABASE=sales_testing` `force=true`. Credentials still come from `.env`; password is not in `phpunit.xml`. `TestCase` calls `withoutVite()`. Inertia `component(..., false)` because kit pages live in `resources/js/Pages` (capital P).
+
+Important cases:
+
+* guest redirected from `/dashboard`, `/companies`, `/employees`, `/calls`, `/settings`
+* authenticated 200 for those product routes
+* company create / update / name+website+email validation
+* employee create with company, company required, update, list
+* call create, company required, employee from another company rejected, invalid status and negative duration rejected
+* legacy `/customers` and `/orders` still 200 when authenticated
+
+`SalesAnalyzerDemoSeeder` was **not** run on production `sales`.
+
+## Build
+
+* `npm run build` — succeeded (Vite 8.2.2, 2723 modules). Optional `fontaine` warning remains.
+* `public/build` is gitignored; the production document root uses the local build output.
+* `php artisan optimize:clear` — succeeded
+* `php artisan migrate --force` — nothing pending
+* nginx / SSL / PHP-FPM not changed
+
+## HTTP verification
+
+Live host `https://sales.owlsolutions.net`.
+
+Guest (no follow):
+
+| URL | Status | Location |
+|---|---|---|
+| `/companies` | 302 | `https://sales.owlsolutions.net/` |
+| `/employees` | 302 | `https://sales.owlsolutions.net/` |
+| `/calls` | 302 | `https://sales.owlsolutions.net/` |
+| `/dashboard` | 302 | `https://sales.owlsolutions.net` |
+| `/settings` | 302 | `https://sales.owlsolutions.net` |
+
+Authenticated (admin session, HTML GET, Inertia `data-page` JSON):
+
+| URL | Status | Component |
+|---|---|---|
+| `/dashboard` | 200 | `Dashboard` — stats all 0, recentCalls 0 |
+| `/companies` | 200 | `Companies/Index` |
+| `/employees` | 200 | `Employees/Index` |
+| `/calls` | 200 | `Calls/Index` statuses pending/uploaded/processing/completed/failed |
+| `/settings` | 200 | `Settings/Index` tab=general |
+| `/settings?tab=telegram` | 200 | `Settings/Index` tab=telegram |
+
+Built `AdminLayout-*.js` contains `companies.index`, `employees.index`, `calls.index`. It does **not** contain `customers.index`, `orders.index`, `services.index`, `staff.index`, or calendar nav routes.
+
+No dedicated browser-driver session was available. UI checks used live HTTP + Inertia page JSON + source/built navigation. Feature tests cover create/update/validation.
+
+## Documentation
+
+Updated:
+
+* `docs/DATA_MODEL.md` — implemented `companies` / `employees` / `calls`
+* `docs/ARCHITECTURE.md` — admin foundation now present; still no AI pipeline
+* `docs/ROADMAP.md` — Phase 1 COMPLETED; Phase 2 remaining = upload/storage
+* `docs/STATUS.md` — current nav, tables, known issues
+* `docs/DECISIONS.md` — DEC-010, DEC-011, DEC-012 Accepted
+* `docs/PROJECT.md` — current vs intended
+* `docs/PRODUCT.md` — live admin is no longer “stock kit only”
+* `README.md` — current status line
+
+New decisions:
+
+* **DEC-010** Separate Company and Employee domain — Accepted
+* **DEC-011** Calls status stored as string — Accepted
+* **DEC-012** Legacy Admin Kit CRM tables retained temporarily — Accepted
+
+## Changed files
+
+Command:
+
+```
+git diff --name-status 65d74ba52c980cada46f685b9698358f0d7c7c66..HEAD
+```
+
+Recorded after the implementation commit (see Git). Working tree at the end of coding included all of the paths below plus `REPORT.md`.
+
+## Security
+
+* no secrets added to Git
+* `.env` not committed
+* DB password not in `phpunit.xml`
+* SQL backup not committed (outside repo under `/home/deploy/backups/sales/`)
+* no AI provider keys connected
 
 ## Git
 
 * branch: `main`
-* commit SHA: 
-* message: Add Sales Analyzer documentation bootstrap.
-* push result: **PASS** — 
+* baseline: `65d74ba52c980cada46f685b9698358f0d7c7c66`
+* final commit SHA: pending (filled after commit)
+* commit messages: pending
+* push result: pending
 
-## Verification
+## Problems / Warnings
 
-* application code unchanged (no `app/`, `routes/`, `resources/`, `database/migrations/`, `config/` edits in this stage)
-* routes unchanged
-* migrations unchanged
-* package versions unchanged (`composer.json` / `package.json` not modified)
-* no secrets added
-* `git status` / `git diff` limited to `README.md`, `REPORT.md`, `docs/*`
+* Optional Vite `fontaine` package warning during `npm run build` (unchanged kit warning).
+* `/owl-admin/health` still reports `"preset":"core"` while the installed preset is `admin` (pre-existing).
+* Composer 2.7.1 PHP 8.5 deprecation notices remain in the environment (pre-existing).
+* PHPUnit cannot use SQLite here (no PDO driver). Tests use MySQL database `sales_testing`.
+* Inertia test component file-existence check is disabled (`false`) because pages are under `resources/js/Pages`.
+* Kit CRM routes still exist and still appear in Ziggy if generated; they are not in `primaryNavItems`.
+* Header Telegram connection badge remains. Telegram is not in sidebar or Settings tabs.
+* No headless browser; sidebar labels were verified from `AdminLayout.jsx` and the built AdminLayout chunk, not by clicking a rendered menu.
+* One accidental production company (`HTTP Check Co`) was created during HTTP verification and deleted before finish.
 
 ## Final status
 
-`DOCUMENTATION PASSED`
+`PHASE 1 PASSED`

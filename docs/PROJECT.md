@@ -59,11 +59,9 @@ Basic first-version flow:
 
 ## What this repository is today
 
-This repository currently hosts a **deployed Laravel 13 application** with **OwlSolutions Custom Admin Kit v0.5.0**.
+This repository currently hosts a **deployed Laravel 13 application** with **OwlSolutions Custom Admin Kit v0.5.0** plus a **Phase 1 Sales Analyzer admin foundation** (Companies, Employees, Calls).
 
-The live site is the **stock admin kit**, not the Sales Analyzer product UI.
-
-That is intentional for Phase 0 (infrastructure). Product modules have not been built yet.
+Transcription, AI scoring, and public upload are **not** built yet.
 
 See:
 
