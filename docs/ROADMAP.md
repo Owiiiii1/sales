@@ -32,16 +32,16 @@ No Sales Analyzer product features in this phase.
 
 ## Phase 2 — Core Domain
 
-**Status: Planned**
+**Status: COMPLETED** (admin audio upload foundation)
 
-Phase 1 already created Company / Employee / Call records and admin CRUD.
+* private `calls` disk (`storage/app/private/calls`)
+* Upload Call form (company, optional employee, audio, optional recorded_at)
+* authenticated audio stream + download
+* Call detail page with player and transcript/AI stubs
+* status after upload: `uploaded` (no STT/AI)
+* file deleted with the Call
 
-Remaining core-domain work:
-
-* audio upload
-* file storage
-* richer call statuses / processing timestamps in the UI
-* public or operator upload flow
+Remaining later: public upload flow, object storage, processing UI beyond stubs.
 
 ## Phase 3 — Transcription
 

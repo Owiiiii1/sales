@@ -188,10 +188,66 @@ Status values: `Accepted` | `Open` | `Superseded` | `Rejected`.
 
 ---
 
+## DEC-013
+
+**Title:** Call audio is private storage  
+**Status:** Accepted  
+**Date:** 2026-09-09
+
+**Decision:** Call audio is stored on a private Laravel disk (`calls` → `storage/app/private/calls`) and is never published as a public URL or via the `/storage` symlink.
+
+**Reason:** Recordings are sensitive. Direct links would leak audio without auth.
+
+**Consequences:** Playback and download use authenticated routes (`calls.audio`, `calls.download`). The UI never receives the physical storage path.
+
+---
+
+## DEC-014
+
+**Title:** Physical audio filename is generated  
+**Status:** Accepted  
+**Date:** 2026-09-09
+
+**Decision:** Stored files are named `{company_id}/{year}/{month}/{uuid}.{ext}`. The original filename is saved only as `calls.original_filename`.
+
+**Reason:** Original names can collide, contain unsafe characters, or leak customer information in filesystem listings.
+
+**Consequences:** Downloads send the original name in `Content-Disposition`. Replacing audio is not supported in this phase; delete and re-upload.
+
+---
+
+## DEC-015
+
+**Title:** Upload and AI processing are separate lifecycle stages  
+**Status:** Accepted  
+**Date:** 2026-09-09
+
+**Decision:** A successful file save sets `status = uploaded`. It does not set `completed` or `processing`. STT/LLM work starts in a later phase.
+
+**Reason:** Upload success is not analysis success. Mixing them would hide processing failures.
+
+**Consequences:** `CallProcessingPipeline` is a no-op hook and does not change status. Lifecycle remains `pending` → `uploaded` → `processing` → `completed`, with `failed` on error.
+
+---
+
+## DEC-016
+
+**Title:** Audio files are removed with deleted Calls  
+**Status:** Accepted  
+**Date:** 2026-09-09
+
+**Decision:** Delete the Call row first. If that succeeds, delete the audio file on the private disk when it exists. Unique generated paths prevent one delete from touching another Call’s file.
+
+**Reason:** If the file were removed first and the DB delete failed, the record would point at missing audio. Orphaned files after a successful DB delete are recoverable from logs/backups; missing files with live rows are worse.
+
+**Consequences:** Failed DB deletes leave the file in place. A later failed file delete can leave an orphan, which is logged.
+
+---
+
 ## Template for new entries
 
 ```
-## DEC-013
+## DEC-017
 
 **Title:**  
 **Status:** Open | Accepted  

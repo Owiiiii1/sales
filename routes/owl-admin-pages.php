@@ -48,9 +48,13 @@ Route::middleware(AdminRouteMiddleware::stack())->group(function () {
     Route::delete('/employees/{employee}', [EmployeesController::class, 'destroy'])->name('employees.destroy');
 
     Route::get('/calls', [CallsController::class, 'index'])->name('calls.index');
+    Route::get('/calls/create', [CallsController::class, 'create'])->name('calls.create');
     Route::post('/calls', [CallsController::class, 'store'])->name('calls.store');
+    Route::get('/calls/{call}', [CallsController::class, 'show'])->name('calls.show');
     Route::patch('/calls/{call}', [CallsController::class, 'update'])->name('calls.update');
     Route::delete('/calls/{call}', [CallsController::class, 'destroy'])->name('calls.destroy');
+    Route::get('/calls/{call}/audio', [CallsController::class, 'audio'])->name('calls.audio');
+    Route::get('/calls/{call}/download', [CallsController::class, 'download'])->name('calls.download');
 
     Route::get('/customers', [CustomersController::class, 'index'])->name('customers.index');
     Route::post('/customers', [CustomersController::class, 'store'])->name('customers.store');

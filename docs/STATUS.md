@@ -7,11 +7,12 @@ Factual state of the running project. Update this file when reality changes.
 * **Phase 0 — Infrastructure:** COMPLETED
 * **Documentation bootstrap:** COMPLETED
 * **Phase 1 — Adapt Admin Foundation:** COMPLETED
-* **Next planned work:** Phase 2 remaining items — audio upload, storage, processing UI (see [ROADMAP.md](ROADMAP.md))
+* **Phase 2 — Audio upload foundation:** COMPLETED
+* **Next planned work:** Phase 3 transcription (provider still Open)
 
 ## Product vs running app
 
-The live admin is now a **Sales Analyzer foundation**: Companies, Employees, Calls, Dashboard stats.
+Admins can upload call audio, open a Call card, play/download privately, and delete the record with its file.
 
 There is still **no** public Upload Call, transcription, or AI scoring.
 
@@ -30,6 +31,7 @@ There is still **no** public Upload Call, transcription, or AI scoring.
 | Database | MySQL 8.0.46 — DB `sales`, user `sales`@`localhost` |
 | Test DB | MySQL `sales_testing` (phpunit only; not production data) |
 | Admin kit | `owlsolutions/custom-admin-kit` **v0.5.0** |
+| Audio disk | `calls` → `storage/app/private/calls` (private, not web-accessible) |
 
 Admin login: guest `GET /` → login. Protected product routes redirect guests to `/`.
 
@@ -44,17 +46,23 @@ Primary navigation:
 * Settings
 * Statistics / Logs
 
-Settings tabs in the hub: General, Users, AI, App. Telegram remains available at `/settings?tab=telegram` but is **not** in the tab bar.
+Calls:
 
-**Hidden from nav (legacy kit, still routed):** Customers, Orders, Services, Staff, Calendar.
-
-Dashboard cards (live counts): Companies, Active Employees, Total Calls, Calls Completed, Calls Processing, Calls Failed, plus Recent Calls empty state.
+* list with filters (company, employee, status)
+* Upload Call
+* detail with HTML audio player, download, metadata, transcript/AI stubs
+* edit company / employee / recorded at
+* no audio replace (delete + re-upload)
 
 ## Database
 
-Phase 1 tables: `companies`, `employees`, `calls`.
+Phase 1 tables unchanged: `companies`, `employees`, `calls`. No Phase 2 migration.
 
-Legacy kit tables retained: `customers`, `services`, `staff`, `orders`, `order_staff`.
+## Audio limits
+
+Application config: `SALES_AUDIO_MAX_MB=200` (`config/sales-analyzer.php`).
+
+Effective HTTP cap on this host is lower until nginx/PHP-FPM site limits are raised (see REPORT). Tiny admin uploads still work.
 
 ## Known issues (non-critical)
 
@@ -63,16 +71,19 @@ Legacy kit tables retained: `customers`, `services`, `staff`, `orders`, `order_s
 * Vite optional `fontaine` warning.
 * Weak install-stage admin credentials (`admin@admin.com`).
 * PHPUnit uses MySQL `sales_testing` because the server has no SQLite PDO driver.
-* Inertia `assertInertia()->component()` file finder defaults to `resources/js/pages` (lowercase); tests pass `shouldExist = false` and still assert the component name.
+* Inertia `assertInertia()->component()` file finder defaults to `resources/js/pages` (lowercase); tests pass `shouldExist = false`.
+* ffprobe/ffmpeg are **not** installed; duration is nullable except best-effort WAV header parse.
+* Site nginx `client_max_body_size` is 64M; PHP-FPM defaults remain `upload_max_filesize=2M` / `post_max_size=8M` unless `public/.user.ini` is honored. Could not change nginx without sudo.
 
 ## What is explicitly not done
 
 * no STT / LLM / embeddings
 * no public Upload Call
-* no audio storage pipeline
+* no automatic processing job
+* no audio replace
 * no scorecards in DB
 * no deletion of kit CRM modules
 
 ## Next planned work
 
-Audio upload and call processing (Phase 2 remainder / Phase 3), still without choosing providers until DEC-006 / DEC-007 close.
+Transcription / diarization (Phase 3). Do not choose providers until DEC-006 / DEC-007 close.

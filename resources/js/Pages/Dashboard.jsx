@@ -80,7 +80,11 @@ export default function Dashboard({
                                         <td className="px-4 py-3 text-slate-700">{call.employee_name || '—'}</td>
                                         <td className="px-4 py-3 text-slate-700">{call.status}</td>
                                         <td className="px-4 py-3 text-slate-700">{formatDuration(call.duration_seconds)}</td>
-                                        <td className="px-4 py-3 text-slate-700">{formatDate(call.recorded_at || call.created_at)}</td>
+                                        <td className="px-4 py-3 text-slate-700">
+                                            <Link href={call.show_url || route('calls.show', call.id)} className="text-indigo-700">
+                                                {formatDate(call.recorded_at || call.created_at)}
+                                            </Link>
+                                        </td>
                                     </tr>
                                 ))}
                                 {recentCalls.length === 0 && (

@@ -66,4 +66,24 @@ class Call extends Model
     {
         return $this->belongsTo(User::class, 'uploaded_by');
     }
+
+    public function fileSizeLabel(): ?string
+    {
+        if ($this->file_size === null) {
+            return null;
+        }
+
+        $bytes = (int) $this->file_size;
+        $units = ['B', 'KB', 'MB', 'GB'];
+        $unit = 0;
+
+        while ($bytes >= 1024 && $unit < count($units) - 1) {
+            $bytes /= 1024;
+            $unit++;
+        }
+
+        $precision = $unit === 0 ? 0 : 1;
+
+        return number_format($bytes, $precision).' '.$units[$unit];
+    }
 }

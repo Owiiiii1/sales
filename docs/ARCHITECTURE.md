@@ -35,7 +35,13 @@ Laravel 13 + Custom Admin Kit, with a **Sales Analyzer admin foundation** on top
 * product admin routes: `/companies`, `/employees`, `/calls`;
 * kit CRM routes still exist but are not in primary navigation.
 
-Domain models **Company**, **Employee**, and **Call** exist. There is still **no** transcription, LLM, or file upload pipeline.
+Domain models **Company**, **Employee**, and **Call** exist. Administrators can upload call audio to a **private** Laravel disk (`calls` → `storage/app/private/calls`). Playback and download go through authenticated routes. There is still **no** transcription or LLM pipeline.
+
+Audio path pattern on the `calls` disk:
+
+`{company_id}/{year}/{month}/{uuid}.{ext}`
+
+Original filename is metadata only (DEC-014). Successful upload sets status `uploaded`, not `completed` (DEC-015). `CallProcessingPipeline` exists as a no-op hook; it is not dispatched into processing in this phase.
 
 ## Target runtime shape (planned)
 
@@ -46,7 +52,7 @@ Browser
   → nginx
     → PHP-FPM / Laravel
       → MySQL
-      → filesystem / object storage (TBD)
+      → private local disk `calls` (Phase 2; object storage still TBD)
       → queue workers
         → STT / diarization provider (TBD)
         → LLM provider (TBD)
@@ -65,7 +71,7 @@ Upload
   → report ready
 ```
 
-Status values for a call (planned, names TBD): e.g. `uploaded` → `transcribing` → `analyzing` → `ready` / `failed`.
+Status values for a call: `pending` → `uploaded` → `processing` → `completed`, or `failed`. After Phase 2 upload the record stays `uploaded` until a later phase starts processing.
 
 Queues **will** be needed for heavy audio work. Which queue backend (database, Redis, etc.) is **TBD**. Laravel currently uses `QUEUE_CONNECTION=database` in production `.env`; that may or may not be enough. **Open question.**
 

@@ -25,6 +25,7 @@ class DashboardController extends Controller
                 'duration_seconds' => $call->duration_seconds,
                 'recorded_at' => optional($call->recorded_at)->toIso8601String(),
                 'created_at' => optional($call->created_at)->toIso8601String(),
+                'show_url' => route('calls.show', $call),
             ])
             ->all();
 

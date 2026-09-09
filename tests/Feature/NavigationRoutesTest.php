@@ -17,6 +17,7 @@ class NavigationRoutesTest extends TestCase
         $this->get('/companies')->assertRedirect('/');
         $this->get('/employees')->assertRedirect('/');
         $this->get('/calls')->assertRedirect('/');
+        $this->get('/calls/create')->assertRedirect('/');
         $this->get('/settings')->assertRedirect('/');
     }
 
@@ -34,6 +35,7 @@ class NavigationRoutesTest extends TestCase
         $this->actingAs($user)->get('/companies')->assertOk();
         $this->actingAs($user)->get('/employees')->assertOk();
         $this->actingAs($user)->get('/calls')->assertOk();
+        $this->actingAs($user)->get('/calls/create')->assertOk();
         $this->actingAs($user)->get('/settings')->assertOk();
     }
 

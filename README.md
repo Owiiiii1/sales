@@ -8,7 +8,7 @@ This repository is **not** a generic Laravel demo. Product intent is in [`docs/P
 
 ## Current status
 
-**Phase 0 (infrastructure) and Phase 1 (admin foundation) are complete.** The live admin has Companies, Employees, Calls, and a stats Dashboard.
+**Phase 0–2 are complete.** The live admin has Companies, Employees, private Call audio upload, and a stats Dashboard.
 
 Sales Analyzer AI analysis and public upload are **not built yet**. Kit CRM screens still exist as hidden legacy routes.
 

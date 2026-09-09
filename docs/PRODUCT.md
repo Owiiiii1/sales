@@ -2,7 +2,7 @@
 
 This document describes the product we intend to build. It is not a description of the current UI.
 
-The live admin now has a Sales Analyzer foundation (Companies, Employees, Calls). Transcription, scoring, and public upload are not built yet. See [STATUS.md](STATUS.md).
+The live admin now has Companies, Employees, and **private Call audio upload** (list, upload, detail, stream, download). Transcription, scoring, and public upload are not built yet. See [STATUS.md](STATUS.md).
 
 ## Problem
 

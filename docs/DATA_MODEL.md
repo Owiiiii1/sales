@@ -110,26 +110,28 @@ Relations: `belongsTo` company, `hasMany` calls.
 
 ## Call
 
-An uploaded or imported conversation. Phase 1 is a **record stub** (no file upload, no processing).
+An uploaded or imported conversation.
 
-**Implemented table `calls`:**
+**Implemented table `calls`:** (no Phase 2 schema change; Phase 1 columns were enough)
 
 * id
 * company_id → companies (restrict)
 * employee_id → employees nullable (restrict)
 * source string default `manual`
 * external_id nullable
-* original_filename, storage_path, mime_type nullable
-* file_size, duration_seconds nullable
-* status string (DEC-011): `pending`, `uploaded`, `processing`, `completed`, `failed`
+* original_filename — client name only; not used as the physical filename
+* storage_path — relative path on the private `calls` disk
+* mime_type, file_size nullable
+* duration_seconds nullable (ffprobe is not installed; WAV headers may be parsed)
+* status string (DEC-011 / DEC-015): after a successful file upload the status is `uploaded`
 * recorded_at nullable
 * uploaded_by → users nullable (`nullOnDelete`)
 * processing_started_at, processing_completed_at, error_message nullable
 * timestamps
 
-Indexes: company_id, employee_id, uploaded_by (FKs), status, recorded_at, source, external_id.
+Physical files live on disk `calls` (`storage/app/private/calls`), never under `public/`. Authenticated stream/download routes serve bytes. Deleting a Call deletes its file after the DB row is removed (DEC-016).
 
-A call’s employee must belong to the same company (backend validation).
+A call’s employee must belong to the same company (backend validation). The frontend never receives `storage_path`.
 
 ## Transcript
 
