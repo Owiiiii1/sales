@@ -199,14 +199,54 @@ Command:
 git diff --name-status 84947b926c4cc223b241582ffbf6246b331c91cc..HEAD
 ```
 
-Recorded after the implementation commit (see Git). REPORT-only follow-up commits only rewrite `REPORT.md`.
+Result after implementation commit `0fce8a17d3b12a9466372dad2a350eab44051cf0` (later REPORT-only commits only rewrite this file):
+
+```
+M	.env.example
+M	README.md
+M	REPORT.md
+M	app/Http/Controllers/CallsController.php
+M	app/Http/Controllers/DashboardController.php
+D	app/Http/Requests/CallRequest.php
+A	app/Http/Requests/Concerns/ValidatesEmployeeCompany.php
+A	app/Http/Requests/StoreCallRequest.php
+A	app/Http/Requests/UpdateCallRequest.php
+M	app/Models/Call.php
+A	app/Services/Calls/AudioMetadataService.php
+A	app/Services/Calls/CallAudioStorage.php
+A	app/Services/Calls/CallAudioStreamer.php
+A	app/Services/Calls/CallProcessingPipeline.php
+A	app/Services/Calls/CallUploadService.php
+M	config/filesystems.php
+A	config/sales-analyzer.php
+M	docs/ARCHITECTURE.md
+M	docs/DATA_MODEL.md
+M	docs/DECISIONS.md
+M	docs/PRODUCT.md
+M	docs/PROJECT.md
+M	docs/ROADMAP.md
+M	docs/STATUS.md
+A	public/.user.ini
+A	resources/js/Pages/Calls/Create.jsx
+M	resources/js/Pages/Calls/Index.jsx
+A	resources/js/Pages/Calls/Show.jsx
+M	resources/js/Pages/Dashboard.jsx
+M	routes/owl-admin-pages.php
+M	tests/Feature/CallsTest.php
+M	tests/Feature/NavigationRoutesTest.php
+```
+
+Nothing omitted. `.env` is not in the list. `public/build` is gitignored. No production audio and no DB dump are in the list.
 
 ## Git
 
 * branch: `main`
-* implementation commit: pending
-* REPORT commits: pending
-* push: pending
+* remote: `https://github.com/Owiiiii1/sales.git`
+* implementation commit: `0fce8a17d3b12a9466372dad2a350eab44051cf0`
+* commit messages:
+  * `Add private call audio upload with authenticated playback.`
+  * `Record Phase 2 commit SHA and changed files in REPORT.md.`
+* push result: pending
 
 ## Problems / Warnings
 
