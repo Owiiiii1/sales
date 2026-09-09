@@ -1,58 +1,57 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Sales Analyzer
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+AI-assisted analysis of **sales phone calls**: transcription, speakers, company context, scorecards, and a structured coaching report.
 
-## About Laravel
+Working name. It may change.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+This repository is **not** a generic Laravel demo. Product intent is in [`docs/PROJECT.md`](docs/PROJECT.md).
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Current status
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+**Phase 0 (infrastructure) is complete.** The live site is a stock **OwlSolutions Custom Admin Kit v0.5.0** admin panel.
 
-## Learning Laravel
+Sales Analyzer domain features (upload, transcription, scoring) are **not built yet**. Kit CRM screens are **not** the product model.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+Details: [`docs/STATUS.md`](docs/STATUS.md) · roadmap: [`docs/ROADMAP.md`](docs/ROADMAP.md)
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## Stack
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+* Laravel 13 / PHP 8.5
+* MySQL 8
+* Inertia + React + Vite
+* OwlSolutions Custom Admin Kit v0.5.0
+* nginx, Ubuntu 24.04
 
-## Agentic Development
+## Live site
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+[https://sales.owlsolutions.net](https://sales.owlsolutions.net)
 
-```bash
-composer require laravel/boost --dev
+Guest root URL is the admin login. Product public upload is planned, not shipped.
 
-php artisan boost:install
-```
+## Documentation
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+| Doc | Contents |
+|---|---|
+| [docs/PROJECT.md](docs/PROJECT.md) | What and why |
+| [docs/PRODUCT.md](docs/PRODUCT.md) | MVP and later product |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Stack and runtime shape |
+| [docs/AI_ANALYSIS.md](docs/AI_ANALYSIS.md) | Analysis engine, knowledge, scorecards |
+| [docs/DATA_MODEL.md](docs/DATA_MODEL.md) | Planned entities |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | Phases |
+| [docs/DECISIONS.md](docs/DECISIONS.md) | Decision log |
+| [docs/STATUS.md](docs/STATUS.md) | What is actually running |
+| [docs/WORKFLOW.md](docs/WORKFLOW.md) | How the team ships |
 
-## Contributing
+`REPORT.md` is the **latest stage report** for the Technical Lead. It is overwritten each phase. Durable facts belong in `docs/`.
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## Development workflow
 
-## Code of Conduct
+Technical Lead (ChatGPT) writes the task → Cursor implements, updates `docs/` + `REPORT.md`, commits, pushes `main`, replies `готово` → PM tells the Lead `готово` → Lead reviews **GitHub**, not the chat.
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Full rules: [`docs/WORKFLOW.md`](docs/WORKFLOW.md)
 
-## Security Vulnerabilities
+## Security
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+Do not commit `.env`, database passwords, `APP_KEY`, API keys, or tokens.
 
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Production secrets stay on the server in `/var/www/sales/.env` (gitignored).
