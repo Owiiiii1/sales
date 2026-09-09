@@ -24,13 +24,13 @@ function Spinner({ label }) {
     );
 }
 
-export default function AnalysisReport({ status, report, message }) {
+export default function AnalysisReport({ status, report, message, error }) {
     if (status === 'uploading' || status === 'processing') {
         return (
             <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
                 <h2 className="text-lg font-semibold text-slate-900">Analysis report</h2>
                 <div className="mt-6">
-                    <Spinner label={status === 'uploading' ? 'Uploading your call…' : 'Analyzing the conversation…'} />
+                    <Spinner label={status === 'uploading' ? 'Uploading your call…' : 'Transcribing your call…'} />
                 </div>
             </section>
         );
@@ -41,7 +41,18 @@ export default function AnalysisReport({ status, report, message }) {
             <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
                 <h2 className="text-lg font-semibold text-slate-900">Analysis report</h2>
                 <p className="mt-3 text-sm leading-6 text-slate-600">
-                    {message || 'Call uploaded successfully. Analysis engine is not connected yet.'}
+                    {message || 'Your call is queued for transcription.'}
+                </p>
+            </section>
+        );
+    }
+
+    if (status === 'transcribed' && !report) {
+        return (
+            <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+                <h2 className="text-lg font-semibold text-slate-900">Analysis report</h2>
+                <p className="mt-3 text-sm leading-6 text-slate-600">
+                    {message || 'Transcription complete.'} AI analysis is not connected yet.
                 </p>
             </section>
         );
@@ -51,7 +62,7 @@ export default function AnalysisReport({ status, report, message }) {
         return (
             <section className="rounded-3xl border border-red-100 bg-white p-8 shadow-sm">
                 <h2 className="text-lg font-semibold text-slate-900">Analysis report</h2>
-                <p className="mt-3 text-sm text-red-700">Analysis failed. Please try again.</p>
+                <p className="mt-3 text-sm text-red-700">{error || message || 'Transcription failed. Please try again.'}</p>
             </section>
         );
     }

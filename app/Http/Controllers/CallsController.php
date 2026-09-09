@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\TranscribeCall;
 use App\Http\Requests\StoreCallRequest;
 use App\Http\Requests\UpdateCallRequest;
 use App\Models\Call;
@@ -10,6 +11,7 @@ use App\Models\Employee;
 use App\Services\Calls\CallAudioStreamer;
 use App\Services\Calls\CallAudioStorage;
 use App\Services\Calls\CallUploadService;
+use App\Support\TranscriptPresenter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -88,7 +90,7 @@ class CallsController extends Controller
 
     public function show(Call $call, CallAudioStorage $storage): Response
     {
-        $call->load(['company:id,name', 'employee:id,first_name,last_name,company_id', 'uploadedBy:id,name,email']);
+        $call->load(['company:id,name', 'employee:id,first_name,last_name,company_id', 'uploadedBy:id,name,email', 'transcript.segments']);
 
         return Inertia::render('Calls/Show', [
             'call' => $this->detailPayload($call, $storage),
@@ -131,6 +133,19 @@ class CallsController extends Controller
     public function download(Call $call, CallAudioStreamer $streamer): BinaryFileResponse
     {
         return $streamer->download($call);
+    }
+
+    public function transcribe(Call $call): RedirectResponse
+    {
+        if ($call->status === 'processing') {
+            return back()->withErrors([
+                'call' => 'Transcription is already in progress.',
+            ]);
+        }
+
+        TranscribeCall::dispatch($call->id);
+
+        return back();
     }
 
     /**
@@ -215,6 +230,8 @@ class CallsController extends Controller
             'has_audio' => $hasAudio,
             'audio_url' => $hasAudio ? route('calls.audio', $call) : null,
             'download_url' => $hasAudio ? route('calls.download', $call) : null,
+            'can_retry_transcription' => in_array($call->status, ['uploaded', 'failed', 'transcribed'], true),
+            'transcript' => TranscriptPresenter::admin($call),
         ];
     }
 }

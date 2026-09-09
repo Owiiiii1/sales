@@ -15,5 +15,6 @@ abstract class TestCase extends BaseTestCase
 
         TestingDatabaseGuard::enforceFromApplication($this->app);
         $this->withoutVite();
+        \Illuminate\Support\Facades\Queue::fake();
     }
 }

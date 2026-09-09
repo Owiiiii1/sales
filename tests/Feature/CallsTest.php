@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\TranscribeCall;
 use App\Models\Call;
 use App\Models\Company;
 use App\Models\Employee;
@@ -33,6 +34,7 @@ class CallsTest extends TestCase
         $this->get("/calls/{$call->id}/audio")->assertRedirect('/login');
         $this->get("/calls/{$call->id}/download")->assertRedirect('/login');
         $this->post('/calls', [])->assertRedirect('/login');
+        $this->post("/calls/{$call->id}/transcribe")->assertRedirect('/login');
     }
 
     public function test_authenticated_admin_can_access_calls_list(): void
@@ -97,6 +99,7 @@ class CallsTest extends TestCase
         $this->assertStringStartsWith($company->id.'/', $call->storage_path);
         $this->assertSame('manual', $call->source);
         Storage::disk(config('sales-analyzer.storage_disk'))->assertExists($call->storage_path);
+        \Illuminate\Support\Facades\Queue::assertPushed(TranscribeCall::class, fn (TranscribeCall $job): bool => $job->callId === $call->id);
     }
 
     public function test_company_is_required_to_upload(): void

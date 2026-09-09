@@ -6,6 +6,7 @@ use Database\Factories\CallFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
 
 class Call extends Model
@@ -17,6 +18,7 @@ class Call extends Model
         'pending',
         'uploaded',
         'processing',
+        'transcribed',
         'completed',
         'failed',
     ];
@@ -80,6 +82,11 @@ class Call extends Model
     public function uploadedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'uploaded_by');
+    }
+
+    public function transcript(): HasOne
+    {
+        return $this->hasOne(Transcript::class);
     }
 
     public function fileSizeLabel(): ?string

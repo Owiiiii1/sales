@@ -65,13 +65,16 @@ Remaining later: object storage, processing UI beyond stubs, public analysis eng
 
 ## Phase 3 — Transcription
 
-**Status: Planned**
+**Status: COMPLETED**
 
-* provider selection (decision still Open);
-* audio processing;
-* transcription;
-* diarization;
-* transcript storage.
+* ElevenLabs Scribe v2 (`POST /v1/speech-to-text`)
+* diarization + timestamps
+* `transcripts` / `transcript_segments`
+* async `TranscribeCall` job + `sales-worker.service`
+* public and admin transcript UI
+* languages `en` / `ru` / `uk`
+
+Live provider smoke is blocked until `ELEVENLABS_API_KEY` is set in this app’s `.env`.
 
 ## Phase 4 — AI Sales Analysis
 

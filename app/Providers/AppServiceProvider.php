@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use App\Support\TestingDatabaseGuard;
+use App\Services\Transcription\ElevenLabsTranscriptionClient;
+use App\Services\Transcription\TranscriptionProvider;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -15,7 +17,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(TranscriptionProvider::class, ElevenLabsTranscriptionClient::class);
     }
 
     /**

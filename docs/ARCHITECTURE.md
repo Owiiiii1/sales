@@ -35,14 +35,16 @@ Laravel 13 + Custom Admin Kit, with a public product surface and an admin founda
 * product admin routes: `/companies`, `/employees`, `/calls`;
 * kit CRM routes still exist but are not in primary navigation.
 
-Domain models **Company**, **Employee**, and **Call** exist. Audio is stored on a **private** Laravel disk (`calls` → `storage/app/private/calls`). Public uploads reuse that disk and are **not** streamed to anonymous users. There is still **no** transcription or LLM pipeline.
+Domain models **Company**, **Employee**, and **Call** exist. Audio is stored on a **private** Laravel disk (`calls` → `storage/app/private/calls`). Public uploads reuse that disk and are **not** streamed to anonymous users.
+
+Transcription runs asynchronously: upload → `TranscribeCall` job → ElevenLabs Scribe v2 → `transcripts` / `transcript_segments`. AI scoring is **not** implemented.
 
 Audio path pattern on the `calls` disk:
 
 * admin: `{company_id}/{year}/{month}/{uuid}.{ext}`
 * public: `public/{year}/{month}/{uuid}.{ext}`
 
-Original filename is metadata only (DEC-014). Successful upload sets status `uploaded`, not `completed` (DEC-015). `CallProcessingPipeline` exists as a no-op hook; it is not dispatched into processing in this phase.
+Original filename is metadata only (DEC-014). Successful upload sets status `uploaded`, then a queue job moves the Call to `processing` and `transcribed` (DEC-028 / DEC-029). `CallProcessingPipeline` dispatches `TranscribeCall`.
 
 ## Target runtime shape (planned)
 
@@ -53,9 +55,9 @@ Browser
   → nginx
     → PHP-FPM / Laravel
       → MySQL
-      → private local disk `calls` (Phase 2; object storage still TBD)
-      → queue workers
-        → STT / diarization provider (TBD)
+      → private local disk `calls`
+      → queue workers (`sales-worker.service`, database queue)
+        → ElevenLabs Scribe v2 (STT + diarization)
         → LLM provider (TBD)
         → embeddings / vector store (TBD)
 ```
@@ -72,21 +74,21 @@ Upload
   → report ready
 ```
 
-Status values for a call: `pending` → `uploaded` → `processing` → `completed`, or `failed`. After Phase 2 upload the record stays `uploaded` until a later phase starts processing.
+Status values for a call: `pending` → `uploaded` → `processing` → `transcribed`, then later `completed` after AI analysis, or `failed`.
 
-Queues **will** be needed for heavy audio work. Which queue backend (database, Redis, etc.) is **TBD**. Laravel currently uses `QUEUE_CONNECTION=database` in production `.env`; that may or may not be enough. **Open question.**
+Queues: production uses `QUEUE_CONNECTION=database` and systemd unit `/etc/systemd/system/sales-worker.service`.
 
 ## AI architecture
 
-**Not chosen.** Do not treat any vendor as selected.
+LLM scoring is **not chosen** (DEC-006). STT is ElevenLabs Scribe v2 (DEC-024 / DEC-025).
 
 ### Open choices
 
 | Concern | Status | Candidate examples (not a decision) |
 |---|---|---|
 | LLM | Open | General-purpose APIs (OpenAI, Anthropic, Gemini, others). Kit already has UI stubs for OpenAI / Anthropic / Gemini — that is kit UI, not a product decision. |
-| Transcription (STT) | Open | Whisper-class APIs, Deepgram, AssemblyAI, Google, provider bundled with diarization, others. |
-| Diarization | Open | Same provider as STT, or a separate step. |
+| Transcription (STT) | Accepted (DEC-024 / DEC-025) | ElevenLabs Scribe v2 |
+| Diarization | Accepted (DEC-027) | Same ElevenLabs STT call (`diarize=true`). Speakers stored as integers (`Speaker 1` in UI). Manager/Client labeling is later. |
 | Embeddings | Open | Same LLM vendor or dedicated embeddings API. |
 | Vector store | Open | Could be skipped in MVP if context is a short form. Later: pgvector-like, dedicated vector DB, or files+MySQL. **TBD.** |
 
@@ -100,14 +102,14 @@ Analysis is expected to be **several structured LLM calls**, not a mandatory mul
 |---|---|---|
 | Relational records | MySQL `sales` | Keep MySQL for users, companies, calls, scores |
 | Audio files | Private local disk `calls` (`storage/app/private/calls`) | Object storage (S3-compatible) **TBD** |
-| Transcripts | Not implemented | Table vs JSON. **TBD** — [DATA_MODEL.md](DATA_MODEL.md) |
+| Transcripts | `transcripts` + `transcript_segments` | Keep normalized tables |
 | Company knowledge | Not implemented | Documents + optional RAG. **TBD** |
 
 ## Frontend architecture
 
 Current: Inertia React + Vite + Ziggy.
 
-* Public product UI uses `PublicLayout` and `Pages/Public/Home` (upload + report shell). It is not the admin panel.
+* Public product UI uses `PublicLayout` and `Pages/Public/Home` (upload, polling, transcript). AI report sections stay empty until a later phase.
 * Admin UI remains Custom Admin Kit layouts (`AdminLayout`, `/dashboard`, CRUD).
 * Same Laravel/Inertia app; no separate frontend.
 
@@ -120,6 +122,7 @@ Constraints (accepted operationally during deploy):
 * project files only under `/var/www/sales`;
 * dedicated MySQL database `sales` (production) and `sales_testing` (PHPUnit only, isolated MySQL user);
 * dedicated nginx vhost `sales.owlsolutions.net`;
+* dedicated queue worker `sales-worker.service` (this project only);
 * no edits to other nginx sites, other `.env` files, or other databases;
 * nginx `reload` after `nginx -t`, not a casual `restart`.
 
@@ -139,12 +142,10 @@ See DEC-021 and DEC-022.
 
 * Do not add microservices “for AI cleanliness.”
 * Do not train a custom model.
-* Do not pick STT/LLM providers in code until a decision is recorded.
+* Do not pick an LLM provider in code until a decision is recorded.
 * Do not migrate kit CRM tables away until Phase 1 adaptation is specified.
 
 ## Open architecture questions
 
-* Queue driver for production audio jobs.
 * Audio object storage.
-* Whether kit AI settings screens will wrap the product’s LLM/STT keys or a separate config will be used.
-* Idempotency and retry policy for provider calls.
+* Whether kit AI settings screens will wrap the product’s LLM keys or a separate config will be used.

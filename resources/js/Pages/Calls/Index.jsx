@@ -18,7 +18,7 @@ function formatDate(value) {
 }
 
 function statusClass(status) {
-    if (status === 'completed') return 'bg-emerald-100 text-emerald-800';
+    if (status === 'completed' || status === 'transcribed') return 'bg-emerald-100 text-emerald-800';
     if (status === 'uploaded') return 'bg-indigo-100 text-indigo-800';
     if (status === 'processing') return 'bg-amber-100 text-amber-800';
     if (status === 'failed') return 'bg-red-100 text-red-800';

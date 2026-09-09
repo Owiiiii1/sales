@@ -107,14 +107,14 @@ Status values: `Accepted` | `Open` | `Superseded` | `Rejected`.
 ## DEC-007
 
 **Title:** STT / transcription (and diarization) provider  
-**Status:** Open  
+**Status:** Superseded  
 **Date:** 2026-09-09
 
-**Decision:** Not selected.
+**Decision:** Not selected (superseded by DEC-024 / DEC-025).
 
-**Reason:** Depends on language, diarization quality, cost, and privacy. Not evaluated yet.
+**Reason:** Closed in Phase 3.
 
-**Consequences:** Phase 3 cannot be implemented as production integration until this closes. Conversation metrics that need timestamps/overlap remain TBD.
+**Consequences:** See DEC-024 and DEC-025.
 
 ---
 
@@ -342,10 +342,94 @@ Status values: `Accepted` | `Open` | `Superseded` | `Rejected`.
 
 ---
 
+## DEC-024
+
+**Title:** ElevenLabs is initial STT provider  
+**Status:** Accepted  
+**Date:** 2026-09-09
+
+**Decision:** The first transcription provider is ElevenLabs, behind a `TranscriptionProvider` interface.
+
+**Reason:** Batch Speech-to-Text with diarization and timestamps is available as Scribe v2, and the product needed a real STT integration before analysis.
+
+**Consequences:** HTTP details stay in `ElevenLabsTranscriptionClient`. Jobs and controllers consume `TranscriptionResult` only. The API key is `ELEVENLABS_API_KEY` in the environment, never Git.
+
+---
+
+## DEC-025
+
+**Title:** Scribe v2 is initial transcription model  
+**Status:** Accepted  
+**Date:** 2026-09-09
+
+**Decision:** Use ElevenLabs model id `scribe_v2` for prerecorded / batch transcription.
+
+**Reason:** Scribe v2 is the current batch STT model with diarization and word timestamps. Realtime Scribe is out of scope.
+
+**Consequences:** Config default `ELEVENLABS_STT_MODEL=scribe_v2`. Endpoint `POST https://api.elevenlabs.io/v1/speech-to-text`.
+
+---
+
+## DEC-026
+
+**Title:** Supported languages are EN/RU/UK  
+**Status:** Accepted  
+**Date:** 2026-09-09
+
+**Decision:** Product languages are English, Russian, and Ukrainian (`en`, `ru`, `uk`). After STT, detected language is normalized and must be in that allowlist.
+
+**Reason:** Those are the languages the product is built for.
+
+**Consequences:** Other detected languages fail the call as unsupported. Public copy: `This language is not supported yet.`
+
+---
+
+## DEC-027
+
+**Title:** Diarized transcript stored in normalized segments  
+**Status:** Accepted  
+**Date:** 2026-09-09
+
+**Decision:** Persist a `transcripts` row per Call and ordered `transcript_segments` with 0-based speaker integers, start/end seconds, and text. UI shows `Speaker 1`, `Speaker 2`, …
+
+**Reason:** Provider JSON must not leak through the app. Manager vs Client labeling is later (LLM), not this phase.
+
+**Consequences:** `provider_metadata` stores only compact fields. Public JSON never includes it.
+
+---
+
+## DEC-028
+
+**Title:** Transcription runs asynchronously  
+**Status:** Accepted  
+**Date:** 2026-09-09
+
+**Decision:** After upload, dispatch `TranscribeCall` on the Laravel database queue. Do not call STT inside the HTTP upload request.
+
+**Reason:** Provider latency and retries would block uploads.
+
+**Consequences:** Dedicated systemd worker `sales-worker.service`. Status stays `uploaded` until the job starts (`processing`).
+
+---
+
+## DEC-029
+
+**Title:** `transcribed` is separate from full AI completion  
+**Status:** Accepted  
+**Date:** 2026-09-09
+
+**Decision:** Successful STT sets Call status `transcribed`. `completed` is reserved for a later full AI analysis.
+
+**Reason:** A transcript is not a sales analysis. Mixing them would hide the next pipeline stage.
+
+**Consequences:** Public UI says transcription is complete and keeps AI report sections empty. Badges treat `transcribed` as a success state for this phase.
+
+---
+
 ## Template for new entries
 
 ```
-## DEC-024
+## DEC-030
 
 **Title:**  
 **Status:** Open | Accepted  

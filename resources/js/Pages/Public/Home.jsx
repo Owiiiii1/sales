@@ -1,4 +1,5 @@
 import AnalysisReport from '@/Components/Public/AnalysisReport';
+import CallTranscript from '@/Components/Public/CallTranscript';
 import PublicLayout from '@/Layouts/PublicLayout';
 import { Head } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
@@ -47,10 +48,10 @@ export default function PublicHome({ upload = {} }) {
                 }
                 const payload = await response.json();
                 setResult((current) => ({ ...(current ?? {}), ...payload }));
-                if (payload.status === 'processing') {
-                    setUiStatus('processing');
+                if (payload.status === 'uploaded' || payload.status === 'processing') {
+                    setUiStatus(payload.status);
                 }
-                if (payload.status === 'completed' || payload.status === 'failed') {
+                if (payload.status === 'transcribed' || payload.status === 'completed' || payload.status === 'failed') {
                     setUiStatus(payload.status);
                     stopPolling();
                     const full = await fetch(route('analysis.show', token), {
@@ -102,14 +103,11 @@ export default function PublicHome({ upload = {} }) {
 
             setResult(payload);
             setFile(audio);
-
-            if (payload.status === 'processing') {
-                setUiStatus('processing');
-                startPolling(payload.public_token);
-                return;
-            }
-
             setUiStatus(payload.status || 'uploaded');
+
+            if (payload.status === 'uploaded' || payload.status === 'processing') {
+                startPolling(payload.public_token);
+            }
         } catch {
             setError('Upload failed. Please try again.');
             setUiStatus('failed');
@@ -118,8 +116,9 @@ export default function PublicHome({ upload = {} }) {
 
     const statusLabel = {
         uploading: 'Uploading',
-        uploaded: 'Uploaded',
-        processing: 'Processing',
+        uploaded: 'Queued',
+        processing: 'Transcribing',
+        transcribed: 'Transcribed',
         completed: 'Completed',
         failed: 'Failed',
     }[uiStatus] ?? '';
@@ -205,12 +204,16 @@ export default function PublicHome({ upload = {} }) {
                     )}
                 </section>
 
-                <div className="mt-10">
+                <div className="mt-10 space-y-6">
                     <AnalysisReport
                         status={uiStatus === 'idle' ? null : uiStatus}
                         report={result?.report}
                         message={result?.message}
+                        error={result?.error}
                     />
+                    {uiStatus === 'transcribed' && result?.transcript && (
+                        <CallTranscript transcript={result.transcript} />
+                    )}
                 </div>
             </div>
         </PublicLayout>

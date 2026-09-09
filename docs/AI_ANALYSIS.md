@@ -1,6 +1,6 @@
 # Sales Analyzer — AI Analysis
 
-This is a design document for the analysis engine. **No AI pipeline is implemented yet.** Providers are not selected.
+This is a design document for the analysis engine. **STT is implemented (ElevenLabs Scribe v2). LLM sales analysis is not.** Providers for scoring remain Open (DEC-006).
 
 ## Main principle
 
@@ -49,15 +49,15 @@ Final report
 
 Each arrow may be one or more jobs. Failures should be visible as call status, not silent.
 
-STT and diarization may be one provider call or two. **TBD.**
+STT and diarization are one ElevenLabs Scribe v2 call (`diarize=true`, word timestamps). Speakers are stored as integers and shown as `Speaker 1`, `Speaker 2`. Manager vs Client is **not** assigned in this phase.
 
 ## Transcription and speakers
 
 Needed for analysis:
 
 * full text;
-* who spoke (manager vs client vs unknown / other);
-* timestamps when the STT provider supplies them.
+* speaker turns (`Speaker 1` …), not Manager/Client yet;
+* timestamps from the STT provider.
 
 If a provider cannot diarize reliably, analysis quality drops. Fallback behavior is **TBD** (manual speaker labels vs “unknown speaker”).
 
@@ -73,7 +73,7 @@ These are useful if the STT/diarization output supports them. Mark unavailable m
 | Pauses | Awkward silence vs thinking | **TBD** |
 | Question count | Discovery quality | Usually possible from transcript |
 | Open vs closed questions | Discovery quality | LLM classification; rubric **TBD** |
-| Talk speed | Delivery | Needs timestamps. **TBD** |
+| Talk speed | Delivery | Timestamps exist on segments; metric not computed yet |
 | Sentiment / emotion | Tone | Only if technically reliable. **TBD**; do not fake precision |
 
 ## What we analyze (minimum categories)
@@ -239,8 +239,8 @@ Do not ship scores we cannot explain.
 ## Open questions
 
 * LLM provider (DEC-006).
-* STT / diarization provider (DEC-007).
+* STT / diarization: ElevenLabs Scribe v2 (DEC-024 / DEC-025 / DEC-027).
 * Whether MVP uses one LLM pass or the preferred multi-pass split.
 * Numeric scale (0–10 vs 0–100 vs weighted 0–100).
-* Language of prompts vs language of the call (auto-detect **TBD**).
+* Language of analysis prompts vs language of the call (STT detects `en`/`ru`/`uk`).
 * Human review / override of scores.

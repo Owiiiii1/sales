@@ -2,12 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\TranscribeCall;
 use App\Models\Call;
 use App\Models\Company;
 use App\Models\Employee;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -49,6 +51,7 @@ class PublicAnalyzerTest extends TestCase
         $this->assertSame('public-call.mp3', $call->original_filename);
         $this->assertStringStartsWith('public/', $call->storage_path);
         Storage::disk(config('sales-analyzer.storage_disk'))->assertExists($call->storage_path);
+        Queue::assertPushed(TranscribeCall::class, fn (TranscribeCall $job): bool => $job->callId === $call->id);
     }
 
     public function test_public_tokens_are_unique(): void
@@ -126,6 +129,8 @@ class PublicAnalyzerTest extends TestCase
         $this->getJson("/analysis/{$token}")
             ->assertOk()
             ->assertJsonPath('report', null)
+            ->assertJsonPath('transcript', null)
+            ->assertJsonPath('message', 'Your call is queued for transcription.')
             ->assertJsonMissingPath('id')
             ->assertJsonMissingPath('storage_path');
     }

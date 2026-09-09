@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\PublicAnalyzeRequest;
 use App\Models\Call;
 use App\Services\Calls\CallUploadService;
+use App\Support\TranscriptPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
@@ -71,6 +72,7 @@ class PublicAnalyzerController extends Controller
     {
         return Call::query()
             ->where('public_token', $publicToken)
+            ->with(['transcript.segments'])
             ->firstOrFail();
     }
 
@@ -79,6 +81,8 @@ class PublicAnalyzerController extends Controller
      */
     private function safePayload(Call $call): array
     {
+        $transcript = TranscriptPresenter::public($call);
+
         return [
             'public_token' => $call->public_token,
             'status' => $call->status,
@@ -87,10 +91,22 @@ class PublicAnalyzerController extends Controller
             'error' => $this->publicError($call),
             'report_available' => $this->reportAvailable($call),
             'report' => null,
-            'message' => $call->status === 'uploaded'
-                ? 'Call uploaded successfully. Analysis engine is not connected yet.'
-                : null,
+            'language' => $transcript['language'] ?? null,
+            'duration_seconds' => $transcript['duration_seconds'] ?? $call->duration_seconds,
+            'transcript' => $transcript,
+            'message' => $this->publicMessage($call),
         ];
+    }
+
+    private function publicMessage(Call $call): ?string
+    {
+        return match ($call->status) {
+            'uploaded' => 'Your call is queued for transcription.',
+            'processing' => 'Transcribing your call…',
+            'transcribed' => 'Transcription complete.',
+            'failed' => $this->publicError($call),
+            default => null,
+        };
     }
 
     private function publicError(Call $call): ?string
@@ -99,7 +115,11 @@ class PublicAnalyzerController extends Controller
             return null;
         }
 
-        return 'Analysis failed. Please try again.';
+        if ($call->error_message === 'This language is not supported yet.') {
+            return $call->error_message;
+        }
+
+        return 'Transcription failed. Please try again.';
     }
 
     private function reportAvailable(Call $call): bool

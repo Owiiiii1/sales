@@ -19,7 +19,7 @@ function formatDate(value) {
 }
 
 function statusClass(status) {
-    if (status === 'completed') return 'bg-emerald-100 text-emerald-800';
+    if (status === 'completed' || status === 'transcribed') return 'bg-emerald-100 text-emerald-800';
     if (status === 'uploaded') return 'bg-indigo-100 text-indigo-800';
     if (status === 'processing') return 'bg-amber-100 text-amber-800';
     if (status === 'failed') return 'bg-red-100 text-red-800';
@@ -60,6 +60,15 @@ export default function CallsShow({ call, companies = [], employees = [] }) {
                                 <a href={call.download_url} className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white">
                                     Download
                                 </a>
+                            )}
+                            {call.can_retry_transcription && (
+                                <button
+                                    type="button"
+                                    className="rounded-lg border border-indigo-200 px-3 py-2 text-sm font-medium text-indigo-700"
+                                    onClick={() => router.post(route('calls.transcribe', call.id))}
+                                >
+                                    Retry transcription
+                                </button>
                             )}
                             <button
                                 type="button"
@@ -150,8 +159,42 @@ export default function CallsShow({ call, companies = [], employees = [] }) {
 
                 <section className="app-widget p-4">
                     <h3 className="text-base font-semibold text-slate-900">Transcript</h3>
-                    <p className="mt-2 text-sm text-slate-500">Not available yet</p>
-                    <p className="mt-1 text-sm text-slate-400">Transcript will appear here after transcription.</p>
+                    {call.status === 'processing' && (
+                        <div className="mt-4 flex items-center gap-3 text-sm text-slate-600">
+                            <span className="h-5 w-5 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600" />
+                            Transcribing this call…
+                        </div>
+                    )}
+                    {call.status === 'uploaded' && !call.transcript && (
+                        <p className="mt-3 text-sm text-slate-500">Queued for transcription.</p>
+                    )}
+                    {call.status === 'failed' && !call.transcript && (
+                        <p className="mt-3 text-sm text-red-700">{call.error_message || 'Transcription failed. Please try again.'}</p>
+                    )}
+                    {call.transcript && (
+                        <div className="mt-4 space-y-4">
+                            <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 text-sm">
+                                <Item label="Provider" value={call.transcript.provider_label} />
+                                <Item label="Model" value={call.transcript.model_label} />
+                                <Item label="Detected language" value={call.transcript.language ? call.transcript.language.toUpperCase() : null} />
+                                <Item label="Duration" value={formatDuration(call.transcript.duration_seconds)} />
+                            </dl>
+                            {call.transcript.segments?.length > 0 ? (
+                                <div className="space-y-3">
+                                    {call.transcript.segments.map((segment, index) => (
+                                        <div key={`${segment.speaker}-${segment.start_seconds}-${index}`}>
+                                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                                {segment.start_label} {segment.speaker_label}
+                                            </p>
+                                            <p className="mt-1 text-sm leading-6 text-slate-800">{segment.text}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="whitespace-pre-wrap text-sm leading-6 text-slate-800">{call.transcript.text}</p>
+                            )}
+                        </div>
+                    )}
                 </section>
 
                 <section className="app-widget p-4">

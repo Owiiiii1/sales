@@ -2,7 +2,7 @@
 
 This document describes the product we intend to build. It is not a description of the current UI.
 
-The live site has a **public homepage** at `/` for uploading a sales call, plus an admin at `/login`. Transcription and scoring are not built yet. See [STATUS.md](STATUS.md).
+The live site has a **public homepage** at `/` for uploading a sales call, plus an admin at `/login`. Transcription is queued through ElevenLabs Scribe v2. Scoring is not built yet. See [STATUS.md](STATUS.md).
 
 ## Problem
 

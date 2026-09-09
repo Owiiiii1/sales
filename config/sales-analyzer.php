@@ -51,4 +51,15 @@ return [
 
     'public_status_per_minute' => (int) env('SALES_PUBLIC_STATUS_PER_MINUTE', 60),
 
+    'transcription' => [
+        'provider' => env('SALES_TRANSCRIPTION_PROVIDER', 'elevenlabs'),
+        'model' => env('ELEVENLABS_STT_MODEL', 'scribe_v2'),
+        'api_key' => env('ELEVENLABS_API_KEY'),
+        'endpoint' => env('ELEVENLABS_STT_ENDPOINT', 'https://api.elevenlabs.io/v1/speech-to-text'),
+        'timeout' => (int) env('ELEVENLABS_STT_TIMEOUT', 120),
+        'supported_languages' => ['en', 'ru', 'uk'],
+        'diarization' => true,
+        'timestamps' => true,
+    ],
+
 ];
