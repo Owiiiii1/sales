@@ -2,11 +2,15 @@
 
 namespace App\Models;
 
+use Database\Factories\TranscriptSegmentFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class TranscriptSegment extends Model
 {
+    /** @use HasFactory<TranscriptSegmentFactory> */
+    use HasFactory;
     protected $fillable = [
         'transcript_id',
         'speaker',

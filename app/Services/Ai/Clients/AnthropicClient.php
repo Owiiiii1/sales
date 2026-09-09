@@ -3,6 +3,9 @@
 namespace App\Services\Ai\Clients;
 
 use App\Services\Ai\Contracts\AiProviderClient;
+use App\Services\Ai\JsonPayloadParser;
+use App\Services\Ai\ProviderHttp;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
@@ -49,5 +52,50 @@ class AnthropicClient implements AiProviderClient
         }
 
         return $models;
+    }
+
+    /**
+     * @param  array<string, mixed>  $jsonSchema
+     * @return array<string, mixed>
+     */
+    public function completeJson(
+        string $apiKey,
+        string $model,
+        string $system,
+        string $user,
+        array $jsonSchema,
+    ): array {
+        try {
+            $response = Http::timeout(90)
+                ->connectTimeout(15)
+                ->withHeaders([
+                    'x-api-key' => $apiKey,
+                    'anthropic-version' => '2023-06-01',
+                ])
+                ->acceptJson()
+                ->post('https://api.anthropic.com/v1/messages', [
+                    'model' => $model,
+                    'max_tokens' => 8192,
+                    'temperature' => 0.2,
+                    'system' => $system."\n\nReturn only JSON matching this schema:\n".json_encode($jsonSchema),
+                    'messages' => [
+                        ['role' => 'user', 'content' => $user],
+                    ],
+                ]);
+        } catch (ConnectionException $e) {
+            throw ProviderHttp::wrapConnection($e);
+        }
+
+        ProviderHttp::throwForStatus($response, 'anthropic');
+
+        $blocks = $response->json('content', []);
+        $text = '';
+        foreach (is_array($blocks) ? $blocks : [] as $block) {
+            if (is_array($block) && ($block['type'] ?? null) === 'text') {
+                $text .= (string) ($block['text'] ?? '');
+            }
+        }
+
+        return JsonPayloadParser::parse($text);
     }
 }

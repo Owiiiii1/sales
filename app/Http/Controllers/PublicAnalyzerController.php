@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\PublicAnalyzeRequest;
 use App\Models\Call;
 use App\Services\Calls\CallUploadService;
+use App\Support\SalesAnalysisPresenter;
 use App\Support\TranscriptPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
@@ -72,7 +73,7 @@ class PublicAnalyzerController extends Controller
     {
         return Call::query()
             ->where('public_token', $publicToken)
-            ->with(['transcript.segments'])
+            ->with(['transcript.segments', 'analysis'])
             ->firstOrFail();
     }
 
@@ -90,7 +91,7 @@ class PublicAnalyzerController extends Controller
             'progress' => null,
             'error' => $this->publicError($call),
             'report_available' => $this->reportAvailable($call),
-            'report' => null,
+            'report' => SalesAnalysisPresenter::public($call),
             'language' => $transcript['language'] ?? null,
             'duration_seconds' => $transcript['duration_seconds'] ?? $call->duration_seconds,
             'transcript' => $transcript,
@@ -104,6 +105,9 @@ class PublicAnalyzerController extends Controller
             'uploaded' => 'Your call is queued for transcription.',
             'processing' => 'Transcribing your call…',
             'transcribed' => 'Transcription complete.',
+            'analysis_pending' => 'Transcription complete. AI analysis is not configured yet.',
+            'analyzing' => 'Analyzing your sales call…',
+            'completed' => 'Analysis complete.',
             'failed' => $this->publicError($call),
             default => null,
         };
@@ -117,6 +121,12 @@ class PublicAnalyzerController extends Controller
 
         if ($call->error_message === 'This language is not supported yet.') {
             return $call->error_message;
+        }
+
+        if ($call->transcript !== null) {
+            return $call->error_message === 'Analysis is not available yet.'
+                ? $call->error_message
+                : 'Analysis failed. Please try again.';
         }
 
         return 'Transcription failed. Please try again.';

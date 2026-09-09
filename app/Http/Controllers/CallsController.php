@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\AnalyzeCall;
 use App\Jobs\TranscribeCall;
 use App\Http\Requests\StoreCallRequest;
 use App\Http\Requests\UpdateCallRequest;
@@ -11,6 +12,7 @@ use App\Models\Employee;
 use App\Services\Calls\CallAudioStreamer;
 use App\Services\Calls\CallAudioStorage;
 use App\Services\Calls\CallUploadService;
+use App\Support\SalesAnalysisPresenter;
 use App\Support\TranscriptPresenter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -90,7 +92,7 @@ class CallsController extends Controller
 
     public function show(Call $call, CallAudioStorage $storage): Response
     {
-        $call->load(['company:id,name', 'employee:id,first_name,last_name,company_id', 'uploadedBy:id,name,email', 'transcript.segments']);
+        $call->load(['company:id,name', 'employee:id,first_name,last_name,company_id', 'uploadedBy:id,name,email', 'transcript.segments', 'analysis']);
 
         return Inertia::render('Calls/Show', [
             'call' => $this->detailPayload($call, $storage),
@@ -144,6 +146,27 @@ class CallsController extends Controller
         }
 
         TranscribeCall::dispatch($call->id);
+
+        return back();
+    }
+
+    public function analyze(Call $call): RedirectResponse
+    {
+        if (in_array($call->status, ['processing', 'analyzing'], true)) {
+            return back()->withErrors([
+                'call' => 'This call is already being processed.',
+            ]);
+        }
+
+        $call->loadMissing('transcript');
+
+        if ($call->transcript === null) {
+            return back()->withErrors([
+                'call' => 'A transcript is required before analysis can run.',
+            ]);
+        }
+
+        AnalyzeCall::dispatch($call->id);
 
         return back();
     }
@@ -230,8 +253,11 @@ class CallsController extends Controller
             'has_audio' => $hasAudio,
             'audio_url' => $hasAudio ? route('calls.audio', $call) : null,
             'download_url' => $hasAudio ? route('calls.download', $call) : null,
-            'can_retry_transcription' => in_array($call->status, ['uploaded', 'failed', 'transcribed'], true),
+            'can_retry_transcription' => in_array($call->status, ['uploaded', 'failed', 'transcribed', 'analysis_pending', 'completed'], true),
+            'can_run_analysis' => $call->transcript !== null && in_array($call->status, ['transcribed', 'analysis_pending', 'failed'], true),
+            'can_rerun_analysis' => $call->transcript !== null && $call->status === 'completed',
             'transcript' => TranscriptPresenter::admin($call),
+            'analysis' => SalesAnalysisPresenter::admin($call),
         ];
     }
 }

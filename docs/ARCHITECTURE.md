@@ -29,22 +29,22 @@ See [STATUS.md](STATUS.md) for operational detail.
 
 Laravel 13 + Custom Admin Kit, with a public product surface and an admin foundation:
 
-* guest `/` → public Sales Analyzer homepage (upload + future report);
+* guest `/` → public Sales Analyzer homepage (upload, transcript, structured report);
 * `/login` → admin login;
 * authenticated `/dashboard` → admin;
 * product admin routes: `/companies`, `/employees`, `/calls`;
 * kit CRM routes still exist but are not in primary navigation.
 
-Domain models **Company**, **Employee**, and **Call** exist. Audio is stored on a **private** Laravel disk (`calls` → `storage/app/private/calls`). Public uploads reuse that disk and are **not** streamed to anonymous users.
+Domain models **Company**, **Employee**, **Call**, **Transcript**, and **SalesAnalysis** exist. Audio is stored on a **private** Laravel disk (`calls` → `storage/app/private/calls`). Public uploads reuse that disk and are **not** streamed to anonymous users.
 
-Transcription runs asynchronously: upload → `TranscribeCall` job → ElevenLabs Scribe v2 → `transcripts` / `transcript_segments`. AI scoring is **not** implemented.
+Pipeline: upload → `TranscribeCall` (ElevenLabs Scribe v2) → `AnalyzeCall` (active kit AI provider). If no AI key/model is configured, the Call stays `analysis_pending`.
 
 Audio path pattern on the `calls` disk:
 
 * admin: `{company_id}/{year}/{month}/{uuid}.{ext}`
 * public: `public/{year}/{month}/{uuid}.{ext}`
 
-Original filename is metadata only (DEC-014). Successful upload sets status `uploaded`, then a queue job moves the Call to `processing` and `transcribed` (DEC-028 / DEC-029). `CallProcessingPipeline` dispatches `TranscribeCall`.
+Original filename is metadata only (DEC-014). Successful upload sets status `uploaded`. STT uses `processing`; AI uses `analyzing` (DEC-032). `completed` means a validated structured analysis exists (DEC-029 / DEC-030).
 
 ## Target runtime shape (planned)
 
@@ -58,8 +58,8 @@ Browser
       → private local disk `calls`
       → queue workers (`sales-worker.service`, database queue)
         → ElevenLabs Scribe v2 (STT + diarization)
-        → LLM provider (TBD)
-        → embeddings / vector store (TBD)
+        → configured kit LLM (OpenAI / Anthropic / Gemini) for generic sales analysis
+        → embeddings / vector store (TBD, later company knowledge)
 ```
 
 ## Preferred processing chain
@@ -74,21 +74,21 @@ Upload
   → report ready
 ```
 
-Status values for a call: `pending` → `uploaded` → `processing` → `transcribed`, then later `completed` after AI analysis, or `failed`.
+Status values for a call: `uploaded` → `processing` → `transcribed` → `analysis_pending` or `analyzing` → `completed`, or `failed`.
 
 Queues: production uses `QUEUE_CONNECTION=database` and systemd unit `/etc/systemd/system/sales-worker.service`.
 
 ## AI architecture
 
-LLM scoring is **not chosen** (DEC-006). STT is ElevenLabs Scribe v2 (DEC-024 / DEC-025).
+LLM vendor is **operator-configured** via Custom Admin Kit Settings → AI (`ai_provider_settings`). Product does not lock a single vendor (DEC-006 remains Open). Analysis HTTP uses the same stored key/model (`ConfiguredSalesAnalysisProvider`).
 
 ### Open choices
 
 | Concern | Status | Candidate examples (not a decision) |
 |---|---|---|
-| LLM | Open | General-purpose APIs (OpenAI, Anthropic, Gemini, others). Kit already has UI stubs for OpenAI / Anthropic / Gemini — that is kit UI, not a product decision. |
+| LLM | Open (DEC-006) | Kit settings: OpenAI, Anthropic, Gemini. First configured active provider is used. |
 | Transcription (STT) | Accepted (DEC-024 / DEC-025) | ElevenLabs Scribe v2 |
-| Diarization | Accepted (DEC-027) | Same ElevenLabs STT call (`diarize=true`). Speakers stored as integers (`Speaker 1` in UI). Manager/Client labeling is later. |
+| Diarization | Accepted (DEC-027 / DEC-034) | Same ElevenLabs STT call. Transcript speakers stay integers. Seller/customer mapping lives on the analysis JSON. |
 | Embeddings | Open | Same LLM vendor or dedicated embeddings API. |
 | Vector store | Open | Could be skipped in MVP if context is a short form. Later: pgvector-like, dedicated vector DB, or files+MySQL. **TBD.** |
 
@@ -103,13 +103,14 @@ Analysis is expected to be **several structured LLM calls**, not a mandatory mul
 | Relational records | MySQL `sales` | Keep MySQL for users, companies, calls, scores |
 | Audio files | Private local disk `calls` (`storage/app/private/calls`) | Object storage (S3-compatible) **TBD** |
 | Transcripts | `transcripts` + `transcript_segments` | Keep normalized tables |
+| Sales analyses | `sales_analyses` (versioned JSON `result`) | Keep JSON source of truth; company-specific scorecards later |
 | Company knowledge | Not implemented | Documents + optional RAG. **TBD** |
 
 ## Frontend architecture
 
 Current: Inertia React + Vite + Ziggy.
 
-* Public product UI uses `PublicLayout` and `Pages/Public/Home` (upload, polling, transcript). AI report sections stay empty until a later phase.
+* Public product UI uses `PublicLayout` and `Pages/Public/Home` (upload, polling, transcript, structured report).
 * Admin UI remains Custom Admin Kit layouts (`AdminLayout`, `/dashboard`, CRUD).
 * Same Laravel/Inertia app; no separate frontend.
 

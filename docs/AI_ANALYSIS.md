@@ -1,6 +1,6 @@
 # Sales Analyzer — AI Analysis
 
-This is a design document for the analysis engine. **STT is implemented (ElevenLabs Scribe v2). LLM sales analysis is not.** Providers for scoring remain Open (DEC-006).
+This is a design document for the analysis engine. **STT is implemented (ElevenLabs Scribe v2). Generic LLM sales analysis is implemented (schema version 1).** Company RAG and custom scorecards are not. The live LLM vendor is whichever provider an admin activates in Settings → AI (DEC-006 remains Open).
 
 ## Main principle
 
@@ -49,7 +49,9 @@ Final report
 
 Each arrow may be one or more jobs. Failures should be visible as call status, not silent.
 
-STT and diarization are one ElevenLabs Scribe v2 call (`diarize=true`, word timestamps). Speakers are stored as integers and shown as `Speaker 1`, `Speaker 2`. Manager vs Client is **not** assigned in this phase.
+STT and diarization are one ElevenLabs Scribe v2 call (`diarize=true`, word timestamps). Speakers are stored as integers and shown as `Speaker 1`, `Speaker 2`. Seller vs customer is assigned in analysis JSON `speaker_roles` (DEC-034), not by mutating transcript rows.
+
+Phase 4 runs **one** structured LLM call with `SalesAnalysisPromptBuilder`. Generic sales methodology only (DEC-031). Company `description` is not used as RAG. Company name may appear as metadata.
 
 ## Transcription and speakers
 
@@ -238,9 +240,8 @@ Do not ship scores we cannot explain.
 
 ## Open questions
 
-* LLM provider (DEC-006).
+* LLM provider (DEC-006): operator picks OpenAI, Anthropic, or Gemini in kit settings.
 * STT / diarization: ElevenLabs Scribe v2 (DEC-024 / DEC-025 / DEC-027).
-* Whether MVP uses one LLM pass or the preferred multi-pass split.
-* Numeric scale (0–10 vs 0–100 vs weighted 0–100).
-* Language of analysis prompts vs language of the call (STT detects `en`/`ru`/`uk`).
+* Whether later phases split analysis into multiple LLM passes.
+* Custom company scorecards / weighted criteria.
 * Human review / override of scores.

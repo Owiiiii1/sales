@@ -3,6 +3,9 @@
 namespace App\Services\Ai\Clients;
 
 use App\Services\Ai\Contracts\AiProviderClient;
+use App\Services\Ai\JsonPayloadParser;
+use App\Services\Ai\ProviderHttp;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
@@ -54,5 +57,47 @@ class GeminiClient implements AiProviderClient
         }
 
         return $models;
+    }
+
+    /**
+     * @param  array<string, mixed>  $jsonSchema
+     * @return array<string, mixed>
+     */
+    public function completeJson(
+        string $apiKey,
+        string $model,
+        string $system,
+        string $user,
+        array $jsonSchema,
+    ): array {
+        $modelId = str_starts_with($model, 'models/') ? substr($model, 7) : $model;
+
+        try {
+            $response = Http::timeout(90)
+                ->connectTimeout(15)
+                ->acceptJson()
+                ->withQueryParameters(['key' => $apiKey])
+                ->post('https://generativelanguage.googleapis.com/v1beta/models/'.$modelId.':generateContent', [
+                    'systemInstruction' => [
+                        'parts' => [['text' => $system]],
+                    ],
+                    'contents' => [
+                        ['role' => 'user', 'parts' => [['text' => $user]]],
+                    ],
+                    'generationConfig' => [
+                        'temperature' => 0.2,
+                        'responseMimeType' => 'application/json',
+                        'responseSchema' => $jsonSchema,
+                    ],
+                ]);
+        } catch (ConnectionException $e) {
+            throw ProviderHttp::wrapConnection($e);
+        }
+
+        ProviderHttp::throwForStatus($response, 'gemini');
+
+        $text = (string) $response->json('candidates.0.content.parts.0.text', '');
+
+        return JsonPayloadParser::parse($text);
     }
 }

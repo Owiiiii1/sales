@@ -19,6 +19,8 @@ class Call extends Model
         'uploaded',
         'processing',
         'transcribed',
+        'analysis_pending',
+        'analyzing',
         'completed',
         'failed',
     ];
@@ -87,6 +89,11 @@ class Call extends Model
     public function transcript(): HasOne
     {
         return $this->hasOne(Transcript::class);
+    }
+
+    public function analysis(): HasOne
+    {
+        return $this->hasOne(SalesAnalysis::class);
     }
 
     public function fileSizeLabel(): ?string

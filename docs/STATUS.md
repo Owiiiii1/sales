@@ -9,14 +9,17 @@ Factual state of the running project. Update this file when reality changes.
 * **Phase 2 — Audio upload foundation:** COMPLETED
 * **Phase 2.1 — Public Analyzer Shell:** COMPLETED
 * **Phase 2.2 — Test isolation & upload limits:** COMPLETED
-* **Phase 3 — ElevenLabs transcription:** COMPLETED (code + mocked tests). Live provider verification **blocked**: `ELEVENLABS_API_KEY` is not set in `/var/www/sales/.env`.
-* **Next planned work:** Phase 4 AI sales analysis (LLM provider still Open)
+* **Phase 3 — ElevenLabs transcription:** COMPLETED (code + mocked tests). Live ElevenLabs verification deferred by Project Manager.
+* **Phase 4 — Structured AI sales analysis:** COMPLETED (application code + mocked tests). Live LLM verification deferred by Project Manager.
+* **Next planned work:** Phase 5 company knowledge / RAG
 
 ## Product vs running app
 
-Guests open `/`, upload a recording, and poll until transcription finishes. Speakers are shown as `Speaker 1`, `Speaker 2`. **No sales scoring / LLM analysis.**
+Guests open `/`, upload a recording, and poll through transcription and analysis. Speakers remain `Speaker 1`, `Speaker 2` on the transcript. Seller/customer mapping is analysis metadata. Generic sales scores appear when an Admin Kit AI provider is configured.
 
-Admins sign in at `/login`. Call detail shows transcript metadata and a Retry transcription action.
+If Settings → AI has no active provider/key/model, calls stay `analysis_pending` after transcription.
+
+Admins sign in at `/login`. Call detail shows transcript, analysis, Retry transcription, Run analysis, and Re-run analysis.
 
 ## Infrastructure
 
@@ -32,7 +35,8 @@ Admins sign in at `/login`. Call detail shows transcript metadata and a Retry tr
 | Database | MySQL 8 — production `sales`; tests `sales_testing` (user `sales_testing`) |
 | Audio disk | `calls` → `storage/app/private/calls` |
 | Queue | `database` + systemd `sales-worker.service` |
-| STT | ElevenLabs Scribe v2 (key not configured on this app yet) |
+| STT | ElevenLabs Scribe v2 |
+| LLM | Custom Admin Kit Settings → AI (OpenAI / Anthropic / Gemini) |
 
 ## Routes
 
@@ -40,36 +44,27 @@ Admins sign in at `/login`. Call detail shows transcript metadata and a Retry tr
 |---|---|---|
 | `/` | guest | public analyzer |
 | `/login` | guest | admin login |
-| `/dashboard` | guest | redirect `/login` |
-| `/analyze` | guest | public audio upload (queues STT) |
+| `/analyze` | guest | public audio upload |
 | `/analysis/{token}/status` | guest | safe status JSON |
-| `/analysis/{token}` | guest | safe status + transcript when transcribed |
+| `/analysis/{token}` | guest | transcript + report when ready |
 | `POST /calls/{call}/transcribe` | auth | retry STT job |
-| admin CRUD | auth | unchanged plus transcript on Call detail |
+| `POST /calls/{call}/analyze` | auth | run / re-run analysis job |
 
 ## Known issues (non-critical)
 
-* `ELEVENLABS_API_KEY` missing on this project; live STT cannot run until it is set.
-* ffprobe/ffmpeg not installed; duration often comes from the STT provider after success.
+* Live ElevenLabs and live LLM verification deferred by Project Manager.
+* Without an active AI provider, analysis stays `analysis_pending`.
+* ffprobe/ffmpeg not installed; duration often comes from STT.
 * Vite optional `fontaine` warning.
-* `/owl-admin/health` reports preset `core`.
 * CAPTCHA is not implemented; public upload is rate-limited instead.
 * Production MySQL user `sales` still has grants on `sales_testing.*`. Tests do not use that user.
 
-## Upload limits (effective)
-
-| Layer | Value |
-|---|---|
-| Laravel `SALES_AUDIO_MAX_MB` | 200 MB |
-| PHP-FPM `upload_max_filesize` | 200M |
-| PHP-FPM `post_max_size` | 210M |
-| nginx `client_max_body_size` (`sales.owlsolutions.net` only) | 210M |
-| Effective HTTP cap | **200 MB** (application validation) |
-
 ## What is explicitly not done
 
-* no LLM sales analysis / scores / recommendations
-* no Manager vs Client speaker mapping
+* no company RAG / documents / embeddings
+* no custom scorecards
+* no employee or team analytics
+* no CRM integration
 * no public audio streaming
 * no CAPTCHA
 * no deletion of kit CRM modules

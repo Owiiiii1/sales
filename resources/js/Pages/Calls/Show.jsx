@@ -1,4 +1,5 @@
 import AdminLayout from '@/Layouts/AdminLayout';
+import AnalysisReport from '@/Components/Public/AnalysisReport';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { useMemo } from 'react';
 
@@ -19,9 +20,9 @@ function formatDate(value) {
 }
 
 function statusClass(status) {
-    if (status === 'completed' || status === 'transcribed') return 'bg-emerald-100 text-emerald-800';
+    if (status === 'completed' || status === 'transcribed' || status === 'analysis_pending') return 'bg-emerald-100 text-emerald-800';
     if (status === 'uploaded') return 'bg-indigo-100 text-indigo-800';
-    if (status === 'processing') return 'bg-amber-100 text-amber-800';
+    if (status === 'processing' || status === 'analyzing') return 'bg-amber-100 text-amber-800';
     if (status === 'failed') return 'bg-red-100 text-red-800';
     return 'bg-slate-100 text-slate-700';
 }
@@ -68,6 +69,24 @@ export default function CallsShow({ call, companies = [], employees = [] }) {
                                     onClick={() => router.post(route('calls.transcribe', call.id))}
                                 >
                                     Retry transcription
+                                </button>
+                            )}
+                            {call.can_run_analysis && (
+                                <button
+                                    type="button"
+                                    className="rounded-lg border border-indigo-200 px-3 py-2 text-sm font-medium text-indigo-700"
+                                    onClick={() => router.post(route('calls.analyze', call.id))}
+                                >
+                                    Run analysis
+                                </button>
+                            )}
+                            {call.can_rerun_analysis && (
+                                <button
+                                    type="button"
+                                    className="rounded-lg border border-indigo-200 px-3 py-2 text-sm font-medium text-indigo-700"
+                                    onClick={() => router.post(route('calls.analyze', call.id))}
+                                >
+                                    Re-run analysis
                                 </button>
                             )}
                             <button
@@ -199,8 +218,39 @@ export default function CallsShow({ call, companies = [], employees = [] }) {
 
                 <section className="app-widget p-4">
                     <h3 className="text-base font-semibold text-slate-900">AI Analysis</h3>
-                    <p className="mt-2 text-sm text-slate-500">Not available yet</p>
-                    <p className="mt-1 text-sm text-slate-400">AI analysis will appear here after processing.</p>
+                    {call.status === 'analyzing' && (
+                        <div className="mt-4 flex items-center gap-3 text-sm text-slate-600">
+                            <span className="h-5 w-5 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600" />
+                            Analyzing this sales call…
+                        </div>
+                    )}
+                    {call.status === 'analysis_pending' && !call.analysis && (
+                        <p className="mt-3 text-sm text-slate-600">Transcription complete. AI analysis is not configured yet.</p>
+                    )}
+                    {call.status === 'transcribed' && !call.analysis && (
+                        <p className="mt-3 text-sm text-slate-600">Transcript is ready. Analysis has not started yet.</p>
+                    )}
+                    {call.analysis && (
+                        <div className="mt-4 space-y-4">
+                            <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 text-sm">
+                                <Item label="Provider" value={call.analysis.provider_label} />
+                                <Item label="Model" value={call.analysis.model} />
+                                <Item label="Schema version" value={call.analysis.schema_version} />
+                                <Item label="Completed" value={formatDate(call.analysis.completed_at)} />
+                            </dl>
+                            {call.analysis.speaker_roles?.length > 0 && (
+                                <div>
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Speaker roles</p>
+                                    <ul className="mt-2 text-sm text-slate-800">
+                                        {call.analysis.speaker_roles.map((role) => (
+                                            <li key={role.speaker}>{role.speaker_label}: {role.role}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                            <AnalysisReport status="completed" report={call.analysis} />
+                        </div>
+                    )}
                 </section>
             </div>
         </AdminLayout>

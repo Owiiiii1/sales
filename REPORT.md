@@ -1,199 +1,201 @@
-# Sales Analyzer — Phase 3 ElevenLabs Transcription Report
+# Sales Analyzer — Phase 4 Structured AI Sales Analysis Report
 
 ## Baseline
 
-* accepted baseline SHA (Phase 2.2 on `main`): `81b5b92506208317d09685e783a7517f3734fc46`
-* HEAD before work: `81b5b92506208317d09685e783a7517f3734fc46`
+* accepted baseline SHA (Phase 3 on `main`): `d9f143be418a64f96eb32be240121d8463fbb8fc`
+* HEAD before work: `d9f143be418a64f96eb32be240121d8463fbb8fc`
 * working tree before work: clean
 * branch: `main` tracking `origin/main`
 * unpushed commits before work: none
 
-Production database backup (outside Git): `/home/deploy/backups/sales/sales-pre-phase3-20260909-141308.sql`
+Production database backup (outside Git): `/home/deploy/backups/sales/sales-pre-phase4-20260909-163145.sql`
 
-## Provider
+Phase 3 live ElevenLabs verification remains deferred by the Project Manager and did **not** block this phase.
 
-* ElevenLabs
-* Scribe v2 (`model_id=scribe_v2`)
-* endpoint: `POST https://api.elevenlabs.io/v1/speech-to-text`
-* type: batch / prerecorded (multipart file upload)
-* request options: `diarize=true`, `timestamps_granularity=word`
-* auth header: `xi-api-key` from `ELEVENLABS_API_KEY` (never committed)
+## Architecture
 
-Language handling:
+Application layer:
 
-* ElevenLabs has no language allowlist parameter; `language_code` is only a single-language hint.
-* This phase does **not** send a language hint so the provider auto-detects.
-* After the response, `language_code` is normalized (`eng`→`en`, `rus`→`ru`, `ukr`→`uk`) and must be `en`, `ru`, or `uk`.
-* Any other language is a permanent failure. Public copy: `This language is not supported yet.`
-* HTTP details stay in `ElevenLabsTranscriptionClient`. Jobs and controllers consume `TranscriptionResult` only.
+* `SalesAnalysisProvider` interface
+* `ConfiguredSalesAnalysisProvider` adapter over kit AI settings
+* `SalesAnalysisPromptBuilder`
+* `SalesAnalysisResultValidator`
+* `SalesAnalysisResult` DTO
+* `AnalyzeCall` job
 
-## Data Model
+Pipeline:
 
-Additive migration `2026_09_09_160000_create_transcripts_tables` (batch 5 on production). No `migrate:fresh` / reset.
+```
+uploaded → processing → transcribed → analysis_pending | analyzing → completed
+```
 
-`transcripts`:
+`processing` is STT only. `analyzing` is AI only. Missing AI configuration is `analysis_pending`, not a fatal error.
 
-* `call_id` unique FK cascade
-* `provider`, `model`, `language`
-* `raw_text`, `duration_seconds`, `confidence`
-* `provider_request_id`
-* `provider_metadata` JSON (compact only: request id, detected language, model, speaker count, duration, language probability)
-* `started_at`, `completed_at`
+Domain code does not depend on a specific LLM vendor. HTTP stays in kit provider clients, not in the job.
 
-`transcript_segments`:
+## Analysis Schema
 
-* `transcript_id` FK cascade
-* `speaker` unsigned int (0-based)
-* `start_seconds`, `end_seconds`, `text`, `confidence`, `sequence`
-* indexes: `transcript_id`, `sequence`, `speaker`
+`schema_version` = `1`.
 
-Call hasOne Transcript. Transcript hasMany segments ordered by `sequence`. Retranscribe deletes the old transcript **only after** a successful provider result, inside a transaction.
+JSON `result` is the source of truth. Denormalized columns: `overall_score`, `summary`, `provider`, `model`.
 
-## Queue
+Version 1 includes overall score 0–100, summary, call_outcome, customer_intent, speaker_roles, seven sections with `applicable`, strengths/issues as evidence objects, buying signals, missed opportunities, recommendations, better phrases, and next_step.
 
-* `QUEUE_CONNECTION=database` (unchanged)
-* database `retry_after` default raised to **360** seconds so it exceeds the job timeout (180s)
-* Job: `App\Jobs\TranscribeCall`
-  * 3 attempts
-  * backoff `60 / 180 / 600` seconds
-  * timeout 180 seconds
-  * `ShouldBeUniqueUntilProcessing` per call id
-* systemd unit (not in Git): `/etc/systemd/system/sales-worker.service`
-  * User `www-data`
-  * WorkingDirectory `/var/www/sales`
-  * `php8.5 artisan queue:work database --sleep=3 --tries=3 --timeout=300 --max-time=3600`
-  * enabled and **active**
-* Other projects’ workers were not changed.
+Inapplicable sections (for example no pricing talk) use `applicable: false` instead of a fake low score.
 
-## Pipeline
+## Provider Integration
 
-1. Public or admin upload stores private audio and sets status `uploaded`.
-2. `CallProcessingPipeline` dispatches `TranscribeCall` (STT is not called inside the HTTP request).
-3. Job verifies the audio file, sets `processing` + `processing_started_at`.
-4. `TranscriptionProvider` returns a normalized `TranscriptionResult`.
-5. `TranscriptWriter::replace()` transactionally writes transcript + segments.
-6. Call duration is updated from the provider when present.
-7. Status `transcribed`, `processing_completed_at = now`.
+Reused Custom Admin Kit Settings → AI. No second settings table.
+
+Found and reused:
+
+* table `ai_provider_settings`
+* model `AiProviderSetting` (encrypted `api_key`, `is_active`, `active_model`, `available_models`)
+* `AiSettingsController` (save key, check connection, activate/deactivate)
+* `AiProviderManager` and clients: OpenAI, Anthropic, Gemini
+
+Kit clients previously only listed models. `AiProviderClient::completeJson()` was added so chat/completions HTTP lives next to the existing clients. `ActiveAiProvider` reads the active row (active flag + key + model).
+
+If nothing is configured, `AnalyzeCall` sets `analysis_pending` and returns.
+
+## Prompt
+
+`SalesAnalysisPromptBuilder` builds system + user messages.
+
+* generic sales methodology only
+* allowed product languages: English, Russian, Ukrainian
+* write the report in the conversation language
+* do not translate the transcript
+* structured JSON required
+* no hallucination / no invented events
+* evidence quotes must be short
+* seller/customer mapping in `speaker_roles` only
+* score semantics 0–100
+* `applicable: false` when a section does not occur
+* company name is metadata, not RAG
+* company description is not injected
+
+## Validation
+
+`SalesAnalysisResultValidator` requires keys, 0–100 scores, known section names, arrays, allowed outcomes, intents, and speaker roles. Syntactically valid JSON that fails schema is rejected and not saved.
+
+OpenAI uses `response_format.json_schema`. Anthropic/Gemini request JSON and are parsed, then validated the same way.
+
+## Speaker Roles
+
+Transcript segments are unchanged. Analysis JSON maps integer speakers to `seller` | `customer` | `unknown` | `other`. Uncertain mappings must be `unknown`.
 
 ## Status Lifecycle
 
 ```
-uploaded → processing → transcribed
+uploaded
+→ processing
+→ transcribed
+→ analysis_pending
+→ analyzing
+→ completed
 ```
 
-`completed` remains reserved for future AI analysis. Failures use `failed`.
+Failure: `failed`.
 
-Public messages:
+Public copy:
 
 * uploaded: `Your call is queued for transcription.`
 * processing: `Transcribing your call…`
 * transcribed: `Transcription complete.`
+* analysis_pending: `Transcription complete. AI analysis is not configured yet.`
+* analyzing: `Analyzing your sales call…`
+* completed: structured report
+* failed: generic transcription or analysis error (unsupported language still has its own public string)
 
-AI report payload stays `null`. Speakers in UI: `Speaker 1`, `Speaker 2`, … Manager/Client labeling is not implemented.
+## Queue Pipeline
 
-## ElevenLabs Client
+1. Upload dispatches `TranscribeCall` (unchanged).
+2. Successful STT stores transcript, sets `transcribed`, dispatches `AnalyzeCall`.
+3. `AnalyzeCall` requires a transcript.
+4. No AI settings → `analysis_pending`.
+5. Configured → `analyzing` → provider → validate → replace `sales_analyses` → `completed`.
 
-`ElevenLabsTranscriptionClient` implements `TranscriptionProvider`.
+Job: 3 attempts, backoff 60 / 180 / 600 seconds, timeout 180. Transient: timeout / 429 / 5xx. Permanent 4xx / schema / missing transcript do not retry. A previous successful analysis is kept if a later run fails.
 
-* Sends the private audio file; does not log bytes, API key, or full transcript.
-* Groups consecutive words by `speaker_id` into turn segments.
-* Normalizes speaker ids to 0-based integers (`speaker_0` / `speaker_1` → 0 / 1).
-* Does **not** send `detect_speaker_roles` (that would label agent/customer; out of scope).
-* Compact `provider_metadata` only; public JSON never includes it.
+Existing `sales-worker.service` was not replaced.
 
-## Language Support
-
-Product languages: English, Russian, Ukrainian (`en`, `ru`, `uk`). Config: `config/sales-analyzer.php` → `transcription.supported_languages`. Unsupported detected language fails the call without storing a transcript.
-
-## Speaker Diarization
-
-Enabled in the same STT request (`diarize=true`). Stored as integer `speaker` on `transcript_segments`. Frontend label is `Speaker N` (N = speaker + 1). No Manager/Client mapping.
+Admin `POST /calls/{call}/analyze` dispatches the same job (Run analysis / Re-run analysis). No LLM call in the controller.
 
 ## Public UI
 
-* Polls while status is `uploaded` or `processing`.
-* Stops on `transcribed`, `failed`, or `completed`.
-* `GET /analysis/{public_token}` after `transcribed` returns status, language, duration, full text, and segments (human-readable timestamps).
-* Does not return Call id, Transcript id, `storage_path`, `provider_metadata`, raw provider JSON, or API info.
-* AI analysis sections remain empty / future state.
+Polling continues through `transcribed` and `analyzing`, and stops on `analysis_pending`, `completed`, or `failed`.
+
+`GET /analysis/{public_token}` after `completed` returns the structured report without Call/Transcript/analysis ids, storage paths, provider/model, prompts, or raw provider payloads.
+
+`AnalysisReport` now renders overall score, summary, outcome, intent, strengths/weaknesses, the seven sections, buying signals, objections, missed opportunities, recommendations, better phrases, and next step.
+
+Transcript is shown once STT has finished (including while analyzing).
 
 ## Admin UI
 
-Call detail shows provider (ElevenLabs), model (Scribe v2), detected language, duration, full transcript, speaker segments, and timestamps.
+Call detail shows analysis provider, model, schema version, timestamps, speaker roles, and the same structured report. Buttons:
 
-* `processing`: spinner
-* `Retry transcription` for `uploaded`, `failed`, and `transcribed`
-* Action: `POST /calls/{call}/transcribe` dispatches the job; does not call the provider in the controller
-* Retry while `processing` is rejected
+* Retry transcription
+* Run analysis (`transcribed`, `analysis_pending`, `failed` with a transcript)
+* Re-run analysis (`completed`)
 
-## Failure & Retry
+## Data Model
 
-Transient (rethrown, Laravel retries): network timeout, HTTP 429, HTTP 5xx.
+Additive migration `2026_09_09_170000_create_sales_analyses_table` (no fresh/reset).
 
-Permanent (mark `failed`, no extra attempts): missing key, missing audio, HTTP 4xx, invalid payload, unsupported language.
+`sales_analyses`: `call_id` unique FK cascade, provider, model, schema_version, overall_score, summary, result JSON, started_at, completed_at, error_message, timestamps.
 
-On failure:
-
-* Call `status=failed`, `processing_completed_at=now`
-* `error_message` is a sanitized public string
-* audio is retained
-* an existing successful transcript is **not** deleted if a later provider call fails
-
-Logs include technical cause, HTTP status, and provider error code when present. They do not include the API key, audio bytes, or full transcript.
+Call hasOne SalesAnalysis.
 
 ## Tests
 
-`php artisan test`: **61 passed, 0 failed, 337 assertions**. No live ElevenLabs HTTP.
+`php artisan test`: **84 passed, 0 failed, 418 assertions**. No live LLM or ElevenLabs calls.
 
-Coverage in `tests/Feature/TranscriptionTest.php` (Http::fake / sequence):
+Coverage includes:
 
-* public upload dispatches job
-* admin upload dispatches job
-* job sets processing then transcribed
-* Transcript + segments + language + duration stored
-* unsupported language fails
-* provider 5xx is retryable (status stays `processing`)
-* provider permanent 4xx fails and keeps audio
-* retry preserves old successful transcript on later provider failure
-* public transcript response is safe (no ids / storage_path / provider_metadata)
-* admin detail includes transcript
-* admin retry route dispatches job
-* missing audio is a permanent failure
+* transcribed call dispatches `AnalyzeCall`
+* no transcript → analysis impossible
+* no provider config → `analysis_pending`
+* configured provider → analyzing then completed
+* valid structured result / overall score / JSON saved
+* malformed JSON rejected
+* invalid score / outcome / speaker role rejected
+* provider 5xx retryable
+* permanent provider failure handled
+* previous successful analysis preserved on failed rerun
+* public report safe (no provider/model/ids/storage_path)
+* report language preserved (Russian summary stored as-is)
+* admin detail includes analysis
+* manual Run analysis and Re-run analysis
+* public payloads for analyzing and completed
+* existing Phase 1–3 tests remain green
 
-`Queue::fake()` in `tests/TestCase` so the suite never runs STT on `QUEUE_CONNECTION=sync`. Phase 2.2 production DB guard remains green (`TestingDatabaseIsolationTest`).
+`npm run build` is recorded below.
 
-`npm run build` succeeded (optional Vite `fontaine` warning only).
+## Live Provider Verification
 
-## Real ElevenLabs Verification
+`Deferred by Project Manager`
 
-* key present: **no** (`ELEVENLABS_API_KEY` is not set in this app’s `.env`; other projects were not copied)
-* success/failure: **not run**
-* detected language: n/a
-* speaker count: n/a
-* segment count: n/a
-* duration: n/a
-* cleanup: n/a
-
-`LIVE PROVIDER VERIFICATION BLOCKED — ELEVENLABS_API_KEY missing`
-
-Code is complete against mocked tests. Live STT will stay failed until this app’s environment has a real key.
+No live ElevenLabs or LLM call was required or attempted for this phase.
 
 ## Production Sentinel
 
-Recorded on production connection `database=sales` immediately before tests and after tests + `php artisan migrate --force` (nothing pending).
+Recorded on production connection `database=sales` after `php artisan migrate --force` and `php artisan test`.
 
-| Metric | Before | After |
-|---|---|---|
-| users | 1 | 1 |
-| companies | 0 | 0 |
-| employees | 0 | 0 |
-| calls | 0 | 0 |
-| transcripts | 0 | 0 |
-| transcript_segments | 0 | 0 |
-| jobs | 0 | 0 |
-| admin | id `1`, `admin@admin.com` | id `1`, `admin@admin.com` |
+| Metric | After |
+|---|---|
+| users | 1 |
+| companies | 0 |
+| employees | 0 |
+| calls | 0 |
+| transcripts | 0 |
+| transcript_segments | 0 |
+| sales_analyses | 0 |
+| jobs | 0 |
+| admin | id `1`, `admin@admin.com` |
 
-No production row changes during the suite.
+Tests did not write production rows. Migration only added an empty `sales_analyses` table.
 
 ## Documentation
 
@@ -209,135 +211,30 @@ Updated:
 
 Accepted:
 
-* DEC-024 — ElevenLabs is initial STT provider
-* DEC-025 — Scribe v2 is initial transcription model
-* DEC-026 — Supported languages are EN/RU/UK
-* DEC-027 — Diarized transcript stored in normalized segments
-* DEC-028 — Transcription runs asynchronously
-* DEC-029 — `transcribed` is separate from full AI completion
-
-DEC-007 (STT provider) is **Superseded**.
+* DEC-030 — Sales analysis has versioned structured schema
+* DEC-031 — Generic sales analysis precedes company-specific context
+* DEC-032 — AI analysis runs asynchronously
+* DEC-033 — Evidence-backed findings are required
+* DEC-034 — Speaker roles are analysis metadata, not transcript mutation
+* DEC-035 — Live external-provider verification may be deferred during development
 
 ## Changed Files
 
-`git diff --stat 81b5b92506208317d09685e783a7517f3734fc46..f29786dc09f699783da302f90d4cde1023def4a5`
-
-```
- .env.example                                       |   3 +
- README.md                                          |   4 +-
- REPORT.md                                          | 337 ++++++++++++++-------
- .../PermanentTranscriptionException.php            |  19 ++
- .../Transcription/TranscriptionException.php       |  13 +
- .../TransientTranscriptionException.php            |   7 +
- app/Http/Controllers/CallsController.php           |  19 +-
- app/Http/Controllers/PublicAnalyzerController.php  |  28 +-
- app/Jobs/TranscribeCall.php                        | 113 +++++++
- app/Models/Call.php                                |   7 +
- app/Models/Transcript.php                          |  48 +++
- app/Models/TranscriptSegment.php                   |  43 +++
- app/Providers/AppServiceProvider.php               |   4 +-
- app/Services/Calls/CallProcessingPipeline.php      |  11 +-
- .../Transcription/DTO/TranscriptionResult.php      |  22 ++
- .../Transcription/DTO/TranscriptionSegment.php     |  14 +
- .../ElevenLabsTranscriptionClient.php              | 288 ++++++++++++++++++
- app/Services/Transcription/TranscriptWriter.php    |  54 ++++
- .../Transcription/TranscriptionProvider.php        |  11 +
- app/Support/LanguageCode.php                       |  41 +++
- app/Support/TranscriptPresenter.php                |  96 ++++++
- config/queue.php                                   |   2 +-
- config/sales-analyzer.php                          |  11 +
- ...2026_09_09_160000_create_transcripts_tables.php |  49 +++
- docs/AI_ANALYSIS.md                                |  14 +-
- docs/ARCHITECTURE.md                               |  33 +-
- docs/DATA_MODEL.md                                 |  58 ++--
- docs/DECISIONS.md                                  |  94 +++++-
- docs/PRODUCT.md                                    |   2 +-
- docs/ROADMAP.md                                    |  15 +-
- docs/STATUS.md                                     |  24 +-
- resources/js/Components/Public/AnalysisReport.jsx  |  19 +-
- resources/js/Components/Public/CallTranscript.jsx  |  44 +++
- resources/js/Pages/Calls/Index.jsx                 |   2 +-
- resources/js/Pages/Calls/Show.jsx                  |  49 ++-
- resources/js/Pages/Public/Home.jsx                 |  25 +-
- routes/owl-admin-pages.php                         |   1 +
- tests/Feature/CallsTest.php                        |   3 +
- tests/Feature/PublicAnalyzerTest.php               |   5 +
- tests/Feature/TranscriptionTest.php                | 269 ++++++++++++++++
- tests/TestCase.php                                 |   1 +
- tests/Unit/LanguageCodeTest.php                    |  24 ++
- 42 files changed, 1711 insertions(+), 215 deletions(-)
-```
-
-`git diff --name-status` vs the same baseline:
-
-```
-M	.env.example
-M	README.md
-M	REPORT.md
-A	app/Exceptions/Transcription/PermanentTranscriptionException.php
-A	app/Exceptions/Transcription/TranscriptionException.php
-A	app/Exceptions/Transcription/TransientTranscriptionException.php
-M	app/Http/Controllers/CallsController.php
-M	app/Http/Controllers/PublicAnalyzerController.php
-A	app/Jobs/TranscribeCall.php
-M	app/Models/Call.php
-A	app/Models/Transcript.php
-A	app/Models/TranscriptSegment.php
-M	app/Providers/AppServiceProvider.php
-M	app/Services/Calls/CallProcessingPipeline.php
-A	app/Services/Transcription/DTO/TranscriptionResult.php
-A	app/Services/Transcription/DTO/TranscriptionSegment.php
-A	app/Services/Transcription/ElevenLabsTranscriptionClient.php
-A	app/Services/Transcription/TranscriptWriter.php
-A	app/Services/Transcription/TranscriptionProvider.php
-A	app/Support/LanguageCode.php
-A	app/Support/TranscriptPresenter.php
-M	config/queue.php
-M	config/sales-analyzer.php
-A	database/migrations/2026_09_09_160000_create_transcripts_tables.php
-M	docs/AI_ANALYSIS.md
-M	docs/ARCHITECTURE.md
-M	docs/DATA_MODEL.md
-M	docs/DECISIONS.md
-M	docs/PRODUCT.md
-M	docs/ROADMAP.md
-M	docs/STATUS.md
-M	resources/js/Components/Public/AnalysisReport.jsx
-A	resources/js/Components/Public/CallTranscript.jsx
-M	resources/js/Pages/Calls/Index.jsx
-M	resources/js/Pages/Calls/Show.jsx
-M	resources/js/Pages/Public/Home.jsx
-M	routes/owl-admin-pages.php
-M	tests/Feature/CallsTest.php
-M	tests/Feature/PublicAnalyzerTest.php
-A	tests/Feature/TranscriptionTest.php
-M	tests/TestCase.php
-A	tests/Unit/LanguageCodeTest.php
-```
-
-Secret scan: no API key values in Git paths. `.env` and `.env.testing` are not staged. `.env.example` contains empty `ELEVENLABS_API_KEY=`.
+Full `git diff --stat` vs baseline is recorded after commit in the Git section.
 
 ## Git
 
 * branch: `main`
-* remote: `https://github.com/Owiiiii1/sales.git`
-* implementation commit: `f29786dc09f699783da302f90d4cde1023def4a5`
-* REPORT SHA/files commit: `c5941925a74ada82e2444193456ec3eaede58994`
-* first successful push: `81b5b92..c594192  main -> main`
-* commit messages:
-  * `Add async ElevenLabs Scribe v2 transcription with diarized segments.`
-  * `Record Phase 3 commit SHA and changed files in REPORT.md.`
-  * `Record Phase 3 GitHub push result in REPORT.md.`
-* push result: **PASS** — `To https://github.com/Owiiiii1/sales.git` `81b5b92..c594192  main -> main`
+* commit SHA: pending (recorded after commit)
+* push: pending
 
 ## Problems / Warnings
 
-* `ELEVENLABS_API_KEY` is missing on this app. Uploaded calls will queue, then fail permanently with a generic public error until a key is added to `/var/www/sales/.env` and the worker is restarted if config is cached.
-* Live provider smoke was not run (blocked by missing key).
+* Live external provider verification deferred by Project Manager (ElevenLabs and LLM).
+* Until Settings → AI has an active provider, model, and key, production calls will stop at `analysis_pending` after transcription.
 * Vite optional `fontaine` warning on `npm run build`.
-* Production MySQL user `sales` still has grants on `sales_testing.*` (unchanged from Phase 2.2). Tests use `sales_testing` only.
-* ffprobe/ffmpeg still not installed; duration is filled from the STT provider after success.
+* Production MySQL user `sales` still has grants on `sales_testing.*` (unchanged from Phase 2.2).
 
 ## Final Status
 
-`PHASE 3 CODE PASSED — LIVE PROVIDER VERIFICATION BLOCKED`
+`PHASE 4 PASSED`

@@ -78,14 +78,14 @@ Live provider smoke is blocked until `ELEVENLABS_API_KEY` is set in this app’s
 
 ## Phase 4 — AI Sales Analysis
 
-**Status: Planned**
+**Status: COMPLETED**
 
-* first scoring engine (LLM + structured prompts, no custom trained model);
-* analysis sections;
-* structured output;
-* report UI.
-
-Provider still Open until DEC-006 / DEC-007 close.
+* generic sales analysis (no company RAG)
+* `sales_analyses` table, schema version 1
+* `AnalyzeCall` chained after `TranscribeCall`
+* `analysis_pending` when Settings → AI has no active provider/key/model
+* public structured report + admin analysis section
+* live external provider verification deferred by Project Manager (DEC-035)
 
 ## Phase 5 — Company Context
 

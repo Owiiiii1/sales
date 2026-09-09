@@ -69,6 +69,8 @@ class TranscribeCall implements ShouldBeUniqueUntilProcessing, ShouldQueue
                 'processing_completed_at' => now(),
                 'error_message' => null,
             ])->save();
+
+            AnalyzeCall::dispatch($call->id);
         } catch (PermanentTranscriptionException $e) {
             $this->markFailed($call, $e);
         } catch (TransientTranscriptionException $e) {
@@ -86,7 +88,7 @@ class TranscribeCall implements ShouldBeUniqueUntilProcessing, ShouldQueue
     {
         $call = Call::query()->find($this->callId);
 
-        if ($call === null || $call->status === 'transcribed') {
+        if ($call === null || in_array($call->status, ['transcribed', 'analysis_pending', 'analyzing', 'completed'], true)) {
             return;
         }
 

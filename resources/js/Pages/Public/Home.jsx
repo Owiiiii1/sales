@@ -48,18 +48,20 @@ export default function PublicHome({ upload = {} }) {
                 }
                 const payload = await response.json();
                 setResult((current) => ({ ...(current ?? {}), ...payload }));
-                if (payload.status === 'uploaded' || payload.status === 'processing') {
+                if (payload.status === 'uploaded' || payload.status === 'processing' || payload.status === 'analyzing' || payload.status === 'transcribed') {
                     setUiStatus(payload.status);
                 }
-                if (payload.status === 'transcribed' || payload.status === 'completed' || payload.status === 'failed') {
-                    setUiStatus(payload.status);
-                    stopPolling();
+                if (payload.status === 'transcribed' || payload.status === 'analyzing' || payload.status === 'analysis_pending' || payload.status === 'completed' || payload.status === 'failed') {
                     const full = await fetch(route('analysis.show', token), {
                         headers: { Accept: 'application/json' },
                     });
                     if (full.ok) {
                         setResult(await full.json());
                     }
+                }
+                if (payload.status === 'analysis_pending' || payload.status === 'completed' || payload.status === 'failed') {
+                    setUiStatus(payload.status);
+                    stopPolling();
                 }
             } catch {
                 // Keep the last known state; the next tick retries.
@@ -105,7 +107,7 @@ export default function PublicHome({ upload = {} }) {
             setFile(audio);
             setUiStatus(payload.status || 'uploaded');
 
-            if (payload.status === 'uploaded' || payload.status === 'processing') {
+            if (payload.status === 'uploaded' || payload.status === 'processing' || payload.status === 'analyzing') {
                 startPolling(payload.public_token);
             }
         } catch {
@@ -119,6 +121,8 @@ export default function PublicHome({ upload = {} }) {
         uploaded: 'Queued',
         processing: 'Transcribing',
         transcribed: 'Transcribed',
+        analysis_pending: 'Analysis pending',
+        analyzing: 'Analyzing',
         completed: 'Completed',
         failed: 'Failed',
     }[uiStatus] ?? '';
@@ -156,7 +160,7 @@ export default function PublicHome({ upload = {} }) {
                         }
                     }}
                 >
-                    {uiStatus === 'uploading' || uiStatus === 'processing' ? (
+                    {uiStatus === 'uploading' || uiStatus === 'processing' || uiStatus === 'analyzing' ? (
                         <div className="flex flex-col items-center gap-4 py-6 text-center">
                             <span className="h-12 w-12 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600" />
                             <div>
@@ -211,7 +215,7 @@ export default function PublicHome({ upload = {} }) {
                         message={result?.message}
                         error={result?.error}
                     />
-                    {uiStatus === 'transcribed' && result?.transcript && (
+                    {(uiStatus === 'transcribed' || uiStatus === 'analysis_pending' || uiStatus === 'analyzing' || uiStatus === 'completed' || uiStatus === 'failed') && result?.transcript && (
                         <CallTranscript transcript={result.transcript} />
                     )}
                 </div>

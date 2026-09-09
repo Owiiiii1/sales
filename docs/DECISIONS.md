@@ -422,14 +422,98 @@ Status values: `Accepted` | `Open` | `Superseded` | `Rejected`.
 
 **Reason:** A transcript is not a sales analysis. Mixing them would hide the next pipeline stage.
 
-**Consequences:** Public UI says transcription is complete and keeps AI report sections empty. Badges treat `transcribed` as a success state for this phase.
+**Consequences:** Public UI says transcription is complete and continues to analysis (`analysis_pending` / `analyzing` / `completed`). A transcript is still not a sales analysis.
+
+---
+
+## DEC-030
+
+**Title:** Sales analysis has versioned structured schema  
+**Status:** Accepted  
+**Date:** 2026-09-09
+
+**Decision:** Persist analyses in `sales_analyses` with `schema_version` starting at `1`. The structured report lives in JSON `result`; `overall_score`, `summary`, `provider`, and `model` are denormalized columns.
+
+**Reason:** The report shape will evolve. Application code must not assume the current JSON is eternal.
+
+**Consequences:** `SalesAnalysisResultValidator` rejects malformed output. Re-analysis replaces the row only after validation succeeds.
+
+---
+
+## DEC-031
+
+**Title:** Generic sales analysis precedes company-specific context  
+**Status:** Accepted  
+**Date:** 2026-09-09
+
+**Decision:** Phase 4 analyzes calls with generic sales methodology. Company documents, scripts, pricing rules, and RAG are out of scope. Company name may be metadata only.
+
+**Reason:** Public uploads have no company. Pretending we know a company’s offer would hallucinate.
+
+**Consequences:** Prompt forbids company-specific invention. A later phase adds company knowledge.
+
+---
+
+## DEC-032
+
+**Title:** AI analysis runs asynchronously  
+**Status:** Accepted  
+**Date:** 2026-09-09
+
+**Decision:** `AnalyzeCall` runs on the Laravel queue after a successful transcript. Controllers only dispatch the job. STT uses status `processing`; AI uses `analyzing`. Missing AI settings yield `analysis_pending` without failing the call.
+
+**Reason:** LLM latency and retries must not block HTTP. Transcription and analysis are different stages.
+
+**Consequences:** `TranscribeCall` dispatches `AnalyzeCall`. Admin **Run analysis** / **Re-run analysis** also dispatch the job.
+
+---
+
+## DEC-033
+
+**Title:** Evidence-backed findings are required  
+**Status:** Accepted  
+**Date:** 2026-09-09
+
+**Decision:** Strengths, issues, and similar findings are objects with `text` plus optional short `quote`, `speaker`, and `timestamp_seconds`. The model must not invent events absent from the transcript. Inapplicable sections use `applicable: false`.
+
+**Reason:** Coaching claims without evidence are not useful and are easy to hallucinate.
+
+**Consequences:** Validator accepts finding objects (or simple strings, normalized). Public UI shows short quotes, not full transcripts.
+
+---
+
+## DEC-034
+
+**Title:** Speaker roles are analysis metadata, not transcript mutation  
+**Status:** Accepted  
+**Date:** 2026-09-09
+
+**Decision:** Transcript segments keep integer speakers. Analysis JSON may map them to `seller`, `customer`, `unknown`, or `other`. If the model is not confident, it must use `unknown`.
+
+**Reason:** Diarization identity and sales-role labeling are different problems. Relabeling stored segments would destroy the STT record.
+
+**Consequences:** Public transcript still shows Speaker 1 / Speaker 2. Admin analysis shows role mapping.
+
+---
+
+## DEC-035
+
+**Title:** Live external-provider verification may be deferred during development  
+**Status:** Accepted  
+**Date:** 2026-09-09
+
+**Decision:** Development phases may be accepted on mocked tests without live ElevenLabs or LLM API calls when the Project Manager defers those checks.
+
+**Reason:** Missing keys must not stall application-layer work.
+
+**Consequences:** REPORT records `Live external provider verification: deferred by Project Manager`. That is not a FAILED/BLOCKED phase by itself.
 
 ---
 
 ## Template for new entries
 
 ```
-## DEC-030
+## DEC-036
 
 **Title:**  
 **Status:** Open | Accepted  

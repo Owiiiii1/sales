@@ -62,6 +62,21 @@ class AiProviderManager
         return $normalized;
     }
 
+    /**
+     * @param  array<string, mixed>  $jsonSchema
+     * @return array<string, mixed>
+     */
+    public function completeJson(
+        string $provider,
+        string $apiKey,
+        string $model,
+        string $system,
+        string $user,
+        array $jsonSchema,
+    ): array {
+        return $this->client($provider)->completeJson($apiKey, $model, $system, $user, $jsonSchema);
+    }
+
     private function client(string $provider): AiProviderClient
     {
         if (! isset($this->clients[$provider])) {

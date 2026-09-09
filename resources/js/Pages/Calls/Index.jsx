@@ -18,9 +18,9 @@ function formatDate(value) {
 }
 
 function statusClass(status) {
-    if (status === 'completed' || status === 'transcribed') return 'bg-emerald-100 text-emerald-800';
+    if (status === 'completed' || status === 'transcribed' || status === 'analysis_pending') return 'bg-emerald-100 text-emerald-800';
     if (status === 'uploaded') return 'bg-indigo-100 text-indigo-800';
-    if (status === 'processing') return 'bg-amber-100 text-amber-800';
+    if (status === 'processing' || status === 'analyzing') return 'bg-amber-100 text-amber-800';
     if (status === 'failed') return 'bg-red-100 text-red-800';
     return 'bg-slate-100 text-slate-700';
 }
@@ -59,7 +59,7 @@ export default function CallsIndex({
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                         <div>
                             <h2 className="text-base font-semibold text-slate-900">Calls</h2>
-                            <p className="mt-1 text-sm text-slate-500">Upload audio to create a call record. Processing is not started in this phase.</p>
+                            <p className="mt-1 text-sm text-slate-500">Upload audio to transcribe and analyze a sales call.</p>
                         </div>
                         <Link
                             href={route('calls.create')}

@@ -8,9 +8,9 @@ This repository is **not** a generic Laravel demo. Product intent is in [`docs/P
 
 ## Current status
 
-**Phase 0–3 are complete (STT code).** `/` is the public analyzer. Admins sign in at `/login`.
+**Phase 0–4 are complete (application code).** `/` is the public analyzer. Admins sign in at `/login`.
 
-Public upload queues ElevenLabs transcription. **LLM sales analysis is not connected yet.** Live STT needs `ELEVENLABS_API_KEY` in this app’s `.env`. Kit CRM screens still exist as hidden legacy routes.
+Public upload queues transcription, then generic AI analysis when Settings → AI is configured. Company RAG is not connected yet. Live ElevenLabs/LLM smoke tests are deferred. Kit CRM screens still exist as hidden legacy routes.
 
 Details: [`docs/STATUS.md`](docs/STATUS.md) · roadmap: [`docs/ROADMAP.md`](docs/ROADMAP.md)
 

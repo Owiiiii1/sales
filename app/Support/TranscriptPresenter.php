@@ -14,7 +14,13 @@ class TranscriptPresenter
     {
         $transcript = $call->transcript;
 
-        if ($transcript === null || $call->status !== 'transcribed') {
+        if ($transcript === null) {
+            return null;
+        }
+
+        $visible = in_array($call->status, ['transcribed', 'analysis_pending', 'analyzing', 'completed', 'failed'], true);
+
+        if (! $visible) {
             return null;
         }
 

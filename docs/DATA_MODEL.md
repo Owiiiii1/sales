@@ -124,7 +124,7 @@ An uploaded or imported conversation.
 * storage_path — relative path on the private `calls` disk
 * mime_type, file_size nullable
 * duration_seconds nullable (ffprobe is not installed; WAV headers may be parsed)
-* status string: `pending` → `uploaded` → `processing` → `transcribed` (DEC-029). `completed` is reserved for later AI analysis. `failed` on error.
+* status string: `pending` → `uploaded` → `processing` (STT) → `transcribed` → `analysis_pending` or `analyzing` → `completed`. `failed` on error.
 * recorded_at nullable
 * uploaded_by → users nullable (`nullOnDelete`); null for public uploads
 * processing_started_at, processing_completed_at, error_message nullable
@@ -165,7 +165,25 @@ A call’s employee must belong to the selected company when both are present. P
 * timestamps
 * indexes: transcript_id, sequence, speaker
 
-Call hasOne Transcript. Transcript hasMany segments ordered by sequence. UI label is `Speaker N` (N = speaker + 1). Manager vs Client is **not** stored.
+Call hasOne Transcript. Transcript hasMany segments ordered by sequence. UI label is `Speaker N` (N = speaker + 1). Manager vs Client is **not** stored on the transcript (DEC-034).
+
+## Sales Analysis
+
+**Implemented table `sales_analyses` (DEC-030).**
+
+* id
+* call_id unique → calls (cascade)
+* provider, model nullable
+* schema_version (starts at 1)
+* overall_score nullable 0–100
+* summary
+* result JSON (source of truth)
+* started_at, completed_at, error_message
+* timestamps
+
+Call hasOne SalesAnalysis. Re-analysis replaces the row only after a validated provider response.
+
+Speaker roles (`seller` / `customer` / `unknown` / `other`) live in `result.speaker_roles`, not on transcript segments.
 
 ## Speaker Segment
 
@@ -173,7 +191,9 @@ Implemented as `transcript_segments` rows (see Transcript). Speaker identity map
 
 ## Analysis
 
-Result of analyzing one call. **Must support versioning.**
+Result of analyzing one call. **Must support versioning** (`schema_version`).
+
+Implemented as `sales_analyses` with JSON `result` as the structured report. Company scorecards / RAG are later (DEC-031).
 
 A call may be re-analyzed when prompts, models, scorecards, or company context change.
 
@@ -252,7 +272,8 @@ Versioning of knowledge used in an analysis should be traceable (`company_contex
 | Company | Call | Direct, even if employee missing |
 | Employee | Call | Many calls per employee |
 | Call | Transcript | 1:1 (`call_id` unique). Retranscribe replaces the row after provider success. |
-| Call | Analysis | 1:N (versions) |
+| Call | SalesAnalysis | 1:1 (`call_id` unique). Re-analysis replaces the row after validation. |
+| Call | Analysis | Future company scorecards may version beyond the current JSON document. |
 | Scorecard | Criterion | 1:N |
 | Analysis | Criterion Result | 1:N |
 | Criterion Result | Criterion | Logical link; snapshot recommended |
@@ -261,7 +282,7 @@ Versioning of knowledge used in an analysis should be traceable (`company_contex
 
 * no deletion of kit CRM tables (DEC-012)
 * no assuming `staff` = Employee or `customers` = Company
-* no analysis / scorecard tables in this phase
+* no company knowledge / scorecard builder tables in this phase
 
 ## Open questions
 
