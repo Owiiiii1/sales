@@ -73,28 +73,30 @@ Guest (no session):
 
 | Route | Status |
 |---|---|
-| `https://sales.owlsolutions.net/login` | 200 |
+| `https://sales.owlsolutions.net/` | 200 (`Auth/Login`) |
+| `https://sales.owlsolutions.net/login` | 302 → `/` |
 | `https://sales.owlsolutions.net/owl-admin/health` | 200 (`{"status":"ok","kit":"0.5.0","preset":"core"}`) |
-| `https://sales.owlsolutions.net/dashboard` | 302 → `/login` |
-| `https://sales.owlsolutions.net/customers` | 302 → `/login` |
-| `https://sales.owlsolutions.net/orders` | 302 → `/login` |
-| `https://sales.owlsolutions.net/services` | 302 → `/login` |
-| `https://sales.owlsolutions.net/staff` | 302 → `/login` |
-| `https://sales.owlsolutions.net/calendar` | 302 → `/login` |
-| `https://sales.owlsolutions.net/settings` | 302 → `/login` |
-| `https://sales.owlsolutions.net/settings?tab=general` | 302 → `/login` |
-| `https://sales.owlsolutions.net/settings?tab=users` | 302 → `/login` |
-| `https://sales.owlsolutions.net/settings?tab=ai` | 302 → `/login` |
-| `https://sales.owlsolutions.net/settings?tab=app` | 302 → `/login` |
-| `https://sales.owlsolutions.net/settings?tab=telegram` | 302 → `/login` |
-| `https://sales.owlsolutions.net/profile` | 302 → `/login` |
-| `https://sales.owlsolutions.net/statistics/logs` | 302 → `/login` |
+| `https://sales.owlsolutions.net/dashboard` | 302 → `/` |
+| `https://sales.owlsolutions.net/customers` | 302 → `/` |
+| `https://sales.owlsolutions.net/orders` | 302 → `/` |
+| `https://sales.owlsolutions.net/services` | 302 → `/` |
+| `https://sales.owlsolutions.net/staff` | 302 → `/` |
+| `https://sales.owlsolutions.net/calendar` | 302 → `/` |
+| `https://sales.owlsolutions.net/settings` | 302 → `/` |
+| `https://sales.owlsolutions.net/settings?tab=general` | 302 → `/` |
+| `https://sales.owlsolutions.net/settings?tab=users` | 302 → `/` |
+| `https://sales.owlsolutions.net/settings?tab=ai` | 302 → `/` |
+| `https://sales.owlsolutions.net/settings?tab=app` | 302 → `/` |
+| `https://sales.owlsolutions.net/settings?tab=telegram` | 302 → `/` |
+| `https://sales.owlsolutions.net/profile` | 302 → `/` |
+| `https://sales.owlsolutions.net/statistics/logs` | 302 → `/` |
 
 Authenticated (admin session):
 
 | Route | Status | Inertia component |
 |---|---|---|
-| `/login` POST | 200 (lands on `/dashboard`) | `Dashboard` |
+| `/` POST | 200 (lands on `/dashboard`) | `Dashboard` |
+| `/` GET (authenticated) | 200 (redirects to `/dashboard`) | `Dashboard` |
 | `/dashboard` | 200 | `Dashboard` |
 | `/customers` | 200 | `Customers/Index` |
 | `/orders` | 200 | `Orders/Index` |
@@ -109,8 +111,8 @@ Authenticated (admin session):
 | `/settings?tab=telegram` | 200 | `Settings/Index` tab=`telegram` |
 | `/profile` | 200 | `Profile/Edit` |
 | `/statistics/logs` | 200 | `Statistics/Logs` |
-| `/logout` POST | 200 (lands on `/login`) | `Auth/Login` |
-| `/dashboard` after logout | 200 (redirected to `/login`) | guest |
+| `/logout` POST | 200 (lands on `/`) | `Auth/Login` |
+| `/dashboard` after logout | 200 (redirected to `/`) | guest |
 
 Vite manifest: `https://sales.owlsolutions.net/build/manifest.json` → 200.
 
@@ -186,6 +188,13 @@ Confirmations:
 * Kit frontend-setup merge of `HandleInertiaRequests` did not attach AI/Telegram badges or `auth`/`locale` until the host share() merge was corrected. Required for standard header UI.
 * Database engine on this server is MySQL 8.0, not MariaDB. Connection works.
 * Cursor browser MCP tools were unavailable; authenticated UI was verified via HTTPS + Inertia JSON rather than a headed browser.
+* Laravel welcome page was initially served at `/`. Root now serves the admin login; `/login` redirects to `/`. Authenticated `/` goes to dashboard.
+
+### Follow-up: admin at site root
+
+* `routes/web.php` no longer renders `welcome`.
+* `routes/owl-admin-auth.php`: `GET/POST /` is login (`route('login')`); `GET /login` redirects to `/`.
+* Verified: guest `/` → 200 `Auth/Login`; guest `/login` and `/dashboard` → 302 `/`; login POST `/` → dashboard; authenticated `/` → dashboard.
 
 ### Final Status
 
