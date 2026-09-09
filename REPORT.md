@@ -296,12 +296,19 @@ Nothing omitted. `public/build` is gitignored and is not in this list. `.env` is
 ## Git
 
 * branch: `main`
-* baseline: `65d74ba52c980cada46f685b9698358f0d7c7c66`
+* remote: `https://github.com/Owiiiii1/sales.git`
 * implementation commit: `8316abc0c91d22623e6a09dc8b47d8f8094473d8`
+* REPORT SHA/files commit: `ea5dc741ceb0c932caa8f0e9853a3fbb2bbda67d`
+* first successful push: `65d74ba..ea5dc74  main -> main`
 * commit messages:
   * `Adapt the admin foundation for companies, employees, and calls.`
-  * (this REPORT SHA commit, recorded next)
-* push result: pending
+  * `Record Phase 1 commit SHA and changed files in REPORT.md.`
+  * `Record Phase 1 GitHub push result in REPORT.md.`
+* push result: **PASS** — `To https://github.com/Owiiiii1/sales.git` `65d74ba..ea5dc74  main -> main`
+
+A further REPORT-only commit may sit on top of `ea5dc74` to record this push paragraph. Application code is in `8316abc`.
+
+Changed-files listing vs baseline is unchanged by REPORT-only commits.
 
 ## Problems / Warnings
 
