@@ -248,14 +248,50 @@ Live provider verification: **Deferred by Project Manager**.
 
 ## Changed Files
 
-`git diff --stat 6a942534f28201cb21a0aa112a8e52561774feac..HEAD` (filled after the implementation commit)
+`git diff --stat 6a942534f28201cb21a0aa112a8e52561774feac..dfa203ac5e95b0bae175977fb260274496a68a14`
+
+```
+ README.md                                          |   4 +-
+ REPORT.md                                          | 349 ++++++-------
+ app/Http/Controllers/CompaniesController.php       |  18 +-
+ app/Http/Controllers/DashboardController.php       |  37 +-
+ app/Http/Controllers/EmployeesController.php       |  23 +
+ app/Models/Call.php                                |   6 +
+ app/Services/Analytics/AnalyticsAggregator.php     | 556 +++++++++++++++++++++
+ app/Services/Analytics/AnalyticsFilter.php         | 155 ++++++
+ app/Services/Analytics/AnalyticsQuery.php          | 123 +++++
+ app/Services/Analytics/CompanyAnalyticsService.php |  40 ++
+ .../Analytics/DashboardAnalyticsService.php        |  35 ++
+ .../Analytics/EmployeeAnalyticsService.php         |  33 ++
+ app/Support/ScoreBand.php                          |  35 ++
+ config/sales-analyzer.php                          |  10 +
+ docs/ARCHITECTURE.md                               |  20 +-
+ docs/DATA_MODEL.md                                 |  13 +-
+ docs/DECISIONS.md                                  |  72 ++-
+ docs/PRODUCT.md                                    |   2 +-
+ docs/ROADMAP.md                                    |  32 +-
+ docs/STATUS.md                                     |   9 +-
+ resources/js/Components/Analytics/Board.jsx        | 504 +++++++++++++++++++
+ resources/js/Pages/Companies/Show.jsx              |  29 +-
+ resources/js/Pages/Dashboard.jsx                   | 107 +---
+ resources/js/Pages/Employees/Index.jsx             |   3 +-
+ resources/js/Pages/Employees/Show.jsx              |  32 ++
+ routes/owl-admin-pages.php                         |   1 +
+ tests/Feature/AnalyticsTest.php                    | 424 ++++++++++++++++
+ tests/Feature/NavigationRoutesTest.php             |   6 +-
+ tests/Unit/AnalyticsFilterTest.php                 |  68 +++
+ 29 files changed, 2381 insertions(+), 365 deletions(-)
+```
 
 ## Git
 
 * branch: `main`
 * remote: `https://github.com/Owiiiii1/sales.git`
-* implementation commit: pending
-* commit message: `Add sales analytics dashboard for companies, employees, and calls.`
+* implementation commit: `dfa203ac5e95b0bae175977fb260274496a68a14`
+* REPORT SHA/files commit: pending
+* commit messages:
+  * `Add sales analytics dashboard for companies, employees, and calls.`
+  * `Record Phase 6 commit SHA and changed files in REPORT.md.`
 
 ## Problems / Warnings
 
