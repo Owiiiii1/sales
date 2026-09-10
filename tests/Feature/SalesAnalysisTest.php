@@ -288,6 +288,7 @@ class SalesAnalysisTest extends TestCase
     {
         $user = User::factory()->create();
         $call = $this->transcribedCall();
+        $this->activateOpenAi();
 
         $this->actingAs($user)
             ->post('/calls/'.$call->id.'/analyze')
@@ -300,6 +301,7 @@ class SalesAnalysisTest extends TestCase
     {
         $user = User::factory()->create();
         $call = $this->completedCall();
+        $this->activateOpenAi();
 
         $this->actingAs($user)
             ->post('/calls/'.$call->id.'/analyze')
@@ -335,7 +337,7 @@ class SalesAnalysisTest extends TestCase
         $this->getJson('/analysis/'.$call->public_token)
             ->assertOk()
             ->assertJsonPath('status', 'analysis_pending')
-            ->assertJsonPath('message', 'Transcription complete. AI analysis is not configured yet.')
+            ->assertJsonPath('message', 'Transcription completed, but AI analysis is temporarily unavailable.')
             ->assertJsonPath('report', null);
     }
 

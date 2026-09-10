@@ -17,6 +17,7 @@ class ConfiguredSalesAnalysisProvider implements SalesAnalysisProvider
         private AiProviderManager $manager,
         private SalesAnalysisPromptBuilder $prompts,
         private SalesAnalysisResultValidator $validator,
+        private AnalysisSettingsRepository $analysisSettings,
     ) {}
 
     public function isConfigured(): bool
@@ -47,6 +48,7 @@ class ConfiguredSalesAnalysisProvider implements SalesAnalysisProvider
             $messages['system'],
             $messages['user'],
             SalesAnalysisSchema::jsonSchema(),
+            $this->analysisSettings->maxOutputTokensFor((string) $setting->provider),
         );
 
         return $this->validator->validate(

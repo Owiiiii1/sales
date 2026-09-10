@@ -352,7 +352,7 @@ Status values: `Accepted` | `Open` | `Superseded` | `Rejected`.
 
 **Reason:** Batch Speech-to-Text with diarization and timestamps is available as Scribe v2, and the product needed a real STT integration before analysis.
 
-**Consequences:** HTTP details stay in `ElevenLabsTranscriptionClient`. Jobs and controllers consume `TranscriptionResult` only. The API key is `ELEVENLABS_API_KEY` in the environment, never Git.
+**Consequences:** HTTP details stay in `ElevenLabsTranscriptionClient`. Jobs and controllers consume `TranscriptionResult` only. Phase 7.1 stores the key encrypted in `transcription_provider_settings`; `ELEVENLABS_API_KEY` remains an env fallback (DEC-053 / DEC-054). Never commit the key.
 
 ---
 
@@ -734,10 +734,80 @@ Status values: `Accepted` | `Open` | `Superseded` | `Rejected`.
 
 ---
 
+## DEC-052
+
+**Title:** Transcription provider settings are managed separately from LLM settings  
+**Status:** Accepted  
+**Date:** 2026-09-10
+
+**Decision:** Store STT credentials and status in `transcription_provider_settings`, not in `ai_provider_settings`. Settings → Transcription configures ElevenLabs. Settings → AI remains the LLM layer.
+
+**Reason:** Speech-to-text and chat-completion providers are different domains. Mixing keys would confuse operators and readiness checks.
+
+**Consequences:** One ElevenLabs row is bootstrapped without a secret. A second STT vendor can be added later without a fake multi-select today.
+
+---
+
+## DEC-053
+
+**Title:** Runtime provider credentials prefer database configuration  
+**Status:** Accepted  
+**Date:** 2026-09-10
+
+**Decision:** Production runtime reads the active transcription (and existing LLM) credentials from the database first.
+
+**Reason:** Operators must be able to configure the pipeline from admin without editing `.env` or restarting workers.
+
+**Consequences:** `ActiveTranscriptionProvider` is the STT source of truth. `ElevenLabsTranscriptionClient` does not call `env()` for secrets.
+
+---
+
+## DEC-054
+
+**Title:** Environment credentials are fallback configuration  
+**Status:** Accepted  
+**Date:** 2026-09-10
+
+**Decision:** If the DB STT key is empty, use `config('sales-analyzer.transcription.api_key')` (`ELEVENLABS_API_KEY`). If a DB key exists, ignore env. Admin UI shows configuration source: Database, Environment, or Not configured.
+
+**Reason:** Existing env keys must keep working. Silent conflict between DB and env is worse than an explicit source label.
+
+**Consequences:** Changing env still requires config cache clear / worker restart. Changing a DB key does not.
+
+---
+
+## DEC-055
+
+**Title:** Pipeline readiness is exposed as one normalized health state  
+**Status:** Accepted  
+**Date:** 2026-09-10
+
+**Decision:** `AnalysisPipelineHealth` returns transcription, analysis, and `pipeline_ready`. The admin UI does not compute readiness in React. Public guests never see provider names or keys.
+
+**Reason:** Upload and Run Analysis must not enter a known-broken path. Duplicating the rules in the frontend would drift.
+
+**Consequences:** Public upload requires transcription ready. Missing LLM after STT remains `analysis_pending`.
+
+---
+
+## DEC-056
+
+**Title:** Provider credentials are configurable without worker restart  
+**Status:** Accepted  
+**Date:** 2026-09-10
+
+**Decision:** Database-stored keys and models are the runtime source of truth. Queue workers read them on each job. `config:cache` may freeze env fallbacks; it does not freeze DB credentials.
+
+**Reason:** Restarting PHP-FPM or the queue worker just to rotate an API key is operational friction.
+
+**Consequences:** Tests and production both resolve through the same provider services.
+
+---
+
 ## Template for new entries
 
 ```
-## DEC-052
+## DEC-057
 
 **Title:**  
 **Status:** Open | Accepted  

@@ -1,6 +1,6 @@
 # Sales Analyzer — AI Analysis
 
-This is a design document for the analysis engine. **STT is implemented (ElevenLabs Scribe v2). Structured LLM sales analysis is implemented (schema version 3).** Company knowledge is stored as structured MySQL records and packed by `AnalysisContextBuilder`. RAG / embeddings are not used. The live LLM vendor is whichever provider an admin activates in Settings → AI (DEC-006 remains Open). Stored v1/v2 analyses remain presentable.
+This is a design document for the analysis engine. **STT is implemented (ElevenLabs Scribe v2) and configured from Settings → Transcription.** Structured LLM sales analysis is implemented (schema version 3). Company knowledge is stored as structured MySQL records and packed by `AnalysisContextBuilder`. RAG / embeddings are not used. The live LLM vendor is whichever provider an admin activates in Settings → AI (DEC-006 remains Open). Stored v1/v2 analyses remain presentable.
 
 ## Main principle
 
@@ -50,6 +50,15 @@ Final report
 Each arrow may be one or more jobs. Failures should be visible as call status, not silent.
 
 STT and diarization are one ElevenLabs Scribe v2 call (`diarize=true`, word timestamps). Speakers are stored as integers and shown as `Speaker 1`, `Speaker 2`. Seller vs customer is assigned in analysis JSON `speaker_roles` (DEC-034), not by mutating transcript rows.
+
+Transcription credentials come from `ActiveTranscriptionProvider` (database first, `ELEVENLABS_API_KEY` / `config('sales-analyzer.transcription.api_key')` as fallback). The supported model list is application-side (`scribe_v2`); there is no fake ElevenLabs STT model discovery. Connection check is `GET /v1/user` with the stored key — no audio, no transcription.
+
+Application analysis settings (`analysis_settings`) apply to every LLM provider:
+
+* `report_language_mode = same_as_call` (the report follows the detected call language; no language selector)
+* `max_output_tokens` default **16384** (min 4096, max 32768), with provider caps (OpenAI 32768, Anthropic 16384, Gemini 16384)
+
+Temperature is **not** a Settings field. Adapters keep `temperature = 0.2` so structured JSON stays stable. A user-facing temperature control would trade reliability for creativity on schema v3.
 
 Phase 4 added **one** structured LLM call with `SalesAnalysisPromptBuilder` for generic sales methodology (DEC-031). Phase 5 still used one LLM call. Phase 7 keeps **one** pass for schema v3 (DEC-047). A second coaching pass was considered and not shipped: collection limits keep the JSON bounded; two calls would duplicate transcript + company context and double latency/failure. `ConversationMetricsCalculator` fills talk-time metrics from transcript segments after speaker-role mapping (DEC-049). Public calls get full generic v3 analysis (DEC-040 still: no company knowledge). Company calls keep the v2 `company_specific` block plus v3 coaching.
 
@@ -249,8 +258,8 @@ Do not ship scores we cannot explain.
 
 ## Open questions
 
-* LLM provider (DEC-006): operator picks OpenAI, Anthropic, or Gemini in kit settings.
-* STT / diarization: ElevenLabs Scribe v2 (DEC-024 / DEC-025 / DEC-027).
+* LLM provider (DEC-006): operator picks OpenAI, Anthropic, or Gemini in Settings → AI.
+* STT / diarization: ElevenLabs Scribe v2 (DEC-024 / DEC-025 / DEC-027), configured in Settings → Transcription (DEC-052).
 * Whether later phases split analysis into multiple LLM passes (Phase 7 kept one pass).
 * Custom company scorecards / weighted criteria: implemented in Phase 5 (DEC-037 / DEC-038). Full scorecard VCS is not built; snapshots are enough (DEC-039).
 * Human review / override of scores.

@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Settings;
 use App\Http\Controllers\Controller;
 use App\Models\TelegramBotSetting;
 use App\Models\User;
+use App\Services\Pipeline\AnalysisPipelineHealth;
+use App\Support\SecretMask;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
@@ -26,7 +28,7 @@ class SettingsController extends Controller
             ])
             ->all();
 
-        $allowedTabs = ['general', 'users', 'ai', 'app', 'telegram'];
+        $allowedTabs = ['general', 'users', 'transcription', 'ai', 'app', 'telegram'];
         $tab = (string) $request->query('tab', 'general');
         if (! in_array($tab, $allowedTabs, true)) {
             $tab = 'general';
@@ -38,6 +40,9 @@ class SettingsController extends Controller
         return Inertia::render('Settings/Index', [
             'users' => $users,
             'providers' => $aiSettings->providersPayload(),
+            'transcription' => app(TranscriptionSettingsController::class)->payload(),
+            'analysis_settings' => app(AnalysisSettingsController::class)->payload(),
+            'pipeline' => app(AnalysisPipelineHealth::class)->payload(),
             'telegram' => $this->telegramPayload(),
             'tab' => $tab,
         ]);
@@ -85,7 +90,7 @@ class SettingsController extends Controller
 
             return [
                 'has_bot_token' => filled($setting->bot_token),
-                'bot_token_masked' => $this->maskSecret($setting->bot_token),
+                'bot_token_masked' => SecretMask::key($setting->bot_token),
                 'bot_username' => $setting->bot_username,
                 'webhook_url' => $setting->webhook_url,
                 'has_webhook_secret' => filled($setting->webhook_secret),
@@ -98,21 +103,5 @@ class SettingsController extends Controller
         } catch (\Throwable) {
             return $empty;
         }
-    }
-
-    private function maskSecret(?string $value): ?string
-    {
-        if (! filled($value)) {
-            return null;
-        }
-
-        $plain = trim((string) $value);
-        $length = strlen($plain);
-
-        if ($length <= 8) {
-            return str_repeat('*', $length);
-        }
-
-        return substr($plain, 0, 4).'...'.substr($plain, -4);
     }
 }

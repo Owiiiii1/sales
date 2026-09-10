@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Settings;
 use App\Http\Controllers\Controller;
 use App\Models\AiProviderSetting;
 use App\Services\Ai\AiProviderManager;
+use App\Support\SecretMask;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -42,7 +43,7 @@ class AiSettingsController extends Controller
                     'provider' => $setting->provider,
                     'label' => $setting->label ?: ucfirst($setting->provider),
                     'has_api_key' => filled($setting->api_key),
-                    'api_key_masked' => $this->maskKey($setting->api_key),
+                    'api_key_masked' => SecretMask::key($setting->api_key),
                     'is_connected' => (bool) $setting->is_connected,
                     'is_active' => (bool) $setting->is_active,
                     'active_model' => $setting->active_model,
@@ -172,19 +173,5 @@ class AiSettingsController extends Controller
         $setting = AiProviderSetting::query()->where('provider', $provider)->firstOrFail();
 
         return $setting;
-    }
-
-    private function maskKey(?string $value): ?string
-    {
-        if (! filled($value)) {
-            return null;
-        }
-
-        $plain = trim((string) $value);
-        if (strlen($plain) <= 8) {
-            return str_repeat('*', strlen($plain));
-        }
-
-        return substr($plain, 0, 4).'...'.substr($plain, -4);
     }
 }

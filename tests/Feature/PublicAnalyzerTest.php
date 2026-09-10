@@ -22,6 +22,7 @@ class PublicAnalyzerTest extends TestCase
     {
         parent::setUp();
 
+        config(['sales-analyzer.transcription.api_key' => 'test-key']);
         Storage::fake(config('sales-analyzer.storage_disk'));
     }
 

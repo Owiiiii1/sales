@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\PublicAnalyzeRequest;
 use App\Models\Call;
 use App\Services\Calls\CallUploadService;
+use App\Services\Transcription\ActiveTranscriptionProvider;
 use App\Support\SalesAnalysisPresenter;
 use App\Support\TranscriptPresenter;
 use Illuminate\Http\JsonResponse;
@@ -15,8 +16,10 @@ use Throwable;
 
 class PublicAnalyzerController extends Controller
 {
-    public function home(): Response
+    public function home(ActiveTranscriptionProvider $transcription): Response
     {
+        $available = $transcription->isReady();
+
         return Inertia::render('Public/Home', [
             'upload' => [
                 'max_audio_size_mb' => (int) config('sales-analyzer.max_audio_size_mb'),
@@ -25,12 +28,20 @@ class PublicAnalyzerController extends Controller
                     ->map(static fn (string $extension): string => '.'.$extension)
                     ->implode(','),
                 'poll_interval_ms' => 3000,
+                'available' => $available,
+                'unavailable_message' => $available ? null : 'Audio analysis is temporarily unavailable.',
             ],
         ]);
     }
 
-    public function store(PublicAnalyzeRequest $request, CallUploadService $uploads): JsonResponse
+    public function store(PublicAnalyzeRequest $request, CallUploadService $uploads, ActiveTranscriptionProvider $transcription): JsonResponse
     {
+        if (! $transcription->isReady()) {
+            return response()->json([
+                'message' => 'Audio analysis is temporarily unavailable.',
+            ], 503);
+        }
+
         try {
             $call = $uploads->upload(null, [
                 'company_id' => null,
@@ -105,7 +116,7 @@ class PublicAnalyzerController extends Controller
             'uploaded' => 'Your call is queued for transcription.',
             'processing' => 'Transcribing your call…',
             'transcribed' => 'Transcription complete.',
-            'analysis_pending' => 'Transcription complete. AI analysis is not configured yet.',
+            'analysis_pending' => 'Transcription completed, but AI analysis is temporarily unavailable.',
             'analyzing' => 'Analyzing your sales call…',
             'completed' => 'Analysis complete.',
             'failed' => $this->publicError($call),

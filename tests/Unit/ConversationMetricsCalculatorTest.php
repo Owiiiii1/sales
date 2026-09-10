@@ -6,10 +6,12 @@ use App\Models\Call;
 use App\Models\Transcript;
 use App\Models\TranscriptSegment;
 use App\Services\Analysis\ConversationMetricsCalculator;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class ConversationMetricsCalculatorTest extends TestCase
 {
+    use RefreshDatabase;
     public function test_talk_percentages_and_switches_use_segments_and_roles(): void
     {
         $call = Call::factory()->create(['status' => 'transcribed']);

@@ -69,11 +69,12 @@ class GeminiClient implements AiProviderClient
         string $system,
         string $user,
         array $jsonSchema,
+        int $maxOutputTokens = 16384,
     ): array {
         $modelId = str_starts_with($model, 'models/') ? substr($model, 7) : $model;
 
         try {
-            $response = Http::timeout(90)
+            $response = Http::timeout(180)
                 ->connectTimeout(15)
                 ->acceptJson()
                 ->withQueryParameters(['key' => $apiKey])
@@ -86,6 +87,7 @@ class GeminiClient implements AiProviderClient
                     ],
                     'generationConfig' => [
                         'temperature' => 0.2,
+                        'maxOutputTokens' => $maxOutputTokens,
                         'responseMimeType' => 'application/json',
                         'responseSchema' => $jsonSchema,
                     ],

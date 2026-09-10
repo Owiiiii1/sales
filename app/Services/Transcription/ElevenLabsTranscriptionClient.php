@@ -15,13 +15,16 @@ use Illuminate\Support\Facades\Log;
 
 class ElevenLabsTranscriptionClient implements TranscriptionProvider
 {
-    public function __construct(private CallAudioStorage $storage) {}
+    public function __construct(
+        private CallAudioStorage $storage,
+        private ActiveTranscriptionProvider $active,
+    ) {}
 
     public function transcribe(Call $call): TranscriptionResult
     {
-        $apiKey = (string) config('sales-analyzer.transcription.api_key');
+        $credentials = $this->active->current();
 
-        if ($apiKey === '') {
+        if ($credentials === null || $credentials->apiKey === '') {
             throw new PermanentTranscriptionException(
                 'ElevenLabs API key is not configured.',
                 'Transcription is temporarily unavailable.',
@@ -40,9 +43,12 @@ class ElevenLabsTranscriptionClient implements TranscriptionProvider
         }
 
         $endpoint = (string) config('sales-analyzer.transcription.endpoint');
-        $model = (string) config('sales-analyzer.transcription.model');
+        $model = $credentials->model !== ''
+            ? $credentials->model
+            : (string) config('sales-analyzer.transcription.model', 'scribe_v2');
         $timeout = (int) config('sales-analyzer.transcription.timeout', 120);
         $filename = $call->original_filename ?: basename($path);
+        $apiKey = $credentials->apiKey;
 
         try {
             $response = Http::timeout($timeout)

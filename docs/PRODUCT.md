@@ -2,7 +2,7 @@
 
 This document describes the product we intend to build. It is not a description of the current UI.
 
-The live site has a **public homepage** at `/` for uploading a sales call, plus an admin at `/login`. Transcription is queued through ElevenLabs Scribe v2. Generic AI sales analysis runs for public calls. Admin-uploaded calls with a Company also use that company’s knowledge and default scorecard. See [STATUS.md](STATUS.md).
+The live site has a **public homepage** at `/` for uploading a sales call, plus an admin at `/login`. Transcription is queued through ElevenLabs Scribe v2. Admins configure the STT key and LLM providers in Settings without editing `.env`. Generic AI sales analysis runs for public calls when the pipeline is ready. Admin-uploaded calls with a Company also use that company’s knowledge and default scorecard. See [STATUS.md](STATUS.md).
 
 ## Problem
 
@@ -114,6 +114,7 @@ These are possible later capabilities. **Do not treat the list as committed scop
 | Analysis report | Deep coaching report for one call | Implemented (Phase 4–7) |
 | Company context form | Admin Sales Knowledge (not a public prompt field) | Implemented (Phase 5) |
 | Admin / operator UI | Adapted from Custom Admin Kit | Implemented (Phase 1) |
+| Settings | Pipeline health, Transcription, AI providers, analysis behavior | Implemented (Phase 7.1) |
 | Personal cabinet | History, companies, employees | Planned (Phase 8) |
 | Knowledge admin | Scripts, products, objections | Implemented (Phase 5) |
 | Scorecard admin | Criteria and weights | Implemented (Phase 5) |

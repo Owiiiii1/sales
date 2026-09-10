@@ -14,17 +14,20 @@ Factual state of the running project. Update this file when reality changes.
 * **Phase 5 — Company knowledge & scorecards:** COMPLETED (application code + mocked tests). Live LLM verification deferred by Project Manager.
 * **Phase 6 — Sales analytics dashboard:** COMPLETED (application code + mocked tests). Live LLM verification deferred by Project Manager.
 * **Phase 7 — Deep call analysis (schema v3):** COMPLETED (application code + mocked tests). Live LLM verification deferred by Project Manager.
+* **Phase 7.1 — Provider settings completion:** COMPLETED (application code + mocked tests). Live ElevenLabs / LLM verification deferred by Project Manager.
 * **Next planned work:** Phase 8 user product (accounts / personal cabinet), unless the roadmap is reordered.
 
 ## Product vs running app
 
-Guests open `/`, upload a recording, and poll through transcription and analysis. Speakers remain `Speaker 1`, `Speaker 2` on the transcript. Seller/customer mapping is analysis metadata. Public calls receive full generic deep v3 analysis (no company scorecard).
+Guests open `/`, upload a recording, and poll through transcription and analysis. If transcription is not configured, the public UI shows `Audio analysis is temporarily unavailable.` Speakers remain `Speaker 1`, `Speaker 2` on the transcript. Seller/customer mapping is analysis metadata. Public calls receive full generic deep v3 analysis (no company scorecard).
 
 Admin company pages hold Sales Knowledge, offerings, objections, scripts, and scorecards. Admin-uploaded calls with a Company use that knowledge automatically (default active scorecard). Generic Overall Sales Score and Company Scorecard scores stay separate.
 
-If Settings → AI has no active provider/key/model, calls stay `analysis_pending` after transcription.
+Settings → Transcription stores the ElevenLabs API key (encrypted) and Scribe v2 model. Settings → AI still holds OpenAI / Anthropic / Gemini. Analysis Behavior stores max output tokens and same-as-call report language. Pipeline Status shows whether both layers are ready.
 
-Admins sign in at `/login`. `/dashboard` is the sales analytics view (Last 30 days by default). Company detail includes an Analytics tab. Employees have a detail/analytics page. Call detail shows analysis context metadata. Re-run analysis is manual after knowledge changes.
+If Settings → AI has no active provider/key/model, calls stay `analysis_pending` after transcription. Public copy: `Transcription completed, but AI analysis is temporarily unavailable.`
+
+Admins sign in at `/login`. `/dashboard` is the sales analytics view (Last 30 days by default). Company detail includes an Analytics tab. Employees have a detail/analytics page. Call detail shows analysis context metadata. Re-run analysis is disabled until an AI provider is ready; the job still checks configuration.
 
 ## Infrastructure
 
@@ -40,8 +43,8 @@ Admins sign in at `/login`. `/dashboard` is the sales analytics view (Last 30 da
 | Database | MySQL 8 — production `sales`; tests `sales_testing` (user `sales_testing`) |
 | Audio disk | `calls` → `storage/app/private/calls` |
 | Queue | `database` + systemd `sales-worker.service` |
-| STT | ElevenLabs Scribe v2 |
-| LLM | Custom Admin Kit Settings → AI (OpenAI / Anthropic / Gemini) |
+| STT | ElevenLabs Scribe v2 (Settings → Transcription; `.env` fallback) |
+| LLM | Settings → AI (OpenAI / Anthropic / Gemini) |
 
 ## Routes
 
@@ -56,12 +59,15 @@ Admins sign in at `/login`. `/dashboard` is the sales analytics view (Last 30 da
 | `/companies/{company}` | auth | company knowledge + analytics tabs |
 | `/employees/{employee}` | auth | employee analytics |
 | `POST /calls/{call}/transcribe` | auth | retry STT job |
-| `POST /calls/{call}/analyze` | auth | run / re-run analysis job |
+| `POST /calls/{call}/analyze` | auth | run / re-run analysis job (rejected if AI is not configured) |
+| `/settings?tab=transcription` | auth | ElevenLabs STT settings |
+| `/settings?tab=ai` | auth | LLM providers + analysis behavior |
 
 ## Known issues (non-critical)
 
 * Live ElevenLabs and live LLM verification deferred by Project Manager.
 * Without an active AI provider, analysis stays `analysis_pending`.
+* Public upload requires a ready transcription provider (DB key + connection check, or env fallback).
 * ffprobe/ffmpeg not installed; duration often comes from STT.
 * Vite optional `fontaine` warning.
 * CAPTCHA is not implemented; public upload is rate-limited instead.

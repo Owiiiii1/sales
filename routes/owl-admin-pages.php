@@ -13,7 +13,9 @@ use App\Http\Controllers\ServicesController;
 use App\Http\Controllers\StaffController;
 use App\Http\Controllers\TelegramWebhookController;
 use App\Http\Controllers\Settings\AiSettingsController;
+use App\Http\Controllers\Settings\AnalysisSettingsController;
 use App\Http\Controllers\Settings\SettingsController;
+use App\Http\Controllers\Settings\TranscriptionSettingsController;
 use App\Http\Controllers\Settings\TelegramSettingsController;
 use App\Http\Controllers\Settings\UserController as SettingsUserController;
 use Illuminate\Support\Facades\Route;
@@ -126,6 +128,10 @@ Route::middleware(AdminRouteMiddleware::stack())->group(function () {
     Route::post('/ai-settings/{provider}/check', [AiSettingsController::class, 'check'])->name('ai-settings.check');
     Route::post('/ai-settings/{provider}/activate', [AiSettingsController::class, 'activate'])->name('ai-settings.activate');
     Route::post('/ai-settings/deactivate', [AiSettingsController::class, 'deactivate'])->name('ai-settings.deactivate');
+
+    Route::post('/settings/transcription', [TranscriptionSettingsController::class, 'save'])->name('settings.transcription.save');
+    Route::post('/settings/transcription/check', [TranscriptionSettingsController::class, 'check'])->name('settings.transcription.check');
+    Route::patch('/settings/analysis', [AnalysisSettingsController::class, 'update'])->name('settings.analysis.update');
 
     Route::get('/statistics/logs', function () {
         return Inertia::render('Statistics/Logs');

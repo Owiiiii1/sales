@@ -1,229 +1,202 @@
-# Sales Analyzer — Phase 7 Deep Call Analysis v2 Report
+# Sales Analyzer — Phase 7.1 Provider Settings Completion Report
 
 ## Baseline
 
-* accepted baseline SHA (Phase 6 on `main`): `92470fbdda97b8e2dc3cf34c54e094f8722d74d1`
-* HEAD before work: `92470fbdda97b8e2dc3cf34c54e094f8722d74d1`
+* accepted baseline SHA (Phase 7 on `main`): `33583e3fc487191ef611894ece9409c7c0ef6724`
+* HEAD before work: `33583e3fc487191ef611894ece9409c7c0ef6724`
 * working tree before work: clean
 * branch: `main` tracking `origin/main`
 * unpushed commits before work: none
 
-No production backup was taken: there is no migration. Schema v3 lives in `sales_analyses.result` JSON.
-
 Live ElevenLabs / LLM verification remains deferred by the Project Manager and did **not** block this phase.
 
-## Schema v3
+## Existing Settings Audit
 
-New analyses write `schema_version = 3` (DEC-047). Stored v1/v2 rows remain presentable; missing v3 keys render as empty / omitted, not as errors.
+Before this phase, Settings tabs were General, Users, AI, App (Telegram hidden).
 
-v3 is v2 plus deep blocks:
+Settings → AI already covered OpenAI, Anthropic, and Gemini: encrypted keys, masked display, check connection, model activate. That layer was left working.
 
-* `executive_summary`
-* `call_objective`
-* `conversation_control`
-* `customer_signals` / `missed_signals`
-* `discovery_depth`
-* `question_analysis`
-* `listening`
-* `value_communication`
-* `objection_map`
-* `negotiation` (`applicable=false` when price was not discussed)
-* `trust_rapport`
-* `closing`
-* `timeline`
-* `turning_points`
-* `critical_mistakes`
-* `what_to_repeat` / `what_to_stop` / `what_to_start`
-* `coaching_priorities` (max 5)
-* `next_call_playbook`
-* `better_phrases` (`original` / `problem` / `better` / `why_better`; v2 `suggested`/`reason` still accepted)
-* `alternative_path`
-* `outcome_analysis`
-* `sales_stage_map`
-* `customer_intent_confidence`
+There was no key/value app-settings table. Telegram uses a dedicated table. Transcription used `config('sales-analyzer.transcription.api_key')` and `ELEVENLABS_STT_MODEL` inside `ElevenLabsTranscriptionClient` (direct config/env). `ActiveAiProvider` already existed for LLM. Analysis HTTP clients hardcoded `temperature => 0.2`. Anthropic sent `max_tokens => 8192`; OpenAI and Gemini had no max-output setting.
 
-`company_specific` from v2 is unchanged.
+## Transcription Settings
 
-## Deep Analysis Areas
+New admin tab: **Settings → Transcription**.
 
-The report is written to answer: what happened; what each side wanted; who led; which signals were used or missed; where the call turned; which mistakes could change the outcome; what to say instead; what to do on the next similar call.
+Backend: `transcription_provider_settings` + `TranscriptionSettingsController` + `ActiveTranscriptionProvider`.
 
-Critical mistakes are outcome-changing only. Tone is judged from wording, not a voice-emotion model. Interruptions are not claimed without overlap evidence.
+UI: provider label ElevenLabs (not a fake multi-provider selector), API key, Scribe v2 model, connection status, Check connection, Save. Blank key save does not erase the stored key. Configuration source is shown (Database / Environment / Not configured).
 
-## Prompt Strategy
+## ElevenLabs Configuration
 
-`SalesAnalysisPromptBuilder` now requires evidence-first analysis, anti-fluff rules, collection size limits, and the v3 keys. Public calls still get a full deep generic analysis. Company context packing from Phase 5 is unchanged.
+* Provider row bootstrapped as `elevenlabs` / `ElevenLabs` with no secret.
+* Default model: `scribe_v2` (application-side list only; no fake STT model discovery).
+* API key encrypted with Laravel `encrypted` cast, `$hidden = ['api_key']`, masked in Inertia (`first4...last4`).
+* Check connection: `GET https://api.elevenlabs.io/v1/user` with `xi-api-key`. No audio, no transcription.
+* Success: Connected, `is_active=true`, `last_checked_at`, cleared error.
+* Failure: sanitized error, no raw secrets.
 
-## One-pass vs Two-pass Decision
+## Configuration Resolution
 
-**One structured LLM call.**
+Priority is explicit (DEC-053 / DEC-054):
 
-A Pass-1 understanding / Pass-2 coaching split was considered. It was not shipped:
+```
+DB configured provider
+→ env fallback (`config('sales-analyzer.transcription.api_key')` / `ELEVENLABS_API_KEY`)
+→ not configured
+```
 
-* v3 JSON is large but bounded (timeline 15, coaching 5, phrases 10, and similar caps)
-* two calls would send the transcript and company context twice
-* latency, cost, and failure modes would double
-* talk-time metrics are already computed outside the model
+If a non-empty DB key exists, env is ignored. If the DB key is empty, env is used and the admin UI shows `Configured via environment` without revealing the value. Env-only credentials are treated as connected/ready (no Check required). DB credentials are ready only with key + model + connection passed + active.
 
-If a single prompt later becomes unreliable against real providers, a second pass can be added without changing the stored schema.
+`php artisan config:cache` can freeze env fallback. It does not freeze DB keys. Workers read DB on each job (DEC-056).
 
-## Evidence Model
+## AI Settings
 
-Quotes, timestamps, and speakers are required on material findings when the transcript has them. Inferred fields (`customer_intent`, speaker roles) may carry `high|medium|low` confidence. The validator rejects unknown enums and negative timestamps.
+Left in place: provider cards, API key, check, model, activate / deactivate.
 
-Modest collection overflow is sliced to the cap. Arrays larger than 2× the cap are rejected.
+Added on the AI tab:
 
-## Timeline
+* Analysis Pipeline health block (shared with Transcription)
+* Analysis Behavior (output language, max output tokens, schema v3 informational)
 
-`timeline` is a short list of material moments (`positive`, `warning`, `critical`, `turning_point`, `objection`, `buying_signal`, `missed_opportunity`). Cap 15 (DEC-050). UI is a vertical list with restrained badges, not a sentence-level dump.
+**Temperature:** not added as a Settings field. All three adapters support it, but structured v3 JSON needs stability more than creativity. Adapters keep hardcoded `temperature = 0.2`.
 
-## Conversation Metrics
+## Analysis Behavior Settings
 
-`ConversationMetricsCalculator` (DEC-049) runs after validation:
+New `analysis_settings` table (product-level, not per provider row):
 
-* seller / customer talk percent (identified roles, positive segment durations)
-* longest consecutive seller monologue
-* speaker switches
-* call duration
+* `report_language_mode = same_as_call` (disabled/info in UI: “Analysis report follows the detected call language.”)
+* `max_output_tokens` default **16384**, min 4096, max 32768
+* Provider caps: OpenAI 32768, Anthropic 16384, Gemini 16384
+* Schema version remains informational v3
 
-Missing data → `null`. Interruptions are not computed. LLM-supplied metrics are overwritten.
+`ConfiguredSalesAnalysisProvider` passes `maxOutputTokensFor($provider)` into `completeJson`.
 
-## Coaching
+## Pipeline Health
 
-Ranked `coaching_priorities` (max 5), `what_to_repeat` / `stop` / `start`, a four-part next-call playbook, and a short alternative path. This is advice for the next similar call, not an HR coaching-plan module.
+`AnalysisPipelineHealth` returns a normalized payload (no keys):
 
-## Company Context Compatibility
+* transcription: ready, provider, model, message, source
+* analysis: ready, provider, model, message
+* `pipeline_ready` only when both layers are ready
 
-Phase 5 context builder, scorecard snapshots, and `company_specific` remain. Company calls get v3 + company block. Public calls get v3 without invented company rules.
+Messages include: API key missing, Connection not checked, Connection failed, Model missing, No active provider, Ready.
 
-## Public UI
+Admin Settings show this block on Transcription and AI tabs.
 
-`AnalysisReport` is the deep report: overall score, executive summary, timeline, signals, critical mistakes, what worked, collapsible deep sections, missed opportunities, better phrases, coaching, playbook, alternative path. Transcript stays below the report on the public home page.
+## Public Behavior
 
-v2 reports without `executive_summary` still show the older summary / strengths / sections layout.
+Public upload is accepted only when transcription is ready.
 
-## Admin UI
+Otherwise HTTP 503 `{ "message": "Audio analysis is temporarily unavailable." }` — no Call created, no ElevenLabs/provider names, no keys.
 
-`Calls/Show` uses the same `AnalysisReport`. Admin additionally shows provider, model, schema version, company context metadata, and timestamps.
+Public homepage disables upload with the same copy.
 
-## Validation
+If STT succeeded but LLM is not configured, status remains `analysis_pending`. Public copy:
 
-`SalesAnalysisResultValidator` requires v3 keys on new writes, checks enums (timeline types, stages, objection categories, confidence, impact), timestamps ≥ 0, and collection caps. Company scorecard rules from Phase 5 are unchanged.
+`Transcription completed, but AI analysis is temporarily unavailable.`
+
+## Admin Behavior
+
+Call detail exposes `analysis_ready` and `analysis_unavailable_message`. Run / Re-run analysis is disabled when AI is not configured. `POST /calls/{call}/analyze` returns a validation error and does **not** dispatch `AnalyzeCall`. The job still keeps its own `isConfigured()` check.
+
+## Encryption & Secret Safety
+
+* Laravel encrypted casts on `TranscriptionProviderSetting` and existing `AiProviderSetting`
+* `api_key` hidden from `toArray()` / JSON
+* `SecretMask` for admin payloads
+* connection errors sanitized
+* no keys in logs, docs, REPORT, or Git
+* plaintext key is not stored in MySQL
 
 ## Tests
 
-`php artisan test`: **142 passed**, 1000 assertions.
+`php artisan test`: **168 passed**, 1158 assertions.
 
-New / extended:
+Coverage added/updated:
 
-* `tests/Unit/ConversationMetricsCalculatorTest.php`
-* `tests/Unit/SalesAnalysisResultValidatorTest.php` — v3 accept, malformed enums, negative timestamps, overflow slice/reject, objection categories
-* `tests/Feature/DeepCallAnalysisTest.php` — public v3 + metrics, no secrets, legacy v2 presentable, admin render, evidence prompt
-* `tests/Fixtures/DeepSalesCall.php` — synthetic discovery / price / weak-close transcript
-* `SalesAnalysisFactory::validPayload()` is v3; `legacyV2Payload()` for presenter compatibility
+* Transcription settings: bootstrap, encrypted save, masked output, blank does not erase, replace key, model stored, activation via check, check success/failure, no secret leaks
+* Resolver: DB preferred, env fallback, no config, model fallback, decrypted key internal-only
+* ElevenLabs client uses resolver; source has no `env(`
+* Pipeline health: nothing configured, STT only, AI only, both, failed connection, env STT
+* Public: unavailable STT safe message; AI pending remains safe
+* Admin: Settings payload; Run Analysis rejected when AI unavailable; configured pipeline still dispatches mocked jobs
+* Existing Phase 1–7 tests remain green
 
-Existing Phase 1–6 tests remain green.
+`ConversationMetricsCalculatorTest` now uses `RefreshDatabase` so unit-suite inserts cannot leak into later feature tests.
 
 ## Live Provider Verification
 
-`Deferred by Project Manager`
+Deferred by Project Manager
 
-No live ElevenLabs or LLM call was required or attempted.
+Check connection is a real HTTP call to ElevenLabs `GET /v1/user` (mocked in CI). It is not a fake button.
 
 ## Database Changes
 
-None. No migration. No new searchable columns.
+Additive migration `2026_09_10_120000_create_transcription_and_analysis_settings.php`:
+
+* `transcription_provider_settings`
+* `analysis_settings`
+
+Bootstrap: ElevenLabs row without API key, model `scribe_v2`; one analysis_settings row (`same_as_call`, 16384).
+
+No fresh/reset. Production backup taken before `php artisan migrate --force`.
 
 ## Production Sentinel
 
-Production connection `database=sales` after `php artisan test` (tests use `sales_testing` only):
+Pre-migrate backup: `/home/deploy/backups/sales/sales-pre-phase71-20260910-103439.sql` (database `sales`).
 
-| Metric | After |
+After `php artisan migrate --force`:
+
+| Table | Count |
 |---|---|
-| users | 1 |
+| calls | 0 (unchanged) |
 | companies | 0 |
 | employees | 0 |
-| calls | 0 |
 | transcripts | 0 |
-| transcript_segments | 0 |
 | sales_analyses | 0 |
-| jobs | 0 |
-| admin | id `1`, `admin@admin.com` |
+| ai_provider_settings | 3 (unchanged) |
+| users | 1 (unchanged) |
+| transcription_provider_settings | 1 (ElevenLabs, no key) |
+| analysis_settings | 1 (`same_as_call`, 16384) |
 
-Tests did not write production rows.
+STT `api_key` is SQL NULL. No worker restart was required for DB credentials.
 
 ## Documentation
 
 Updated:
 
-* `docs/AI_ANALYSIS.md`
 * `docs/ARCHITECTURE.md`
-* `docs/DATA_MODEL.md`
+* `docs/AI_ANALYSIS.md`
 * `docs/PRODUCT.md`
-* `docs/ROADMAP.md`
 * `docs/STATUS.md`
+* `docs/ROADMAP.md`
 * `docs/DECISIONS.md`
-* `README.md`
+* `docs/DATA_MODEL.md`
 
 Accepted:
 
-* DEC-047 — Deep Call Analysis schema v3
-* DEC-048 — Analysis prioritizes evidence over generic coaching
-* DEC-049 — Conversation metrics are calculated application-side
-* DEC-050 — Timeline contains only material call moments
-* DEC-051 — Coaching output is prioritized and actionable
+* DEC-052 — Transcription provider settings are managed separately from LLM settings
+* DEC-053 — Runtime provider credentials prefer database configuration
+* DEC-054 — Environment credentials are fallback configuration
+* DEC-055 — Pipeline readiness is exposed as one normalized health state
+* DEC-056 — Provider credentials are configurable without worker restart
 
 ## Changed Files
 
-`git diff --stat 92470fbdda97b8e2dc3cf34c54e094f8722d74d1..c69db2c50c30a93cbf67ef9f5c29f20964c7122e`
-
-```
- README.md                                          |   4 +-
- REPORT.md                                          | 298 +++------
- app/Jobs/AnalyzeCall.php                           |   4 +-
- .../Analysis/ConversationMetricsCalculator.php     | 128 ++++
- .../Analysis/SalesAnalysisPromptBuilder.php        |  48 +-
- .../Analysis/SalesAnalysisResultValidator.php      | 674 ++++++++++++++++++++-
- app/Services/Analysis/SalesAnalysisSchema.php      | 667 +++++++++++++++++---
- app/Support/SalesAnalysisPresenter.php             | 298 ++++++++-
- config/sales-analyzer.php                          |   2 +-
- database/factories/SalesAnalysisFactory.php        | 269 ++++++++
- docs/AI_ANALYSIS.md                                |  54 +-
- docs/ARCHITECTURE.md                               |   2 +-
- docs/DATA_MODEL.md                                 |   6 +-
- docs/DECISIONS.md                                  |  72 ++-
- docs/PRODUCT.md                                    |   4 +-
- docs/ROADMAP.md                                    |  17 +-
- docs/STATUS.md                                     |   5 +-
- resources/js/Components/Public/AnalysisReport.jsx  | 561 ++++++++++++++---
- tests/Feature/DeepCallAnalysisTest.php             | 201 ++++++
- tests/Fixtures/DeepSalesCall.php                   |  54 ++
- tests/Unit/ConversationMetricsCalculatorTest.php   |  97 +++
- tests/Unit/SalesAnalysisResultValidatorTest.php    | 107 ++++
- 22 files changed, 3153 insertions(+), 419 deletions(-)
-```
+Recorded after commit (baseline `33583e3` .. HEAD).
 
 ## Git
 
-* branch: `main`
-* remote: `https://github.com/Owiiiii1/sales.git`
-* implementation commit: `c69db2c50c30a93cbf67ef9f5c29f20964c7122e`
-* REPORT SHA/files commit: `c0509ab`
-* first successful push: `92470fb..c0509ab  main -> main`
-* commit messages:
-  * `Add schema v3 deep call analysis and coaching report.`
-  * `Record Phase 7 commit SHA and changed files in REPORT.md.`
-  * `Record Phase 7 GitHub push result in REPORT.md.`
-* push result: **PASS** — `To https://github.com/Owiiiii1/sales.git` `92470fb..c0509ab  main -> main`
+Pending commit + push on `main`.
 
 ## Problems / Warnings
 
 * Live external provider verification deferred by Project Manager (ElevenLabs and LLM).
 * Vite optional `fontaine` warning on `npm run build`.
 * Production MySQL user `sales` still has grants on `sales_testing.*` (unchanged from Phase 2.2).
-* One-pass v3 JSON is large; collection caps are the size control. A second pass can be added later if live models struggle.
-* No PDF export, CRM, billing, or employee coaching plans (out of scope).
+* Temperature is intentionally not configurable.
+* Env fallback still requires config cache clear / worker restart if `.env` is edited by hand. DB keys do not.
 
 ## Final Status
 
-`PHASE 7 PASSED`
+`PHASE 7.1 PASSED`

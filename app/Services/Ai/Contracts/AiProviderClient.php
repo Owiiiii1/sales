@@ -25,5 +25,6 @@ interface AiProviderClient
         string $system,
         string $user,
         array $jsonSchema,
+        int $maxOutputTokens = 16384,
     ): array;
 }

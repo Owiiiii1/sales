@@ -64,9 +64,10 @@ class AnthropicClient implements AiProviderClient
         string $system,
         string $user,
         array $jsonSchema,
+        int $maxOutputTokens = 16384,
     ): array {
         try {
-            $response = Http::timeout(90)
+            $response = Http::timeout(180)
                 ->connectTimeout(15)
                 ->withHeaders([
                     'x-api-key' => $apiKey,
@@ -75,7 +76,7 @@ class AnthropicClient implements AiProviderClient
                 ->acceptJson()
                 ->post('https://api.anthropic.com/v1/messages', [
                     'model' => $model,
-                    'max_tokens' => 8192,
+                    'max_tokens' => $maxOutputTokens,
                     'temperature' => 0.2,
                     'system' => $system."\n\nReturn only JSON matching this schema:\n".json_encode($jsonSchema),
                     'messages' => [

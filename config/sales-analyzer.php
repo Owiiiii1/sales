@@ -56,8 +56,12 @@ return [
         'model' => env('ELEVENLABS_STT_MODEL', 'scribe_v2'),
         'api_key' => env('ELEVENLABS_API_KEY'),
         'endpoint' => env('ELEVENLABS_STT_ENDPOINT', 'https://api.elevenlabs.io/v1/speech-to-text'),
+        'user_endpoint' => env('ELEVENLABS_USER_ENDPOINT', 'https://api.elevenlabs.io/v1/user'),
         'timeout' => (int) env('ELEVENLABS_STT_TIMEOUT', 120),
         'supported_languages' => ['en', 'ru', 'uk'],
+        'supported_models' => [
+            ['id' => 'scribe_v2', 'name' => 'Scribe v2'],
+        ],
         'diarization' => true,
         'timestamps' => true,
     ],
@@ -66,6 +70,16 @@ return [
         'schema_version' => 3,
         // Character budget for company knowledge packed into the LLM prompt.
         'context_budget_characters' => (int) env('SALES_ANALYSIS_CONTEXT_BUDGET', 24000),
+        'max_output_tokens' => [
+            'default' => 16384,
+            'min' => 4096,
+            'max' => 32768,
+            'providers' => [
+                'openai' => 32768,
+                'anthropic' => 16384,
+                'gemini' => 16384,
+            ],
+        ],
     ],
 
     'analytics' => [

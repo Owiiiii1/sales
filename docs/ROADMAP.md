@@ -74,7 +74,7 @@ Remaining later: object storage, processing UI beyond stubs, public analysis eng
 * public and admin transcript UI
 * languages `en` / `ru` / `uk`
 
-Live provider smoke is blocked until `ELEVENLABS_API_KEY` is set in this app’s `.env`.
+Live provider smoke for STT can use either Settings → Transcription or the env fallback `ELEVENLABS_API_KEY`.
 
 ## Phase 4 — AI Sales Analysis
 
@@ -123,6 +123,19 @@ Scorecard builder already shipped with Phase 5. This phase adds management analy
 * application-side conversation metrics
 * one structured LLM pass (not two)
 * public + admin share `AnalysisReport`
+* live provider verification deferred (DEC-035)
+
+## Phase 7.1 — Provider Settings Completion
+
+**Status: COMPLETED**
+
+* Settings → Transcription (ElevenLabs API key, Scribe v2, check connection)
+* `transcription_provider_settings` separate from LLM settings (DEC-052)
+* runtime credentials prefer DB; `.env` is documented fallback (DEC-053 / DEC-054)
+* Analysis Pipeline health (`AnalysisPipelineHealth`)
+* Analysis Behavior: same-as-call language, configurable max output tokens
+* public upload gated when STT is not ready
+* workers pick up DB keys without restart (DEC-056)
 * live provider verification deferred (DEC-035)
 
 ## Phase 8 — User Product

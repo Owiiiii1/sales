@@ -1,6 +1,6 @@
 import AdminLayout from '@/Layouts/AdminLayout';
 import AnalysisReport from '@/Components/Public/AnalysisReport';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 
 function formatDuration(seconds) {
@@ -28,6 +28,7 @@ function statusClass(status) {
 }
 
 export default function CallsShow({ call, companies = [], employees = [] }) {
+    const { errors = {} } = usePage().props;
     const form = useForm({
         company_id: call.company_id ?? '',
         employee_id: call.employee_id ?? '',
@@ -75,8 +76,15 @@ export default function CallsShow({ call, companies = [], employees = [] }) {
                             {call.can_run_analysis && (
                                 <button
                                     type="button"
-                                    className="rounded-lg border border-indigo-200 px-3 py-2 text-sm font-medium text-indigo-700"
-                                    onClick={() => router.post(route('calls.analyze', call.id))}
+                                    disabled={call.analysis_ready === false}
+                                    title={call.analysis_ready === false ? call.analysis_unavailable_message : undefined}
+                                    className="rounded-lg border border-indigo-200 px-3 py-2 text-sm font-medium text-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                    onClick={() => {
+                                        if (call.analysis_ready === false) {
+                                            return;
+                                        }
+                                        router.post(route('calls.analyze', call.id));
+                                    }}
                                 >
                                     Run analysis
                                 </button>
@@ -84,8 +92,15 @@ export default function CallsShow({ call, companies = [], employees = [] }) {
                             {call.can_rerun_analysis && (
                                 <button
                                     type="button"
-                                    className="rounded-lg border border-indigo-200 px-3 py-2 text-sm font-medium text-indigo-700"
-                                    onClick={() => router.post(route('calls.analyze', call.id))}
+                                    disabled={call.analysis_ready === false}
+                                    title={call.analysis_ready === false ? call.analysis_unavailable_message : undefined}
+                                    className="rounded-lg border border-indigo-200 px-3 py-2 text-sm font-medium text-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                    onClick={() => {
+                                        if (call.analysis_ready === false) {
+                                            return;
+                                        }
+                                        router.post(route('calls.analyze', call.id));
+                                    }}
                                 >
                                     Re-run analysis
                                 </button>
@@ -103,6 +118,11 @@ export default function CallsShow({ call, companies = [], employees = [] }) {
                             </button>
                         </div>
                     </div>
+
+                    {call.analysis_ready === false && (call.can_run_analysis || call.can_rerun_analysis) && call.analysis_unavailable_message && (
+                        <p className="mt-3 text-sm text-amber-800">{call.analysis_unavailable_message}</p>
+                    )}
+                    {errors.call ? <p className="mt-3 text-sm text-red-600">{errors.call}</p> : null}
 
                     <dl className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 text-sm">
                         <Item label="Company" value={call.company_name} />

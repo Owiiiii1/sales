@@ -9,6 +9,7 @@ use App\Http\Requests\UpdateCallRequest;
 use App\Models\Call;
 use App\Models\Company;
 use App\Models\Employee;
+use App\Services\Ai\ActiveAiProvider;
 use App\Services\Calls\CallAudioStreamer;
 use App\Services\Calls\CallAudioStorage;
 use App\Services\Calls\CallUploadService;
@@ -166,6 +167,12 @@ class CallsController extends Controller
             ]);
         }
 
+        if (! app(ActiveAiProvider::class)->isConfigured()) {
+            return back()->withErrors([
+                'call' => 'AI analysis is not configured. Activate a provider and model in Settings → AI.',
+            ]);
+        }
+
         AnalyzeCall::dispatch($call->id);
 
         return back();
@@ -230,6 +237,7 @@ class CallsController extends Controller
     private function detailPayload(Call $call, CallAudioStorage $storage): array
     {
         $hasAudio = $storage->exists($call->storage_path);
+        $analysisReady = app(ActiveAiProvider::class)->isConfigured();
 
         return [
             'id' => $call->id,
@@ -256,6 +264,10 @@ class CallsController extends Controller
             'can_retry_transcription' => in_array($call->status, ['uploaded', 'failed', 'transcribed', 'analysis_pending', 'completed'], true),
             'can_run_analysis' => $call->transcript !== null && in_array($call->status, ['transcribed', 'analysis_pending', 'failed'], true),
             'can_rerun_analysis' => $call->transcript !== null && $call->status === 'completed',
+            'analysis_ready' => $analysisReady,
+            'analysis_unavailable_message' => $analysisReady
+                ? null
+                : 'AI analysis is not configured. Activate a provider and model in Settings → AI.',
             'transcript' => TranscriptPresenter::admin($call),
             'analysis' => SalesAnalysisPresenter::admin($call),
             'analysis_context' => [

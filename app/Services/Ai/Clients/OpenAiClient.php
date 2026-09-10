@@ -61,15 +61,17 @@ class OpenAiClient implements AiProviderClient
         string $system,
         string $user,
         array $jsonSchema,
+        int $maxOutputTokens = 16384,
     ): array {
         try {
-            $response = Http::timeout(90)
+            $response = Http::timeout(180)
                 ->connectTimeout(15)
                 ->withToken($apiKey)
                 ->acceptJson()
                 ->post('https://api.openai.com/v1/chat/completions', [
                     'model' => $model,
                     'temperature' => 0.2,
+                    'max_tokens' => $maxOutputTokens,
                     'messages' => [
                         ['role' => 'system', 'content' => $system],
                         ['role' => 'user', 'content' => $user],

@@ -2,13 +2,16 @@ import AdminLayout from '@/Layouts/AdminLayout';
 import { Head, router, usePage } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
 import AiPanel from './AiPanel';
+import AnalysisBehaviorPanel from './AnalysisBehaviorPanel';
 import AppPanel from './AppPanel';
 import GeneralPanel from './GeneralPanel';
+import PipelineStatus from './PipelineStatus';
 import TelegramPanel from './TelegramPanel';
+import TranscriptionPanel from './TranscriptionPanel';
 import UsersPanel from './UsersPanel';
 
 export default function SettingsIndex() {
-    const { locale = 'en', tab: initialTab = 'general' } = usePage().props;
+    const { locale = 'en', tab: initialTab = 'general', pipeline = {} } = usePage().props;
     const [activeTab, setActiveTab] = useState(initialTab);
 
     useEffect(() => {
@@ -20,6 +23,7 @@ export default function SettingsIndex() {
             pageTitle: 'Settings',
             general: 'General',
             users: 'Users',
+            transcription: 'Transcription',
             ai: 'AI',
             app: 'App settings',
             telegram: 'Telegram',
@@ -28,6 +32,7 @@ export default function SettingsIndex() {
             pageTitle: 'Settings',
             general: 'General',
             users: 'Users',
+            transcription: 'Transcription',
             ai: 'AI',
             app: 'App settings',
             telegram: 'Telegram',
@@ -36,6 +41,7 @@ export default function SettingsIndex() {
             pageTitle: 'Settings',
             general: 'General',
             users: 'Users',
+            transcription: 'Transcription',
             ai: 'AI',
             app: 'App settings',
             telegram: 'Telegram',
@@ -47,10 +53,11 @@ export default function SettingsIndex() {
         () => [
             { id: 'general', label: t.general },
             { id: 'users', label: t.users },
+            { id: 'transcription', label: t.transcription },
             { id: 'ai', label: t.ai },
             { id: 'app', label: t.app },
         ],
-        [t.ai, t.app, t.general, t.users],
+        [t.ai, t.app, t.general, t.transcription, t.users],
     );
 
     const switchTab = (nextTab) => {
@@ -69,6 +76,8 @@ export default function SettingsIndex() {
             },
         );
     };
+
+    const showPipeline = activeTab === 'transcription' || activeTab === 'ai';
 
     return (
         <AdminLayout title={t.pageTitle}>
@@ -96,9 +105,16 @@ export default function SettingsIndex() {
                     })}
                 </div>
 
+                {showPipeline && <PipelineStatus pipeline={pipeline} />}
                 {activeTab === 'general' && <GeneralPanel />}
                 {activeTab === 'users' && <UsersPanel />}
-                {activeTab === 'ai' && <AiPanel />}
+                {activeTab === 'transcription' && <TranscriptionPanel />}
+                {activeTab === 'ai' && (
+                    <div className="space-y-6">
+                        <AiPanel />
+                        <AnalysisBehaviorPanel />
+                    </div>
+                )}
                 {activeTab === 'app' && <AppPanel />}
                 {activeTab === 'telegram' && <TelegramPanel />}
             </div>

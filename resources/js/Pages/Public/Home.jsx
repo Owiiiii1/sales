@@ -10,6 +10,8 @@ export default function PublicHome({ upload = {} }) {
     const maxMb = upload.max_audio_size_mb ?? 200;
     const accept = upload.accept ?? '.mp3,.wav,.m4a,.mp4,.ogg,.webm';
     const pollInterval = upload.poll_interval_ms ?? 3000;
+    const uploadAvailable = upload.available !== false;
+    const unavailableMessage = upload.unavailable_message ?? 'Audio analysis is temporarily unavailable.';
     const inputRef = useRef(null);
     const pollRef = useRef(null);
 
@@ -144,16 +146,22 @@ export default function PublicHome({ upload = {} }) {
 
                 <section
                     className={`mt-12 rounded-3xl border-2 border-dashed bg-white p-8 shadow-sm transition sm:p-12 ${
-                        dragOver ? 'border-indigo-400 bg-indigo-50/60' : 'border-slate-200'
+                        dragOver && uploadAvailable ? 'border-indigo-400 bg-indigo-50/60' : 'border-slate-200'
                     }`}
                     onDragOver={(event) => {
                         event.preventDefault();
+                        if (!uploadAvailable) {
+                            return;
+                        }
                         setDragOver(true);
                     }}
                     onDragLeave={() => setDragOver(false)}
                     onDrop={(event) => {
                         event.preventDefault();
                         setDragOver(false);
+                        if (!uploadAvailable) {
+                            return;
+                        }
                         const dropped = event.dataTransfer.files?.[0];
                         if (dropped) {
                             assignFile(dropped);
@@ -170,9 +178,13 @@ export default function PublicHome({ upload = {} }) {
                         </div>
                     ) : (
                         <div className="flex flex-col items-center text-center">
-                            <p className="text-lg font-semibold text-slate-900">Drop your audio file here</p>
+                            <p className="text-lg font-semibold text-slate-900">
+                                {uploadAvailable ? 'Drop your audio file here' : unavailableMessage}
+                            </p>
                             <p className="mt-2 text-sm text-slate-500">
-                                MP3, WAV, M4A, MP4, OGG or WEBM. Maximum {maxMb} MB.
+                                {uploadAvailable
+                                    ? `MP3, WAV, M4A, MP4, OGG or WEBM. Maximum ${maxMb} MB.`
+                                    : 'Please try again later.'}
                             </p>
                             {file && (
                                 <p className="mt-3 text-sm font-medium text-slate-700">{file.name}</p>
@@ -183,15 +195,17 @@ export default function PublicHome({ upload = {} }) {
                             <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
                                 <button
                                     type="button"
+                                    disabled={!uploadAvailable}
                                     onClick={() => inputRef.current?.click()}
-                                    className="rounded-full border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                                    className="rounded-full border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     Choose file
                                 </button>
                                 <button
                                     type="button"
+                                    disabled={!uploadAvailable}
                                     onClick={() => submit()}
-                                    className="rounded-full bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500"
+                                    className="rounded-full bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     Analyze call
                                 </button>

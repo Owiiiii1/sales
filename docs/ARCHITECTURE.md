@@ -37,7 +37,9 @@ Laravel 13 + Custom Admin Kit, with a public product surface and an admin founda
 
 Domain models **Company**, **Employee**, **Call**, **Transcript**, **SalesAnalysis**, and company knowledge (`CompanyProfile`, offerings, objections, scripts, scorecards) exist. Audio is stored on a **private** Laravel disk (`calls` → `storage/app/private/calls`). Public uploads reuse that disk and are **not** streamed to anonymous users.
 
-Pipeline: upload → `TranscribeCall` (ElevenLabs Scribe v2) → `AnalyzeCall`. `AnalyzeCall` uses `AnalysisContextBuilder` then **one** structured LLM call (schema v3). A second coaching pass was considered and rejected: the v3 JSON is bounded by collection limits, two calls would duplicate the transcript and company context, and failure/latency would double. `ConversationMetricsCalculator` overwrites talk-time metrics from transcript segments after speaker-role mapping (DEC-049). Public calls (`company_id` null) get full generic deep analysis. Admin calls with a Company also receive that company’s knowledge and default active scorecard. If no AI key/model is configured, the Call stays `analysis_pending`. Stored v1/v2 results remain presentable.
+Pipeline: upload → `TranscribeCall` (ElevenLabs Scribe v2) → `AnalyzeCall`. `AnalyzeCall` uses `AnalysisContextBuilder` then **one** structured LLM call (schema v3). A second coaching pass was considered and rejected: the v3 JSON is bounded by collection limits, two calls would duplicate the transcript and company context, and failure/latency would double. `ConversationMetricsCalculator` overwrites talk-time metrics from transcript segments after speaker-role mapping (DEC-049). Public calls (`company_id` null) get full generic deep analysis. Admin calls with a Company also receive that company’s knowledge and default active scorecard. If transcription is not ready, public upload is rejected with a generic unavailable message (no provider names). If no AI key/model is configured, the Call stays `analysis_pending`. Stored v1/v2 results remain presentable.
+
+Admin Settings expose pipeline health (`AnalysisPipelineHealth`), a Transcription tab (`transcription_provider_settings`), existing AI provider cards, and application analysis settings (`analysis_settings`: report language = same as call, max output tokens). Runtime credentials prefer the database; `.env` is fallback only (DEC-053 / DEC-054). Workers read DB keys without restart (DEC-056). `php artisan config:cache` can freeze env fallback values; it does not freeze DB keys.
 
 Admin analytics (`DashboardAnalyticsService`, `CompanyAnalyticsService`, `EmployeeAnalyticsService`) aggregate existing `calls` / `sales_analyses` rows. No analytics tables. Date basis is `COALESCE(recorded_at, created_at)` in the application timezone (DEC-042 / DEC-045). JSON section scores are aggregated in PHP, not via opaque MySQL JSON SQL. Charts are lightweight SVG (no extra chart library).
 
@@ -96,7 +98,15 @@ Queues: production uses `QUEUE_CONNECTION=database` and systemd unit `/etc/syste
 
 ## AI architecture
 
-LLM vendor is **operator-configured** via Custom Admin Kit Settings → AI (`ai_provider_settings`). Product does not lock a single vendor (DEC-006 remains Open). Analysis HTTP uses the same stored key/model (`ConfiguredSalesAnalysisProvider`).
+LLM vendor is **operator-configured** via Settings → AI (`ai_provider_settings`). STT is **operator-configured** via Settings → Transcription (`transcription_provider_settings`). These are separate provider domains (DEC-052). Product does not lock a single LLM vendor (DEC-006 remains Open).
+
+Resolution order for transcription credentials:
+
+```
+DB configured provider → env fallback (`config('sales-analyzer.transcription.api_key')`) → not configured
+```
+
+`ActiveTranscriptionProvider` is the only resolver. `ElevenLabsTranscriptionClient` does not read `env()` for secrets. Analysis HTTP uses the stored LLM key/model plus application `max_output_tokens` (`ConfiguredSalesAnalysisProvider`).
 
 ### Open choices
 
@@ -119,15 +129,17 @@ Analysis is expected to be **several structured LLM calls**, not a mandatory mul
 | Relational records | MySQL `sales` | Keep MySQL for users, companies, calls, scores |
 | Audio files | Private local disk `calls` (`storage/app/private/calls`) | Object storage (S3-compatible) **TBD** |
 | Transcripts | `transcripts` + `transcript_segments` | Keep normalized tables |
-| Sales analyses | `sales_analyses` (versioned JSON `result`, schema v2) | Keep JSON source of truth; generic `overall_score` and `company_scorecard_score` are separate |
+| Sales analyses | `sales_analyses` (versioned JSON `result`, schema v3) | Keep JSON source of truth; generic `overall_score` and `company_scorecard_score` are separate |
+| Transcription / analysis settings | `transcription_provider_settings`, `analysis_settings` | DB is runtime source of truth; `.env` is optional fallback |
 | Company knowledge | `company_profiles`, `company_offerings`, `company_objections`, `company_sales_scripts`, `company_scorecards`, `company_scorecard_criteria` | Documents + optional RAG still **TBD**. No vector store in this phase. |
 
 ## Frontend architecture
 
 Current: Inertia React + Vite + Ziggy.
 
-* Public product UI uses `PublicLayout` and `Pages/Public/Home` (upload, polling, transcript, structured report).
-* Admin UI remains Custom Admin Kit layouts (`AdminLayout`, `/dashboard`, CRUD).
+* Public product UI uses `PublicLayout` and `Pages/Public/Home` (upload, polling, transcript, structured report). Upload is disabled when transcription is not ready.
+* Admin UI remains Custom Admin Kit layouts (`AdminLayout`, `/dashboard`, CRUD, Settings).
+* Settings tabs: General, Users, Transcription, AI, App. Pipeline status is shown on Transcription and AI.
 * Same Laravel/Inertia app; no separate frontend.
 
 ## Isolation on the server
@@ -165,4 +177,3 @@ See DEC-021 and DEC-022.
 ## Open architecture questions
 
 * Audio object storage.
-* Whether kit AI settings screens will wrap the product’s LLM keys or a separate config will be used.

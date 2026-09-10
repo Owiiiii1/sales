@@ -2,7 +2,7 @@
 
 This document describes the **domain model**.
 
-Phase 1 implemented `companies`, `employees`, and `calls`. Phase 3 added transcripts. Phase 4 added `sales_analyses`. Phase 5 added company knowledge and configurable scorecards. Phase 6 computes analytics from those tables; there is no `analytics_daily` (DEC-042).
+Phase 1 implemented `companies`, `employees`, and `calls`. Phase 3 added transcripts. Phase 4 added `sales_analyses`. Phase 5 added company knowledge and configurable scorecards. Phase 6 computes analytics from those tables; there is no `analytics_daily` (DEC-042). Phase 7.1 added `transcription_provider_settings` and `analysis_settings`.
 
 **Do not** treat kit CRM tables as Sales Analyzer domain.
 
@@ -12,7 +12,7 @@ MySQL database `sales` has Laravel + admin kit tables **and** Phase 1 domain tab
 
 * `users`, `sessions`, `cache`, `jobs`, …
 * **legacy kit CRM:** `customers`, `orders`, `services`, `staff`, `order_staff` (DEC-012 — retained, hidden from nav)
-* `ai_provider_settings`, `telegram_bot_settings`
+* `ai_provider_settings`, `telegram_bot_settings`, `transcription_provider_settings`, `analysis_settings`
 * **Sales Analyzer:** `companies`, `employees`, `calls`, `transcripts`, `transcript_segments`, `sales_analyses`, `company_profiles`, `company_offerings`, `company_objections`, `company_sales_scripts`, `company_scorecards`, `company_scorecard_criteria`
 
 ## Implemented domain (Phase 1)
@@ -195,6 +195,34 @@ Call hasOne Transcript. Transcript hasMany segments ordered by sequence. UI labe
 Call hasOne SalesAnalysis. Re-analysis replaces the row only after a validated provider response. Knowledge edits do not rewrite an existing analysis (DEC-039).
 
 Speaker roles (`seller` / `customer` / `unknown` / `other`) live in `result.speaker_roles`, not on transcript segments.
+
+## Transcription provider settings
+
+**Implemented table `transcription_provider_settings` (DEC-052).** Separate from `ai_provider_settings`.
+
+* id
+* provider unique (`elevenlabs`)
+* label (`ElevenLabs`)
+* api_key encrypted nullable (Laravel encrypted cast; hidden on serialization)
+* is_connected, is_active
+* active_model nullable (default `scribe_v2`)
+* available_models json nullable (application-side list)
+* last_checked_at, last_error nullable
+* settings json nullable
+* timestamps
+
+Bootstrap inserts the ElevenLabs row without a secret. Runtime resolution: non-empty DB key → `config('sales-analyzer.transcription.api_key')` env fallback → not configured (DEC-053 / DEC-054).
+
+## Analysis settings
+
+**Implemented table `analysis_settings`.** Product-level, not per LLM provider.
+
+* id
+* report_language_mode default `same_as_call`
+* max_output_tokens unsigned int default 16384
+* timestamps
+
+Schema version remains informational (`config('sales-analyzer.analysis.schema_version')` = 3). Temperature is not stored.
 
 ## Speaker Segment
 

@@ -73,8 +73,9 @@ class AiProviderManager
         string $system,
         string $user,
         array $jsonSchema,
+        int $maxOutputTokens = 16384,
     ): array {
-        return $this->client($provider)->completeJson($apiKey, $model, $system, $user, $jsonSchema);
+        return $this->client($provider)->completeJson($apiKey, $model, $system, $user, $jsonSchema, $maxOutputTokens);
     }
 
     private function client(string $provider): AiProviderClient
