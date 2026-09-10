@@ -2,7 +2,7 @@
 
 This document describes the product we intend to build. It is not a description of the current UI.
 
-The live site has a **public homepage** at `/` for uploading a sales call, plus an admin at `/login`. Transcription is queued through ElevenLabs Scribe v2. Generic AI sales analysis runs when an Admin Kit AI provider is configured. Company-specific knowledge is not used yet. See [STATUS.md](STATUS.md).
+The live site has a **public homepage** at `/` for uploading a sales call, plus an admin at `/login`. Transcription is queued through ElevenLabs Scribe v2. Generic AI sales analysis runs for public calls. Admin-uploaded calls with a Company also use that company’s knowledge and default scorecard. See [STATUS.md](STATUS.md).
 
 ## Problem
 
@@ -110,13 +110,13 @@ These are possible later capabilities. **Do not treat the list as committed scop
 
 | Surface | Purpose | Status |
 |---|---|---|
-| Upload Call | Submit audio | Planned (Phase 1) |
-| Analysis report | Read scores and recommendations | Planned (Phase 4) |
-| Company context form | Minimal context in MVP; stored later | Planned |
-| Admin / operator UI | Adapted from Custom Admin Kit | Planned (Phase 1 adapt) |
-| Personal cabinet | History, companies, employees | Planned (Phase 2 / 7) |
-| Knowledge admin | Scripts, products, objections | Planned (Phase 5) |
-| Scorecard admin | Criteria and weights | Planned (Phase 6) |
+| Upload Call | Submit audio | Implemented (public + admin) |
+| Analysis report | Read scores and recommendations | Implemented (Phase 4–5) |
+| Company context form | Admin Sales Knowledge (not a public prompt field) | Implemented (Phase 5) |
+| Admin / operator UI | Adapted from Custom Admin Kit | Implemented (Phase 1) |
+| Personal cabinet | History, companies, employees | Planned (Phase 7) |
+| Knowledge admin | Scripts, products, objections | Implemented (Phase 5) |
+| Scorecard admin | Criteria and weights | Implemented (Phase 5) |
 | Team analytics | Trends and comparisons | Planned (Phase 8) |
 
 ## What we reuse from the admin kit

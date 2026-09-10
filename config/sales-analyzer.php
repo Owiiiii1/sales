@@ -62,4 +62,10 @@ return [
         'timestamps' => true,
     ],
 
+    'analysis' => [
+        'schema_version' => 2,
+        // Character budget for company knowledge packed into the LLM prompt.
+        'context_budget_characters' => (int) env('SALES_ANALYSIS_CONTEXT_BUDGET', 24000),
+    ],
+
 ];

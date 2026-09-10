@@ -11,15 +11,18 @@ Factual state of the running project. Update this file when reality changes.
 * **Phase 2.2 — Test isolation & upload limits:** COMPLETED
 * **Phase 3 — ElevenLabs transcription:** COMPLETED (code + mocked tests). Live ElevenLabs verification deferred by Project Manager.
 * **Phase 4 — Structured AI sales analysis:** COMPLETED (application code + mocked tests). Live LLM verification deferred by Project Manager.
-* **Next planned work:** Phase 5 company knowledge / RAG
+* **Phase 5 — Company knowledge & scorecards:** COMPLETED (application code + mocked tests). Live LLM verification deferred by Project Manager.
+* **Next planned work:** Phase 7 user product (accounts / personal cabinet), unless the roadmap is reordered.
 
 ## Product vs running app
 
-Guests open `/`, upload a recording, and poll through transcription and analysis. Speakers remain `Speaker 1`, `Speaker 2` on the transcript. Seller/customer mapping is analysis metadata. Generic sales scores appear when an Admin Kit AI provider is configured.
+Guests open `/`, upload a recording, and poll through transcription and analysis. Speakers remain `Speaker 1`, `Speaker 2` on the transcript. Seller/customer mapping is analysis metadata. Public calls use generic sales scores only.
+
+Admin company pages hold Sales Knowledge, offerings, objections, scripts, and scorecards. Admin-uploaded calls with a Company use that knowledge automatically (default active scorecard). Generic Overall Sales Score and Company Scorecard scores stay separate.
 
 If Settings → AI has no active provider/key/model, calls stay `analysis_pending` after transcription.
 
-Admins sign in at `/login`. Call detail shows transcript, analysis, Retry transcription, Run analysis, and Re-run analysis.
+Admins sign in at `/login`. Company detail is tabbed. Call detail shows analysis context metadata (company, scorecard, schema version, company context used). Re-run analysis is manual after knowledge changes.
 
 ## Infrastructure
 
@@ -47,6 +50,7 @@ Admins sign in at `/login`. Call detail shows transcript, analysis, Retry transc
 | `/analyze` | guest | public audio upload |
 | `/analysis/{token}/status` | guest | safe status JSON |
 | `/analysis/{token}` | guest | transcript + report when ready |
+| `/companies/{company}` | auth | company knowledge tabs |
 | `POST /calls/{call}/transcribe` | auth | retry STT job |
 | `POST /calls/{call}/analyze` | auth | run / re-run analysis job |
 
@@ -61,8 +65,7 @@ Admins sign in at `/login`. Call detail shows transcript, analysis, Retry transc
 
 ## What is explicitly not done
 
-* no company RAG / documents / embeddings
-* no custom scorecards
+* no company document RAG / embeddings / vector store
 * no employee or team analytics
 * no CRM integration
 * no public audio streaming

@@ -450,7 +450,7 @@ Status values: `Accepted` | `Open` | `Superseded` | `Rejected`.
 
 **Reason:** Public uploads have no company. Pretending we know a company’s offer would hallucinate.
 
-**Consequences:** Prompt forbids company-specific invention. A later phase adds company knowledge.
+**Consequences:** Prompt forbids company-specific invention on public/generic calls. Phase 5 adds a separate company knowledge layer for calls that have a Company (DEC-036) without replacing this generic baseline.
 
 ---
 
@@ -510,10 +510,94 @@ Status values: `Accepted` | `Open` | `Superseded` | `Rejected`.
 
 ---
 
+## DEC-036
+
+**Title:** Company knowledge is a separate domain layer  
+**Status:** Accepted  
+**Date:** 2026-09-10
+
+**Decision:** Store company-specific sales knowledge in dedicated tables (`company_profiles`, offerings, objections, scripts, scorecards). Do not add dozens of knowledge columns onto `companies`. Do not use JSON for naturally textual fields.
+
+**Reason:** Company knowledge is a domain, not a company metadata dump. Generic analysis must keep working when `company_id` is null.
+
+**Consequences:** `AnalysisContextBuilder` loads active knowledge for a Call’s Company. Public calls skip this layer. RAG/embeddings remain later.
+
+---
+
+## DEC-037
+
+**Title:** Company scorecards are configurable  
+**Status:** Accepted  
+**Date:** 2026-09-10
+
+**Decision:** Companies may define one or more scorecards with weighted criteria. Analysis uses the default active scorecard. No fictitious scorecard is auto-created. Admin upload does not pick a scorecard in v1.
+
+**Reason:** Companies score different behaviors. A universal scorecard would hide that.
+
+**Consequences:** Missing scorecard means generic sections only. Weights need not sum to 100 in the database; the UI warns.
+
+---
+
+## DEC-038
+
+**Title:** Weighted score is calculated application-side  
+**Status:** Accepted  
+**Date:** 2026-09-10
+
+**Decision:** The LLM returns per-criterion scores. Laravel computes `sum((score/max_score)*weight) / sum(applicable weights) * 100`. Non-applicable criteria are excluded. The LLM `total_score` is overwritten. Critical failure is a flag only; it does not force total=0.
+
+**Reason:** Models are unreliable at weighted arithmetic. The snapshot is the source of weights.
+
+**Consequences:** Generic `overall_score` and `company_scorecard_score` stay separate columns/UI values.
+
+---
+
+## DEC-039
+
+**Title:** Analyses store immutable context snapshots  
+**Status:** Accepted  
+**Date:** 2026-09-10
+
+**Decision:** Each `sales_analyses` row stores `company_context_hash`, `context_snapshot`, `scorecard_id`, and `scorecard_snapshot`. Editing company knowledge does not rewrite old analyses. Re-run analysis is manual and writes a new snapshot.
+
+**Reason:** Coaching history must remain explainable against the rules that produced it.
+
+**Consequences:** No knowledge version-control UI in v1. Snapshots are enough.
+
+---
+
+## DEC-040
+
+**Title:** Public calls use generic analysis only  
+**Status:** Accepted  
+**Date:** 2026-09-10
+
+**Decision:** Anonymous public uploads keep `company_id` null, `company_context_used=false`, and generic methodology. The public form does not ask for company knowledge.
+
+**Reason:** Guests have no company. Inventing one would hallucinate.
+
+**Consequences:** Company-specific fields in schema v2 are empty/not applicable for public calls.
+
+---
+
+## DEC-041
+
+**Title:** Transcript is untrusted prompt content  
+**Status:** Accepted  
+**Date:** 2026-09-10
+
+**Decision:** Company knowledge is trusted admin-entered context. The transcript is untrusted. Prompts separate SYSTEM RULES, COMPANY CONTEXT, and CALL TRANSCRIPT, and tell the model to ignore instruction-like transcript text.
+
+**Reason:** A caller (or a file) can say “ignore previous instructions.” That must not override system or company rules.
+
+**Consequences:** Prompt-injection resistance is wording and structure, not a separate ML classifier.
+
+---
+
 ## Template for new entries
 
 ```
-## DEC-036
+## DEC-042
 
 **Title:**  
 **Status:** Open | Accepted  

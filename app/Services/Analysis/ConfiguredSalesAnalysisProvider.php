@@ -53,6 +53,7 @@ class ConfiguredSalesAnalysisProvider implements SalesAnalysisProvider
             $payload,
             (string) $setting->provider,
             (string) $setting->active_model,
+            $context,
         );
     }
 }

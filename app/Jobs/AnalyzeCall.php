@@ -5,7 +5,7 @@ namespace App\Jobs;
 use App\Exceptions\Analysis\PermanentAnalysisException;
 use App\Exceptions\Analysis\TransientAnalysisException;
 use App\Models\Call;
-use App\Services\Analysis\DTO\AnalysisContext;
+use App\Services\Analysis\AnalysisContextBuilder;
 use App\Services\Analysis\SalesAnalysisProvider;
 use App\Services\Analysis\SalesAnalysisWriter;
 use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
@@ -34,8 +34,11 @@ class AnalyzeCall implements ShouldBeUniqueUntilProcessing, ShouldQueue
         return (string) $this->callId;
     }
 
-    public function handle(SalesAnalysisProvider $provider, SalesAnalysisWriter $writer): void
-    {
+    public function handle(
+        SalesAnalysisProvider $provider,
+        SalesAnalysisWriter $writer,
+        AnalysisContextBuilder $contexts,
+    ): void {
         $call = Call::query()->with(['transcript.segments', 'company'])->find($this->callId);
 
         if ($call === null) {
@@ -69,10 +72,7 @@ class AnalyzeCall implements ShouldBeUniqueUntilProcessing, ShouldQueue
         ])->save();
 
         try {
-            $result = $provider->analyze($transcript, new AnalysisContext(
-                language: $transcript->language,
-                companyName: $call->company?->name,
-            ));
+            $result = $provider->analyze($transcript, $contexts->build($call));
 
             $writer->replace($call, $result, $startedAt);
 

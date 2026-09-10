@@ -258,6 +258,12 @@ class CallsController extends Controller
             'can_rerun_analysis' => $call->transcript !== null && $call->status === 'completed',
             'transcript' => TranscriptPresenter::admin($call),
             'analysis' => SalesAnalysisPresenter::admin($call),
+            'analysis_context' => [
+                'company' => $call->company?->name,
+                'scorecard_name' => $call->analysis?->scorecard_snapshot['name'] ?? null,
+                'schema_version' => $call->analysis?->schema_version,
+                'company_context_used' => (bool) ($call->analysis?->result['company_context_used'] ?? false),
+            ],
         ];
     }
 }

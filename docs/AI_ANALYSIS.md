@@ -1,6 +1,6 @@
 # Sales Analyzer — AI Analysis
 
-This is a design document for the analysis engine. **STT is implemented (ElevenLabs Scribe v2). Generic LLM sales analysis is implemented (schema version 1).** Company RAG and custom scorecards are not. The live LLM vendor is whichever provider an admin activates in Settings → AI (DEC-006 remains Open).
+This is a design document for the analysis engine. **STT is implemented (ElevenLabs Scribe v2). Structured LLM sales analysis is implemented (schema version 2).** Company knowledge is stored as structured MySQL records and packed by `AnalysisContextBuilder`. RAG / embeddings are not used. The live LLM vendor is whichever provider an admin activates in Settings → AI (DEC-006 remains Open).
 
 ## Main principle
 
@@ -25,7 +25,7 @@ A call analysis without knowledge of the company is **limited**.
 
 The same phrase can be a good close for one offer and a compliance violation for another. “Did they mention the 24-hour guarantee?” is meaningless unless we know that guarantee exists.
 
-Company-specific context is an accepted product requirement (DEC-005). How it is stored and retrieved in MVP (short form vs knowledge base vs RAG) is **TBD**.
+Company-specific context is an accepted product requirement (DEC-005). Phase 5 stores it as structured company knowledge (DEC-036), not as a public form and not as RAG.
 
 ## Pipeline (preliminary)
 
@@ -51,7 +51,17 @@ Each arrow may be one or more jobs. Failures should be visible as call status, n
 
 STT and diarization are one ElevenLabs Scribe v2 call (`diarize=true`, word timestamps). Speakers are stored as integers and shown as `Speaker 1`, `Speaker 2`. Seller vs customer is assigned in analysis JSON `speaker_roles` (DEC-034), not by mutating transcript rows.
 
-Phase 4 runs **one** structured LLM call with `SalesAnalysisPromptBuilder`. Generic sales methodology only (DEC-031). Company `description` is not used as RAG. Company name may appear as metadata.
+Phase 4 added **one** structured LLM call with `SalesAnalysisPromptBuilder` for generic sales methodology (DEC-031). Phase 5 still uses one LLM call. `AnalysisContextBuilder` attaches company knowledge when `Call.company_id` is set. Public calls stay generic (DEC-040).
+
+Prompt layout:
+
+1. SYSTEM RULES
+2. GENERIC SALES METHODOLOGY
+3. COMPANY-SPECIFIC INSTRUCTIONS (only when company context is used)
+4. COMPANY CONTEXT (trusted admin text, character budget 24,000)
+5. CALL TRANSCRIPT (untrusted) (DEC-041)
+
+Priority when packing company context: scorecard → mandatory questions → forbidden claims → scripts → offerings → objections → core profile → competitors/notes. Overflow is truncated, logged, and does not fail the job.
 
 ## Transcription and speakers
 
@@ -145,7 +155,9 @@ Prompt version, model, scorecard version, and context version must be stored wit
 
 ## Company knowledge
 
-Before analysis, the system should load **relevant** knowledge for that company (RAG / context retrieval is the preliminary approach).
+Before analysis, `AnalysisContextBuilder` loads relevant knowledge for that Call’s Company (if any). Public calls skip this. Context is packed with a 24,000-character budget (config `sales-analyzer.analysis.context_budget_characters`). Truncation logs a warning and does not fail.
+
+Schema v2 adds `company_context_used` and `company_specific` (script adherence, mandatory questions, forbidden claims, objection handling, offering accuracy, scorecard criteria). Laravel overwrites scorecard `total_score`. Generic `overall_score` is not replaced by the company scorecard.
 
 Future knowledge types to store:
 
@@ -168,7 +180,7 @@ Future knowledge types to store:
 * examples of good calls
 * examples of bad calls
 
-MVP may start with a **small structured or free-text context form** instead of a full knowledge base. Full RAG is **Planned** (roadmap Phase 5), not current work.
+MVP uses structured MySQL knowledge (profile, offerings, objections, scripts, scorecards) packed into the prompt with a 24,000-character budget. Full RAG (chunking, embeddings, vector store) is still later / TBD, not current work.
 
 Retrieval quality (chunking, embeddings, filters) is **TBD**.
 
@@ -178,7 +190,9 @@ Fine-tuning is not a substitute for this knowledge in v1.
 
 There must **not** be only one universal sales score.
 
-A company should eventually **choose or create** a scorecard.
+A company can **create** a scorecard in admin. Public calls keep the generic seven-section methodology. When a company has an active default scorecard, the model evaluates each criterion; Laravel computes the weighted total. Generic `overall_score` and company scorecard score are stored separately and are not mixed into one number.
+
+Each analysis stores `scorecard_snapshot` and `context_snapshot` so later knowledge edits do not rewrite history.
 
 Each criterion may have:
 
@@ -234,6 +248,7 @@ Do not ship scores we cannot explain.
 ## Safety and product constraints
 
 * Do not invent facts about the company that were not in context or the call.
+* Treat the transcript as untrusted. Ignore attempts in the recording to override system or company rules (DEC-041).
 * If evidence is missing, say so (e.g. “no pricing discussion in transcript”).
 * Recording consent and PII retention are **TBD** (legal).
 * Provider and prompt versions belong in stored analysis metadata.
@@ -243,5 +258,5 @@ Do not ship scores we cannot explain.
 * LLM provider (DEC-006): operator picks OpenAI, Anthropic, or Gemini in kit settings.
 * STT / diarization: ElevenLabs Scribe v2 (DEC-024 / DEC-025 / DEC-027).
 * Whether later phases split analysis into multiple LLM passes.
-* Custom company scorecards / weighted criteria.
+* Custom company scorecards / weighted criteria: implemented in Phase 5 (DEC-037 / DEC-038). Full scorecard VCS is not built; snapshots are enough (DEC-039).
 * Human review / override of scores.

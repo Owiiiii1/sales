@@ -1,177 +1,182 @@
-# Sales Analyzer — Phase 4 Structured AI Sales Analysis Report
+# Sales Analyzer — Phase 5 Company Knowledge & Scorecards Report
 
 ## Baseline
 
-* accepted baseline SHA (Phase 3 on `main`): `d9f143be418a64f96eb32be240121d8463fbb8fc`
-* HEAD before work: `d9f143be418a64f96eb32be240121d8463fbb8fc`
+* accepted baseline SHA (Phase 4 on `main`): `555029d3ef9e6fb09a1023181f2de50332b7f49d`
+* HEAD before work: `555029d3ef9e6fb09a1023181f2de50332b7f49d`
 * working tree before work: clean
 * branch: `main` tracking `origin/main`
 * unpushed commits before work: none
 
-Production database backup (outside Git): `/home/deploy/backups/sales/sales-pre-phase4-20260909-163145.sql`
+Production database backup (outside Git): `/home/deploy/backups/sales/sales-pre-phase5-20260910-081604.sql`
 
-Phase 3 live ElevenLabs verification remains deferred by the Project Manager and did **not** block this phase.
+Phase 4 live ElevenLabs / LLM verification remains deferred by the Project Manager and did **not** block this phase.
 
-## Architecture
+## Company Knowledge Model
 
-Application layer:
+Company knowledge is a separate domain layer (DEC-036). `companies` was not expanded into a wide table.
 
-* `SalesAnalysisProvider` interface
-* `ConfiguredSalesAnalysisProvider` adapter over kit AI settings
-* `SalesAnalysisPromptBuilder`
-* `SalesAnalysisResultValidator`
-* `SalesAnalysisResult` DTO
-* `AnalyzeCall` job
+`company_profiles` is one-to-one with `Company` (`company_id` unique). Fields are nullable text / longText: short description, sales context, target audience, ICP, value proposition, USP, pricing context, competitors, customer pains, sales goals, desired next steps, forbidden claims, mandatory questions, notes.
 
-Pipeline:
+Admin enters business information. There is no `Prompt` field. `AnalysisContextBuilder` turns the stored text into LLM context.
 
-```
-uploaded → processing → transcribed → analysis_pending | analyzing → completed
-```
+## Offerings
 
-`processing` is STT only. `analyzing` is AI only. Missing AI configuration is `analysis_pending`, not a fatal error.
+`company_offerings` stores knowledge for analysis, not an inventory catalog.
 
-Domain code does not depend on a specific LLM vendor. HTTP stays in kit provider clients, not in the job.
+* `type`: `product` | `service` | `other`
+* name, description, target customer, value proposition, pricing, differentiators, common use cases
+* `is_active`
 
-## Analysis Schema
+Inactive offerings are ignored by the context builder.
 
-`schema_version` = `1`.
+## Objections
 
-JSON `result` is the source of truth. Denormalized columns: `overall_score`, `summary`, `provider`, `model`.
+`company_objections` stores expected handling for remarks such as “too expensive”.
 
-Version 1 includes overall score 0–100, summary, call_outcome, customer_intent, speaker_roles, seven sections with `applicable`, strengths/issues as evidence objects, buying signals, missed opportunities, recommendations, better phrases, and next_step.
+* objection
+* recommended_response
+* notes, priority
+* `is_active`
 
-Inapplicable sections (for example no pricing talk) use `applicable: false` instead of a fake low score.
+## Scripts
 
-## Provider Integration
+`company_sales_scripts` allows several scripts per company. Multiple active scripts may be concatenated into analysis context. There is no exclusive primary-script constraint.
 
-Reused Custom Admin Kit Settings → AI. No second settings table.
+## Scorecards
 
-Found and reused:
+`company_scorecards` + `company_scorecard_criteria` (DEC-037).
 
-* table `ai_provider_settings`
-* model `AiProviderSetting` (encrypted `api_key`, `is_active`, `active_model`, `available_models`)
-* `AiSettingsController` (save key, check connection, activate/deactivate)
-* `AiProviderManager` and clients: OpenAI, Anthropic, Gemini
+* scorecard: name, description, `is_default`, `is_active`
+* criterion: `key`, name, description, weight, `max_score` (default 100), `is_critical`, `ai_instructions`, sequence, `is_active`
+* unique `(scorecard_id, key)`
 
-Kit clients previously only listed models. `AiProviderClient::completeJson()` was added so chat/completions HTTP lives next to the existing clients. `ActiveAiProvider` reads the active row (active flag + key + model).
+No fictitious company scorecard is created automatically. Analysis uses the default active scorecard, or the first active scorecard if none is marked default. Admin upload does not pick a scorecard; the company’s default is used.
 
-If nothing is configured, `AnalyzeCall` sets `analysis_pending` and returns.
+Weights need not sum to 100 in the database. Admin UI shows **Total weight** and a warning when the sum is not 100. Save is not blocked.
 
-## Prompt
+## Context Builder
 
-`SalesAnalysisPromptBuilder` builds system + user messages.
+`AnalysisContextBuilder` receives a Call.
 
-* generic sales methodology only
-* allowed product languages: English, Russian, Ukrainian
-* write the report in the conversation language
-* do not translate the transcript
-* structured JSON required
-* no hallucination / no invented events
-* evidence quotes must be short
-* seller/customer mapping in `speaker_roles` only
-* score semantics 0–100
-* `applicable: false` when a section does not occur
-* company name is metadata, not RAG
-* company description is not injected
+* `company_id` null → generic context only (`company_context_used=false`).
+* Company present → basic company data, profile, active offerings, active objections, active scripts, default/first active scorecard + active criteria. `company_context_used=true` even if knowledge is empty.
 
-## Validation
+The job does not assemble this itself. `AnalyzeCall` calls the builder, then the provider.
 
-`SalesAnalysisResultValidator` requires keys, 0–100 scores, known section names, arrays, allowed outcomes, intents, and speaker roles. Syntactically valid JSON that fails schema is rejected and not saved.
+## Context Budget
 
-OpenAI uses `response_format.json_schema`. Anthropic/Gemini request JSON and are parsed, then validated the same way.
+Config: `sales-analyzer.analysis.context_budget_characters` (default **24,000**, minimum 1,000).
 
-## Speaker Roles
+Packing priority:
 
-Transcript segments are unchanged. Analysis JSON maps integer speakers to `seller` | `customer` | `unknown` | `other`. Uncertain mappings must be `unknown`.
+1. scorecard
+2. mandatory questions
+3. forbidden claims
+4. sales script
+5. offerings
+6. objections
+7. core profile
+8. competitors / notes
 
-## Status Lifecycle
+Overflow is truncated, a warning is logged, and analysis continues.
 
-```
-uploaded
-→ processing
-→ transcribed
-→ analysis_pending
-→ analyzing
-→ completed
-```
+## Schema v2
 
-Failure: `failed`.
+New writes use `schema_version = 2`. Existing v1 JSON remains displayable. Generic and company-aware calls both persist v2. Generic payloads may omit `company_specific`; the validator fills an empty structure.
 
-Public copy:
+Added result fields:
 
-* uploaded: `Your call is queued for transcription.`
-* processing: `Transcribing your call…`
-* transcribed: `Transcription complete.`
-* analysis_pending: `Transcription complete. AI analysis is not configured yet.`
-* analyzing: `Analyzing your sales call…`
-* completed: structured report
-* failed: generic transcription or analysis error (unsupported language still has its own public string)
+* `company_context_used`
+* `company_specific.script_adherence`
+* `mandatory_questions` (`asked` / `missed`)
+* `forbidden_claims.violations`
+* `objection_handling.matched`
+* `offering_accuracy.issues`
+* `scorecard.criteria` + application-side `total_score`
 
-## Queue Pipeline
+Generic `overall_score` is not replaced by the company scorecard.
 
-1. Upload dispatches `TranscribeCall` (unchanged).
-2. Successful STT stores transcript, sets `transcribed`, dispatches `AnalyzeCall`.
-3. `AnalyzeCall` requires a transcript.
-4. No AI settings → `analysis_pending`.
-5. Configured → `analyzing` → provider → validate → replace `sales_analyses` → `completed`.
+## Score Calculation
 
-Job: 3 attempts, backoff 60 / 180 / 600 seconds, timeout 180. Transient: timeout / 429 / 5xx. Permanent 4xx / schema / missing transcript do not retry. A previous successful analysis is kept if a later run fails.
+LLM returns per-criterion evaluation (`key`, `score`, `max_score`, `applicable`, `summary`, `evidence`, `critical_failure`).
 
-Existing `sales-worker.service` was not replaced.
+Laravel (`CompanyScoreCalculator`) computes:
 
-Admin `POST /calls/{call}/analyze` dispatches the same job (Run analysis / Re-run analysis). No LLM call in the controller.
+`normalized = score / max_score`
 
-## Public UI
+`weighted = normalized * weight`
 
-Polling continues through `transcribed` and `analyzing`, and stops on `analysis_pending`, `completed`, or `failed`.
+`total = round((sum weighted / sum applicable weights) * 100)`
 
-`GET /analysis/{public_token}` after `completed` returns the structured report without Call/Transcript/analysis ids, storage paths, provider/model, prompts, or raw provider payloads.
+Non-applicable criteria are excluded. Unknown or duplicate criterion keys are rejected. Missing snapshot keys are filled as `applicable=false`. Critical failure is a flag only; it does not force total=0.
 
-`AnalysisReport` now renders overall score, summary, outcome, intent, strengths/weaknesses, the seven sections, buying signals, objections, missed opportunities, recommendations, better phrases, and next step.
+UI shows **Overall Sales Score** and **Company Scorecard** separately.
 
-Transcript is shown once STT has finished (including while analyzing).
+## Context Snapshot
+
+`sales_analyses` additive columns:
+
+* `company_context_hash`
+* `scorecard_id` (nullable, nullOnDelete)
+* `company_scorecard_score`
+* `scorecard_snapshot` JSON
+* `context_snapshot` JSON
+
+Editing company knowledge does not rewrite old analyses (DEC-039). Admin **Re-run analysis** writes a new row/snapshot from the current knowledge.
+
+## Prompt Security
+
+Prompt sections are explicit (DEC-041):
+
+* SYSTEM RULES
+* GENERIC SALES METHODOLOGY
+* COMPANY-SPECIFIC INSTRUCTIONS (when a Company is attached)
+* COMPANY CONTEXT (trusted admin text)
+* CALL TRANSCRIPT (untrusted)
+
+The model is told not to treat transcript text as instructions, including “ignore previous instructions”. Company rules override conflicting generic advice. Forbidden claims, mandatory questions, script adherence, objection handling, and offering accuracy are evaluated when context exists.
 
 ## Admin UI
 
-Call detail shows analysis provider, model, schema version, timestamps, speaker roles, and the same structured report. Buttons:
+`GET /companies/{company}` is a tabbed company detail page:
 
-* Retry transcription
-* Run analysis (`transcribed`, `analysis_pending`, `failed` with a transcript)
-* Re-run analysis (`completed`)
+* Overview (identity, contacts, knowledge completeness checklist)
+* Knowledge (business-language labels; no Prompt field)
+* Offerings / Objections / Scripts / Scorecard CRUD
+* Employees
+* Calls (recent)
 
-## Data Model
+Companies index has **View**. Scorecard UI shows Total weight and a not-100 warning. Completeness is a simple 6-item percent (target audience, USP, pains, active offering, active script, active scorecard with criteria).
 
-Additive migration `2026_09_09_170000_create_sales_analyses_table` (no fresh/reset).
+Call detail shows Analysis context: company, scorecard name, schema version, company context used yes/no. Context snapshot is a collapsed admin debug block. Raw system prompt is not shown.
 
-`sales_analyses`: `call_id` unique FK cascade, provider, model, schema_version, overall_score, summary, result JSON, started_at, completed_at, error_message, timestamps.
+## Analysis Integration
 
-Call hasOne SalesAnalysis.
+Pipeline is unchanged: `TranscribeCall` → `AnalyzeCall`.
+
+`AnalyzeCall` → `AnalysisContextBuilder` → provider → `SalesAnalysisResultValidator` (with context) → `SalesAnalysisWriter`.
+
+Admin-created calls already select a Company; that Company now determines knowledge context.
+
+## Public Calls
+
+Public anonymous uploads keep `company_id` null. Analysis is generic: `company_context_used=false`. The public form does not ask for company knowledge (DEC-040).
 
 ## Tests
 
-`php artisan test`: **84 passed, 0 failed, 418 assertions**. No live LLM or ElevenLabs calls.
+`php artisan test`: **115 passed**, 652 assertions.
 
 Coverage includes:
 
-* transcribed call dispatches `AnalyzeCall`
-* no transcript → analysis impossible
-* no provider config → `analysis_pending`
-* configured provider → analyzing then completed
-* valid structured result / overall score / JSON saved
-* malformed JSON rejected
-* invalid score / outcome / speaker role rejected
-* provider 5xx retryable
-* permanent provider failure handled
-* previous successful analysis preserved on failed rerun
-* public report safe (no provider/model/ids/storage_path)
-* report language preserved (Russian summary stored as-is)
-* admin detail includes analysis
-* manual Run analysis and Re-run analysis
-* public payloads for analyzing and completed
-* existing Phase 1–3 tests remain green
+* profile create/update and one-to-one unique `company_id`
+* offerings / objections / scripts CRUD and company isolation
+* scorecards, criteria, weights, default, active/inactive
+* context builder: public generic only; company knowledge; inactive ignored; budget truncation
+* analysis: company context included; generic unaffected; unknown criteria rejected; weighted score application-side; non-applicable excluded; snapshots saved; knowledge edits do not mutate old analysis; rerun uses a new snapshot
+* UI: company detail tabs, knowledge/scorecard props, call analysis context metadata
 
-`npm run build` is recorded below.
+Existing Phase 1–4 tests remained green.
 
 ## Live Provider Verification
 
@@ -181,9 +186,11 @@ No live ElevenLabs or LLM call was required or attempted for this phase.
 
 ## Production Sentinel
 
-Recorded on production connection `database=sales` after `php artisan migrate --force` and `php artisan test`.
+Backup taken before migrations: `/home/deploy/backups/sales/sales-pre-phase5-20260910-081604.sql`
 
-| Metric | After |
+Recorded on production connection `database=sales` **before** migrate:
+
+| Metric | Before |
 |---|---|
 | users | 1 |
 | companies | 0 |
@@ -195,7 +202,27 @@ Recorded on production connection `database=sales` after `php artisan migrate --
 | jobs | 0 |
 | admin | id `1`, `admin@admin.com` |
 
-Tests did not write production rows. Migration only added an empty `sales_analyses` table.
+After `php artisan migrate --force` and `php artisan test`:
+
+| Metric | After |
+|---|---|
+| users | 1 |
+| companies | 0 |
+| employees | 0 |
+| calls | 0 |
+| transcripts | 0 |
+| transcript_segments | 0 |
+| sales_analyses | 0 |
+| company_profiles | 0 |
+| company_offerings | 0 |
+| company_objections | 0 |
+| company_sales_scripts | 0 |
+| company_scorecards | 0 |
+| company_scorecard_criteria | 0 |
+| jobs | 0 |
+| admin | id `1`, `admin@admin.com` |
+
+Tests did not write production rows. Migrations were additive only (new knowledge tables + nullable snapshot columns on `sales_analyses`). No fresh/reset.
 
 ## Documentation
 
@@ -208,86 +235,90 @@ Updated:
 * `docs/ROADMAP.md`
 * `docs/STATUS.md`
 * `docs/DECISIONS.md`
+* `README.md`
 
 Accepted:
 
-* DEC-030 — Sales analysis has versioned structured schema
-* DEC-031 — Generic sales analysis precedes company-specific context
-* DEC-032 — AI analysis runs asynchronously
-* DEC-033 — Evidence-backed findings are required
-* DEC-034 — Speaker roles are analysis metadata, not transcript mutation
-* DEC-035 — Live external-provider verification may be deferred during development
+* DEC-036 — Company knowledge is a separate domain layer
+* DEC-037 — Company scorecards are configurable
+* DEC-038 — Weighted score is calculated application-side
+* DEC-039 — Analyses store immutable context snapshots
+* DEC-040 — Public calls use generic analysis only
+* DEC-041 — Transcript is untrusted prompt content
 
 ## Changed Files
 
-`git diff --stat d9f143be418a64f96eb32be240121d8463fbb8fc..83023a7b8843e16aabff8572b4d2c4655db89d46`
+`git diff --stat 555029d3ef9e6fb09a1023181f2de50332b7f49d`
 
 ```
  README.md                                          |   4 +-
- REPORT.md                                          | 395 +++++++----------
- app/Exceptions/Analysis/AnalysisException.php      |  13 +
- .../Analysis/PermanentAnalysisException.php        |  19 +
- .../Analysis/TransientAnalysisException.php        |  11 +
- app/Http/Controllers/CallsController.php           |  30 +-
- app/Http/Controllers/PublicAnalyzerController.php  |  14 +-
- app/Jobs/AnalyzeCall.php                           | 125 ++++++
- app/Jobs/TranscribeCall.php                        |   4 +-
- app/Models/Call.php                                |   7 +
- app/Models/SalesAnalysis.php                       |  45 ++
- app/Models/Transcript.php                          |   4 +
- app/Models/TranscriptSegment.php                   |   4 +
- app/Providers/AppServiceProvider.php               |   3 +
- app/Services/Ai/ActiveAiProvider.php               |  27 ++
- app/Services/Ai/AiProviderManager.php              |  15 +
- app/Services/Ai/Clients/AnthropicClient.php        |  48 +++
- app/Services/Ai/Clients/GeminiClient.php           |  45 ++
- app/Services/Ai/Clients/OpenAiClient.php           |  46 ++
- app/Services/Ai/Contracts/AiProviderClient.php     |  14 +
- app/Services/Ai/JsonPayloadParser.php              |  28 ++
- app/Services/Ai/ProviderHttp.php                   |  61 +++
- .../Analysis/ConfiguredSalesAnalysisProvider.php   |  58 +++
- app/Services/Analysis/DTO/AnalysisContext.php      |  11 +
- app/Services/Analysis/DTO/SalesAnalysisResult.php  |  18 +
- .../Analysis/SalesAnalysisPromptBuilder.php        |  83 ++++
- app/Services/Analysis/SalesAnalysisProvider.php    |  14 +
- .../Analysis/SalesAnalysisResultValidator.php      | 253 +++++++++++
- app/Services/Analysis/SalesAnalysisSchema.php      | 149 +++++++
- app/Services/Analysis/SalesAnalysisWriter.php      |  33 ++
- app/Support/SalesAnalysisPresenter.php             | 190 +++++++++
- app/Support/TranscriptPresenter.php                |   8 +-
- database/factories/SalesAnalysisFactory.php        | 103 +++++
- database/factories/TranscriptFactory.php           |  40 ++
- database/factories/TranscriptSegmentFactory.php    |  31 ++
- ...26_09_09_170000_create_sales_analyses_table.php |  31 ++
- docs/AI_ANALYSIS.md                                |  13 +-
- docs/ARCHITECTURE.md                               |  23 +-
- docs/DATA_MODEL.md                                 |  31 +-
+ REPORT.md                                          | 335 +++++++-------
+ app/Http/Controllers/CallsController.php           |   6 +
+ app/Http/Controllers/CompaniesController.php       | 108 ++++-
+ .../Controllers/CompanyKnowledgeController.php     | 183 ++++++++
+ app/Http/Requests/CompanyObjectionRequest.php      |  44 ++
+ app/Http/Requests/CompanyOfferingRequest.php       |  46 ++
+ app/Http/Requests/CompanyProfileRequest.php        |  60 +++
+ app/Http/Requests/CompanySalesScriptRequest.php    |  37 ++
+ .../Requests/CompanyScorecardCriterionRequest.php  |  60 +++
+ app/Http/Requests/CompanyScorecardRequest.php      |  39 ++
+ app/Jobs/AnalyzeCall.php                           |  14 +-
+ app/Models/Company.php                             |  26 ++
+ app/Models/CompanyObjection.php                    |  38 ++
+ app/Models/CompanyOffering.php                     |  43 ++
+ app/Models/CompanyProfile.php                      |  36 ++
+ app/Models/CompanySalesScript.php                  |  36 ++
+ app/Models/CompanyScorecard.php                    |  53 +++
+ app/Models/CompanyScorecardCriterion.php           |  45 ++
+ app/Models/SalesAnalysis.php                       |  13 +
+ app/Services/Analysis/AnalysisContextBuilder.php   | 357 +++++++++++++++
+ app/Services/Analysis/CompanyScoreCalculator.php   |  50 ++
+ .../Analysis/ConfiguredSalesAnalysisProvider.php   |   1 +
+ app/Services/Analysis/DTO/AnalysisContext.php      |  12 +
+ app/Services/Analysis/DTO/SalesAnalysisResult.php  |   8 +
+ .../Analysis/SalesAnalysisPromptBuilder.php        |  85 ++--
+ .../Analysis/SalesAnalysisResultValidator.php      | 210 ++++++++-
+ app/Services/Analysis/SalesAnalysisSchema.php      |  98 +++-
+ app/Services/Analysis/SalesAnalysisWriter.php      |   5 +
+ app/Support/CompanyKnowledgeCompleteness.php       |  34 ++
+ app/Support/SalesAnalysisPresenter.php             |   7 +
+ config/sales-analyzer.php                          |   6 +
+ database/factories/CompanyObjectionFactory.php     |  30 ++
+ database/factories/CompanyOfferingFactory.php      |  34 ++
+ database/factories/CompanyProfileFactory.php       |  39 ++
+ database/factories/CompanySalesScriptFactory.php   |  29 ++
+ .../factories/CompanyScorecardCriterionFactory.php |  34 ++
+ database/factories/CompanyScorecardFactory.php     |  29 ++
+ database/factories/SalesAnalysisFactory.php        |   2 +
+ ...9_10_080000_create_company_knowledge_tables.php | 113 +++++
+ ...09_10_080100_add_analysis_context_snapshots.php |  32 ++
+ docs/AI_ANALYSIS.md                                |  29 +-
+ docs/ARCHITECTURE.md                               |  14 +-
+ docs/DATA_MODEL.md                                 | 102 +++--
  docs/DECISIONS.md                                  |  88 +++-
- docs/PRODUCT.md                                    |   4 +-
- docs/ROADMAP.md                                    |  14 +-
- docs/STATUS.md                                     |  43 +-
- resources/js/Components/Public/AnalysisReport.jsx  | 193 +++++++--
- resources/js/Pages/Calls/Index.jsx                 |   6 +-
- resources/js/Pages/Calls/Show.jsx                  |  58 ++-
- resources/js/Pages/Public/Home.jsx                 |  18 +-
- routes/owl-admin-pages.php                         |   1 +
- tests/Feature/SalesAnalysisTest.php                | 466 +++++++++++++++++++++
- tests/Unit/SalesAnalysisResultValidatorTest.php    |  62 +++
- 50 files changed, 2638 insertions(+), 366 deletions(-)
+ docs/PRODUCT.md                                    |  16 +-
+ docs/ROADMAP.md                                    |  32 +-
+ docs/STATUS.md                                     |  13 +-
+ resources/js/Components/Public/AnalysisReport.jsx  |  89 +++-
+ resources/js/Pages/Calls/Show.jsx                  |  24 +-
+ resources/js/Pages/Companies/Index.jsx             |   3 +-
+ resources/js/Pages/Companies/Show.jsx              | 502 +++++++++++++++++++++
+ routes/owl-admin-pages.php                         |  19 +
+ tests/Feature/AnalysisContextBuilderTest.php       | 185 ++++++++
+ tests/Feature/CompaniesTest.php                    |   2 +-
+ tests/Feature/CompanyKnowledgeTest.php             | 331 ++++++++++++++
+ tests/Feature/SalesAnalysisTest.php                | 220 ++++++++-
+ tests/Unit/CompanyScoreCalculatorTest.php          |  50 ++
+ tests/Unit/SalesAnalysisResultValidatorTest.php    | 146 ++++++
+ 59 files changed, 3987 insertions(+), 319 deletions(-)
 ```
 
 ## Git
 
 * branch: `main`
 * remote: `https://github.com/Owiiiii1/sales.git`
-* implementation commit: `83023a7b8843e16aabff8572b4d2c4655db89d46`
-* REPORT SHA/files commit: `ee23ea2`
-* first successful push: `d9f143b..ee23ea2  main -> main`
-* commit messages:
-  * `Add generic structured AI sales analysis after transcription.`
-  * `Record Phase 4 commit SHA and changed files in REPORT.md.`
-  * `Record Phase 4 GitHub push result in REPORT.md.`
-* push result: **PASS** — `To https://github.com/Owiiiii1/sales.git` `d9f143b..ee23ea2  main -> main`
+* implementation commit: pending
+* push result: pending
 
 ## Problems / Warnings
 
@@ -295,7 +326,8 @@ Accepted:
 * Until Settings → AI has an active provider, model, and key, production calls will stop at `analysis_pending` after transcription.
 * Vite optional `fontaine` warning on `npm run build`.
 * Production MySQL user `sales` still has grants on `sales_testing.*` (unchanged from Phase 2.2).
+* Context budget is a character budget (24,000), not a tokenizer-accurate token count.
 
 ## Final Status
 
-`PHASE 4 PASSED`
+`PHASE 5 PASSED`

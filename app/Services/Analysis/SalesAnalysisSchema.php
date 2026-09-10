@@ -4,7 +4,7 @@ namespace App\Services\Analysis;
 
 final class SalesAnalysisSchema
 {
-    public const VERSION = 1;
+    public const VERSION = 2;
 
     public const SECTION_KEYS = [
         'opening_rapport',
@@ -107,6 +107,8 @@ final class SalesAnalysisSchema
                 'recommendations',
                 'better_phrases',
                 'next_step',
+                'company_context_used',
+                'company_specific',
             ],
             'properties' => [
                 'overall_score' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 100],
@@ -143,6 +145,100 @@ final class SalesAnalysisSchema
                     ],
                 ],
                 'next_step' => ['type' => 'string'],
+                'company_context_used' => ['type' => 'boolean'],
+                'company_specific' => [
+                    'type' => 'object',
+                    'additionalProperties' => false,
+                    'required' => [
+                        'script_adherence',
+                        'mandatory_questions',
+                        'forbidden_claims',
+                        'objection_handling',
+                        'offering_accuracy',
+                        'scorecard',
+                    ],
+                    'properties' => [
+                        'script_adherence' => [
+                            'type' => 'object',
+                            'additionalProperties' => false,
+                            'properties' => [
+                                'applicable' => ['type' => 'boolean'],
+                                'score' => ['type' => ['integer', 'null'], 'minimum' => 0, 'maximum' => 100],
+                                'summary' => ['type' => 'string'],
+                                'issues' => ['type' => 'array', 'items' => $finding],
+                            ],
+                            'required' => ['applicable', 'summary', 'issues'],
+                        ],
+                        'mandatory_questions' => [
+                            'type' => 'object',
+                            'properties' => [
+                                'asked' => ['type' => 'array', 'items' => ['type' => 'string']],
+                                'missed' => ['type' => 'array', 'items' => ['type' => 'string']],
+                            ],
+                            'required' => ['asked', 'missed'],
+                        ],
+                        'forbidden_claims' => [
+                            'type' => 'object',
+                            'properties' => [
+                                'violations' => ['type' => 'array', 'items' => $finding],
+                            ],
+                            'required' => ['violations'],
+                        ],
+                        'objection_handling' => [
+                            'type' => 'object',
+                            'properties' => [
+                                'matched' => ['type' => 'array'],
+                            ],
+                            'required' => ['matched'],
+                        ],
+                        'offering_accuracy' => [
+                            'type' => 'object',
+                            'properties' => [
+                                'issues' => ['type' => 'array', 'items' => $finding],
+                            ],
+                            'required' => ['issues'],
+                        ],
+                        'scorecard' => [
+                            'type' => 'object',
+                            'properties' => [
+                                'criteria' => ['type' => 'array'],
+                            ],
+                            'required' => ['criteria'],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function emptyCompanySpecific(): array
+    {
+        return [
+            'script_adherence' => [
+                'applicable' => false,
+                'score' => null,
+                'summary' => '',
+                'issues' => [],
+            ],
+            'mandatory_questions' => [
+                'asked' => [],
+                'missed' => [],
+            ],
+            'forbidden_claims' => [
+                'violations' => [],
+            ],
+            'objection_handling' => [
+                'matched' => [],
+            ],
+            'offering_accuracy' => [
+                'issues' => [],
+            ],
+            'scorecard' => [
+                'total_score' => null,
+                'criteria' => [],
             ],
         ];
     }

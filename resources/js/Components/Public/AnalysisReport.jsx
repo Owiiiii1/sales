@@ -128,9 +128,17 @@ export default function AnalysisReport({ status, report, message, error }) {
         <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
             <h2 className="text-lg font-semibold text-slate-900">Analysis report</h2>
 
-            <div className="mt-6 flex items-end gap-3">
-                <p className="text-5xl font-semibold tracking-tight text-slate-900">{report.overall_score ?? '—'}</p>
-                <p className="pb-1 text-sm font-medium text-slate-500">Overall score</p>
+            <div className="mt-6 flex flex-wrap items-end gap-8">
+                <div>
+                    <p className="text-5xl font-semibold tracking-tight text-slate-900">{report.overall_score ?? '—'}</p>
+                    <p className="mt-1 text-sm font-medium text-slate-500">Overall Sales Score</p>
+                </div>
+                {report.company_scorecard_score !== null && report.company_scorecard_score !== undefined && (
+                    <div>
+                        <p className="text-5xl font-semibold tracking-tight text-slate-900">{report.company_scorecard_score}</p>
+                        <p className="mt-1 text-sm font-medium text-slate-500">Company Scorecard</p>
+                    </div>
+                )}
             </div>
 
             {report.summary && (
@@ -208,6 +216,81 @@ export default function AnalysisReport({ status, report, message, error }) {
                     <p className="mt-2 text-sm leading-6 text-slate-800">{report.next_step}</p>
                 </div>
             )}
+            {report.company_context_used && report.company_specific && (
+                <CompanySpecific specific={report.company_specific} />
+            )}
         </section>
+    );
+}
+
+function CompanySpecific({ specific }) {
+    const asked = specific.mandatory_questions?.asked || [];
+    const missed = specific.mandatory_questions?.missed || [];
+    const violations = specific.forbidden_claims?.violations || [];
+    const matched = specific.objection_handling?.matched || [];
+    const offeringIssues = specific.offering_accuracy?.issues || [];
+    const criteria = specific.scorecard?.criteria || [];
+
+    return (
+        <div className="mt-8 space-y-6">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Company-specific analysis</h3>
+            {specific.script_adherence && (
+                <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Script adherence</p>
+                    <p className="mt-1 text-sm text-slate-800">
+                        {specific.script_adherence.applicable === false
+                            ? 'Not applicable'
+                            : `Score ${specific.script_adherence.score ?? '—'}`}
+                    </p>
+                    {specific.script_adherence.summary && (
+                        <p className="mt-1 text-sm leading-6 text-slate-700">{specific.script_adherence.summary}</p>
+                    )}
+                    <FindingList items={specific.script_adherence.issues} />
+                </div>
+            )}
+            <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Mandatory questions</p>
+                <p className="mt-2 text-sm text-slate-800">Asked: {asked.length ? asked.join(', ') : 'none noted'}</p>
+                <p className="mt-1 text-sm text-slate-800">Missed: {missed.length ? missed.join(', ') : 'none noted'}</p>
+            </div>
+            <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Forbidden claims</p>
+                <FindingList items={violations} />
+            </div>
+            <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Objection handling</p>
+                {matched.length ? (
+                    <ul className="mt-2 space-y-2 text-sm text-slate-800">
+                        {matched.map((item, index) => (
+                            <li key={`${item.objection}-${index}`}>
+                                {item.objection}{item.handled === false ? ' — not handled as expected' : ''}
+                                {item.summary ? ` · ${item.summary}` : ''}
+                            </li>
+                        ))}
+                    </ul>
+                ) : (
+                    <p className="mt-2 text-sm text-slate-500">None noted.</p>
+                )}
+            </div>
+            <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Offering accuracy</p>
+                <FindingList items={offeringIssues} />
+            </div>
+            {criteria.length > 0 && (
+                <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Company scorecard criteria</p>
+                    <ul className="mt-2 space-y-3">
+                        {criteria.map((item) => (
+                            <li key={item.key} className="text-sm text-slate-800">
+                                <p className="font-medium">
+                                    {item.key}: {item.applicable === false ? 'not applicable' : `${item.score ?? '—'} / ${item.max_score ?? 100}`}
+                                </p>
+                                {item.summary && <p className="mt-1 text-slate-700">{item.summary}</p>}
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+        </div>
     );
 }

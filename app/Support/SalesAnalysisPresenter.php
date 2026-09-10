@@ -40,6 +40,10 @@ class SalesAnalysisPresenter
             'schema_version' => $analysis->schema_version,
             'started_at' => optional($analysis->started_at)?->toIso8601String(),
             'completed_at' => optional($analysis->completed_at)?->toIso8601String(),
+            'company_context_used' => (bool) ($analysis->result['company_context_used'] ?? false),
+            'company_scorecard_score' => $analysis->company_scorecard_score,
+            'scorecard_name' => $analysis->scorecard_snapshot['name'] ?? null,
+            'context_snapshot' => $analysis->context_snapshot,
         ]);
     }
 
@@ -88,6 +92,9 @@ class SalesAnalysisPresenter
             'recommendations' => self::findings($result['recommendations'] ?? []),
             'better_phrases' => self::phrases($result['better_phrases'] ?? []),
             'next_step' => $result['next_step'] ?? '',
+            'company_context_used' => (bool) ($result['company_context_used'] ?? false),
+            'company_scorecard_score' => $analysis->company_scorecard_score,
+            'company_specific' => $result['company_specific'] ?? null,
         ];
 
         unset($admin);

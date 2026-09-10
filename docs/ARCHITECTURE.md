@@ -32,12 +32,12 @@ Laravel 13 + Custom Admin Kit, with a public product surface and an admin founda
 * guest `/` → public Sales Analyzer homepage (upload, transcript, structured report);
 * `/login` → admin login;
 * authenticated `/dashboard` → admin;
-* product admin routes: `/companies`, `/employees`, `/calls`;
+* product admin routes: `/companies`, `/companies/{company}` (knowledge tabs), `/employees`, `/calls`;
 * kit CRM routes still exist but are not in primary navigation.
 
-Domain models **Company**, **Employee**, **Call**, **Transcript**, and **SalesAnalysis** exist. Audio is stored on a **private** Laravel disk (`calls` → `storage/app/private/calls`). Public uploads reuse that disk and are **not** streamed to anonymous users.
+Domain models **Company**, **Employee**, **Call**, **Transcript**, **SalesAnalysis**, and company knowledge (`CompanyProfile`, offerings, objections, scripts, scorecards) exist. Audio is stored on a **private** Laravel disk (`calls` → `storage/app/private/calls`). Public uploads reuse that disk and are **not** streamed to anonymous users.
 
-Pipeline: upload → `TranscribeCall` (ElevenLabs Scribe v2) → `AnalyzeCall` (active kit AI provider). If no AI key/model is configured, the Call stays `analysis_pending`.
+Pipeline: upload → `TranscribeCall` (ElevenLabs Scribe v2) → `AnalyzeCall`. `AnalyzeCall` uses `AnalysisContextBuilder` then the active kit AI provider. Public calls (`company_id` null) get generic methodology only. Admin calls with a Company also receive that company’s knowledge and default active scorecard. If no AI key/model is configured, the Call stays `analysis_pending`.
 
 Audio path pattern on the `calls` disk:
 
@@ -58,8 +58,8 @@ Browser
       → private local disk `calls`
       → queue workers (`sales-worker.service`, database queue)
         → ElevenLabs Scribe v2 (STT + diarization)
-        → configured kit LLM (OpenAI / Anthropic / Gemini) for generic sales analysis
-        → embeddings / vector store (TBD, later company knowledge)
+        → configured kit LLM (OpenAI / Anthropic / Gemini)
+        → embeddings / vector store remain TBD (company knowledge is structured MySQL, not RAG)
 ```
 
 ## Preferred processing chain
@@ -103,8 +103,8 @@ Analysis is expected to be **several structured LLM calls**, not a mandatory mul
 | Relational records | MySQL `sales` | Keep MySQL for users, companies, calls, scores |
 | Audio files | Private local disk `calls` (`storage/app/private/calls`) | Object storage (S3-compatible) **TBD** |
 | Transcripts | `transcripts` + `transcript_segments` | Keep normalized tables |
-| Sales analyses | `sales_analyses` (versioned JSON `result`) | Keep JSON source of truth; company-specific scorecards later |
-| Company knowledge | Not implemented | Documents + optional RAG. **TBD** |
+| Sales analyses | `sales_analyses` (versioned JSON `result`, schema v2) | Keep JSON source of truth; generic `overall_score` and `company_scorecard_score` are separate |
+| Company knowledge | `company_profiles`, `company_offerings`, `company_objections`, `company_sales_scripts`, `company_scorecards`, `company_scorecard_criteria` | Documents + optional RAG still **TBD**. No vector store in this phase. |
 
 ## Frontend architecture
 

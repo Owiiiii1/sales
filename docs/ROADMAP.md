@@ -87,27 +87,29 @@ Live provider smoke is blocked until `ELEVENLABS_API_KEY` is set in this app’s
 * public structured report + admin analysis section
 * live external provider verification deferred by Project Manager (DEC-035)
 
-## Phase 5 — Company Context
+## Phase 5 — Company Context & Scorecards
 
-**Status: Planned**
+**Status: COMPLETED**
 
-* company profile;
-* knowledge base;
-* scripts;
-* products;
-* objections;
-* RAG / retrieval.
-
-MVP may use a simpler context form before this phase.
+* `company_profiles` (1:1)
+* offerings, objections, sales scripts
+* configurable company scorecards + criteria
+* `AnalysisContextBuilder` + 24,000-character budget
+* schema version 2 with `company_specific`
+* immutable analysis context / scorecard snapshots
+* public calls remain generic (no extra form)
+* live external provider verification deferred by Project Manager (DEC-035)
 
 ## Phase 6 — Scorecards
 
-**Status: Planned**
+**Status: COMPLETED** (shipped with Phase 5)
 
-* methodologies;
-* custom criteria;
-* weights;
-* scorecard versioning.
+* custom criteria and weights
+* default/active flags
+* application-side weighted total
+* per-analysis scorecard snapshot
+
+Remaining later if needed: a dedicated scorecard version-control UI. Snapshots already make old reports explainable.
 
 ## Phase 7 — User Product
 

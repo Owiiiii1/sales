@@ -4,6 +4,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\CallsController;
 use App\Http\Controllers\CompaniesController;
+use App\Http\Controllers\CompanyKnowledgeController;
 use App\Http\Controllers\CustomersController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EmployeesController;
@@ -37,9 +38,27 @@ Route::middleware(AdminRouteMiddleware::stack())->group(function () {
 
     Route::get('/companies', [CompaniesController::class, 'index'])->name('companies.index');
     Route::post('/companies', [CompaniesController::class, 'store'])->name('companies.store');
+    Route::get('/companies/{company}', [CompaniesController::class, 'show'])->name('companies.show');
     Route::patch('/companies/{company}', [CompaniesController::class, 'update'])->name('companies.update');
     Route::patch('/companies/{company}/toggle', [CompaniesController::class, 'toggle'])->name('companies.toggle');
     Route::delete('/companies/{company}', [CompaniesController::class, 'destroy'])->name('companies.destroy');
+
+    Route::patch('/companies/{company}/profile', [CompanyKnowledgeController::class, 'updateProfile'])->name('companies.profile.update');
+    Route::post('/companies/{company}/offerings', [CompanyKnowledgeController::class, 'storeOffering'])->name('companies.offerings.store');
+    Route::patch('/companies/{company}/offerings/{offering}', [CompanyKnowledgeController::class, 'updateOffering'])->name('companies.offerings.update');
+    Route::delete('/companies/{company}/offerings/{offering}', [CompanyKnowledgeController::class, 'destroyOffering'])->name('companies.offerings.destroy');
+    Route::post('/companies/{company}/objections', [CompanyKnowledgeController::class, 'storeObjection'])->name('companies.objections.store');
+    Route::patch('/companies/{company}/objections/{objection}', [CompanyKnowledgeController::class, 'updateObjection'])->name('companies.objections.update');
+    Route::delete('/companies/{company}/objections/{objection}', [CompanyKnowledgeController::class, 'destroyObjection'])->name('companies.objections.destroy');
+    Route::post('/companies/{company}/scripts', [CompanyKnowledgeController::class, 'storeScript'])->name('companies.scripts.store');
+    Route::patch('/companies/{company}/scripts/{script}', [CompanyKnowledgeController::class, 'updateScript'])->name('companies.scripts.update');
+    Route::delete('/companies/{company}/scripts/{script}', [CompanyKnowledgeController::class, 'destroyScript'])->name('companies.scripts.destroy');
+    Route::post('/companies/{company}/scorecards', [CompanyKnowledgeController::class, 'storeScorecard'])->name('companies.scorecards.store');
+    Route::patch('/companies/{company}/scorecards/{scorecard}', [CompanyKnowledgeController::class, 'updateScorecard'])->name('companies.scorecards.update');
+    Route::delete('/companies/{company}/scorecards/{scorecard}', [CompanyKnowledgeController::class, 'destroyScorecard'])->name('companies.scorecards.destroy');
+    Route::post('/companies/{company}/scorecards/{scorecard}/criteria', [CompanyKnowledgeController::class, 'storeCriterion'])->name('companies.scorecards.criteria.store');
+    Route::patch('/companies/{company}/scorecards/{scorecard}/criteria/{criterion}', [CompanyKnowledgeController::class, 'updateCriterion'])->name('companies.scorecards.criteria.update');
+    Route::delete('/companies/{company}/scorecards/{scorecard}/criteria/{criterion}', [CompanyKnowledgeController::class, 'destroyCriterion'])->name('companies.scorecards.criteria.destroy');
 
     Route::get('/employees', [EmployeesController::class, 'index'])->name('employees.index');
     Route::post('/employees', [EmployeesController::class, 'store'])->name('employees.store');

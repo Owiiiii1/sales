@@ -3,6 +3,7 @@
 namespace App\Services\Analysis;
 
 use App\Exceptions\Analysis\PermanentAnalysisException;
+use App\Services\Analysis\DTO\AnalysisContext;
 use App\Services\Analysis\DTO\SalesAnalysisResult;
 
 class SalesAnalysisResultValidator
@@ -10,8 +11,9 @@ class SalesAnalysisResultValidator
     /**
      * @param  array<string, mixed>  $payload
      */
-    public function validate(array $payload, string $provider, string $model): SalesAnalysisResult
+    public function validate(array $payload, string $provider, string $model, ?AnalysisContext $context = null): SalesAnalysisResult
     {
+        $context ??= new AnalysisContext;
         foreach ([
             'overall_score',
             'summary',
@@ -79,6 +81,10 @@ class SalesAnalysisResultValidator
             'next_step' => $this->string($payload['next_step'], 'next_step'),
         ];
 
+        $companySpecific = $this->companySpecific($payload, $context);
+        $normalized['company_context_used'] = $context->companyContextUsed;
+        $normalized['company_specific'] = $companySpecific;
+
         return new SalesAnalysisResult(
             provider: $provider,
             model: $model,
@@ -86,7 +92,209 @@ class SalesAnalysisResultValidator
             overallScore: $overall,
             summary: $summary,
             payload: $normalized,
+            companyContextUsed: $context->companyContextUsed,
+            companyScorecardScore: $companySpecific['scorecard']['total_score'] ?? null,
+            companyContextHash: $context->companyContextHash,
+            scorecardId: $context->scorecardId,
+            scorecardSnapshot: $context->scorecardSnapshot,
+            contextSnapshot: $context->snapshot,
         );
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function companySpecific(array $payload, AnalysisContext $context): array
+    {
+        $raw = $payload['company_specific'] ?? null;
+
+        if ($raw === null) {
+            if ($context->companyContextUsed) {
+                throw new PermanentAnalysisException('company_specific is required when company context is used.');
+            }
+
+            return SalesAnalysisSchema::emptyCompanySpecific();
+        }
+
+        if (! is_array($raw)) {
+            throw new PermanentAnalysisException('company_specific must be an object.');
+        }
+
+        if (array_key_exists('company_context_used', $payload) && $payload['company_context_used'] !== $context->companyContextUsed) {
+            throw new PermanentAnalysisException('company_context_used does not match the analysis context.');
+        }
+
+        $script = is_array($raw['script_adherence'] ?? null) ? $raw['script_adherence'] : ['applicable' => false, 'summary' => '', 'issues' => []];
+        $questions = is_array($raw['mandatory_questions'] ?? null) ? $raw['mandatory_questions'] : [];
+        $claims = is_array($raw['forbidden_claims'] ?? null) ? $raw['forbidden_claims'] : [];
+        $objections = is_array($raw['objection_handling'] ?? null) ? $raw['objection_handling'] : [];
+        $offerings = is_array($raw['offering_accuracy'] ?? null) ? $raw['offering_accuracy'] : [];
+
+        $criteria = $this->scorecardCriteria($raw['scorecard']['criteria'] ?? [], $context);
+        $total = app(CompanyScoreCalculator::class)->total($criteria, $context->scorecardSnapshot ?? ['criteria' => []]);
+
+        return [
+            'script_adherence' => [
+                'applicable' => $this->boolean($script['applicable'] ?? false, 'company_specific.script_adherence.applicable'),
+                'score' => isset($script['score']) && $script['score'] !== null
+                    ? $this->score($script['score'], 'company_specific.script_adherence.score')
+                    : null,
+                'summary' => $this->string($script['summary'] ?? '', 'company_specific.script_adherence.summary'),
+                'issues' => $this->findings($script['issues'] ?? [], 'company_specific.script_adherence.issues'),
+            ],
+            'mandatory_questions' => [
+                'asked' => $this->stringList($questions['asked'] ?? [], 'company_specific.mandatory_questions.asked'),
+                'missed' => $this->stringList($questions['missed'] ?? [], 'company_specific.mandatory_questions.missed'),
+            ],
+            'forbidden_claims' => [
+                'violations' => $this->findings($claims['violations'] ?? [], 'company_specific.forbidden_claims.violations'),
+            ],
+            'objection_handling' => [
+                'matched' => $this->matchedObjections($objections['matched'] ?? []),
+            ],
+            'offering_accuracy' => [
+                'issues' => $this->findings($offerings['issues'] ?? [], 'company_specific.offering_accuracy.issues'),
+            ],
+            'scorecard' => [
+                'total_score' => $total,
+                'criteria' => $criteria,
+            ],
+        ];
+    }
+
+    /**
+     * @param  mixed  $items
+     * @return array<int, array<string, mixed>>
+     */
+    private function scorecardCriteria(mixed $items, AnalysisContext $context): array
+    {
+        if (! is_array($items)) {
+            throw new PermanentAnalysisException('company_specific.scorecard.criteria must be an array.');
+        }
+
+        $expected = [];
+        foreach ($context->scorecardSnapshot['criteria'] ?? [] as $criterion) {
+            $expected[(string) $criterion['key']] = $criterion;
+        }
+
+        $seen = [];
+        $normalized = [];
+
+        foreach (array_values($items) as $index => $item) {
+            if (! is_array($item) || ! isset($item['key'])) {
+                throw new PermanentAnalysisException("company_specific.scorecard.criteria.{$index} must include a key.");
+            }
+
+            $key = $this->string($item['key'], "company_specific.scorecard.criteria.{$index}.key");
+
+            if (isset($seen[$key])) {
+                throw new PermanentAnalysisException("Duplicate scorecard criterion: {$key}.");
+            }
+
+            if ($expected !== [] && ! isset($expected[$key])) {
+                throw new PermanentAnalysisException("Unknown scorecard criterion: {$key}.");
+            }
+
+            $seen[$key] = true;
+            $max = (int) ($expected[$key]['max_score'] ?? $item['max_score'] ?? 100);
+            $applicable = $this->boolean($item['applicable'] ?? true, "company_specific.scorecard.criteria.{$index}.applicable");
+
+            $normalized[] = [
+                'key' => $key,
+                'score' => $applicable ? $this->boundedScore($item['score'] ?? null, $max, "company_specific.scorecard.criteria.{$index}.score") : null,
+                'max_score' => $max,
+                'applicable' => $applicable,
+                'summary' => $this->string($item['summary'] ?? '', "company_specific.scorecard.criteria.{$index}.summary"),
+                'evidence' => $this->findings($item['evidence'] ?? [], "company_specific.scorecard.criteria.{$index}.evidence"),
+                'critical_failure' => $this->boolean($item['critical_failure'] ?? false, "company_specific.scorecard.criteria.{$index}.critical_failure"),
+            ];
+        }
+
+        foreach ($expected as $key => $criterion) {
+            if (! isset($seen[$key])) {
+                $normalized[] = [
+                    'key' => $key,
+                    'score' => null,
+                    'max_score' => (int) ($criterion['max_score'] ?? 100),
+                    'applicable' => false,
+                    'summary' => '',
+                    'evidence' => [],
+                    'critical_failure' => false,
+                ];
+            }
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param  mixed  $items
+     * @return array<int, string>
+     */
+    private function stringList(mixed $items, string $path): array
+    {
+        if (! is_array($items)) {
+            throw new PermanentAnalysisException("{$path} must be an array.");
+        }
+
+        $values = [];
+        foreach (array_values($items) as $index => $item) {
+            $values[] = $this->string($item, $path.'.'.$index);
+        }
+
+        return $values;
+    }
+
+    /**
+     * @param  mixed  $items
+     * @return array<int, array{objection:string, handled:bool, summary:string}>
+     */
+    private function matchedObjections(mixed $items): array
+    {
+        if (! is_array($items)) {
+            throw new PermanentAnalysisException('company_specific.objection_handling.matched must be an array.');
+        }
+
+        $normalized = [];
+        foreach (array_values($items) as $index => $item) {
+            if (is_string($item)) {
+                $normalized[] = [
+                    'objection' => $item,
+                    'handled' => true,
+                    'summary' => '',
+                ];
+
+                continue;
+            }
+
+            if (! is_array($item)) {
+                throw new PermanentAnalysisException("company_specific.objection_handling.matched.{$index} must be an object.");
+            }
+
+            $normalized[] = [
+                'objection' => $this->string($item['objection'] ?? $item['text'] ?? '', "company_specific.objection_handling.matched.{$index}.objection"),
+                'handled' => $this->boolean($item['handled'] ?? true, "company_specific.objection_handling.matched.{$index}.handled"),
+                'summary' => $this->string($item['summary'] ?? '', "company_specific.objection_handling.matched.{$index}.summary"),
+            ];
+        }
+
+        return $normalized;
+    }
+
+    private function boundedScore(mixed $value, int $max, string $path): int
+    {
+        $max = max(1, $max);
+
+        if (is_int($value) && $value >= 0 && $value <= $max) {
+            return $value;
+        }
+
+        if (is_float($value) && $value >= 0 && $value <= $max && floor($value) === $value) {
+            return (int) $value;
+        }
+
+        throw new PermanentAnalysisException("{$path} must be an integer between 0 and {$max}.");
     }
 
     /**

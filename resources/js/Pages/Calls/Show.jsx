@@ -1,7 +1,7 @@
 import AdminLayout from '@/Layouts/AdminLayout';
 import AnalysisReport from '@/Components/Public/AnalysisReport';
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
 function formatDuration(seconds) {
     if (seconds === null || seconds === undefined) {
@@ -33,6 +33,7 @@ export default function CallsShow({ call, companies = [], employees = [] }) {
         employee_id: call.employee_id ?? '',
         recorded_at: call.recorded_at ? call.recorded_at.slice(0, 16) : '',
     });
+    const [showSnapshot, setShowSnapshot] = useState(false);
 
     const employeesForCompany = useMemo(
         () => employees.filter((employee) => String(employee.company_id) === String(form.data.company_id)),
@@ -232,6 +233,15 @@ export default function CallsShow({ call, companies = [], employees = [] }) {
                     )}
                     {call.analysis && (
                         <div className="mt-4 space-y-4">
+                            <div>
+                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Analysis context</p>
+                                <dl className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 text-sm">
+                                    <Item label="Company" value={call.analysis_context?.company} />
+                                    <Item label="Scorecard" value={call.analysis_context?.scorecard_name} />
+                                    <Item label="Schema version" value={call.analysis_context?.schema_version} />
+                                    <Item label="Company context used" value={call.analysis_context?.company_context_used ? 'yes' : 'no'} />
+                                </dl>
+                            </div>
                             <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 text-sm">
                                 <Item label="Provider" value={call.analysis.provider_label} />
                                 <Item label="Model" value={call.analysis.model} />
@@ -249,6 +259,18 @@ export default function CallsShow({ call, companies = [], employees = [] }) {
                                 </div>
                             )}
                             <AnalysisReport status="completed" report={call.analysis} />
+                            {call.analysis.context_snapshot && (
+                                <div className="rounded-xl border border-slate-200 p-4">
+                                    <button type="button" className="text-sm font-medium text-indigo-700" onClick={() => setShowSnapshot((open) => !open)}>
+                                        {showSnapshot ? 'Hide context snapshot' : 'Show context snapshot'}
+                                    </button>
+                                    {showSnapshot && (
+                                        <pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap text-xs text-slate-700">
+                                            {JSON.stringify(call.analysis.context_snapshot, null, 2)}
+                                        </pre>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     )}
                 </section>

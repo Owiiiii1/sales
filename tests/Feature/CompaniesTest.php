@@ -54,7 +54,7 @@ class CompaniesTest extends TestCase
             ->patch("/companies/{$company->id}", [
                 'name' => 'New Name',
             ])
-            ->assertRedirect('/companies');
+            ->assertRedirect("/companies/{$company->id}");
 
         $this->assertDatabaseHas('companies', [
             'id' => $company->id,

@@ -22,11 +22,16 @@ class SalesAnalysisWriter
                 'model' => $result->model,
                 'schema_version' => $result->schemaVersion,
                 'overall_score' => $result->overallScore,
+                'company_scorecard_score' => $result->companyScorecardScore,
                 'summary' => $result->summary,
                 'result' => $result->payload,
                 'started_at' => $startedAt ?? now(),
                 'completed_at' => now(),
                 'error_message' => null,
+                'company_context_hash' => $result->companyContextHash,
+                'scorecard_id' => $result->scorecardId,
+                'scorecard_snapshot' => $result->scorecardSnapshot,
+                'context_snapshot' => $result->contextSnapshot,
             ]);
         });
     }

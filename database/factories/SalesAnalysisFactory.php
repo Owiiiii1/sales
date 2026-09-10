@@ -96,6 +96,8 @@ class SalesAnalysisFactory extends Factory
                 'reason' => 'A specific next step is easier to keep.',
             ]],
             'next_step' => 'Schedule a follow-up with a clear agenda.',
+            'company_context_used' => false,
+            'company_specific' => SalesAnalysisSchema::emptyCompanySpecific(),
         ];
 
         return array_replace_recursive($payload, $overrides);

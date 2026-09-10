@@ -2,7 +2,9 @@
 
 This document describes the **domain model**.
 
-Phase 1 implemented `companies`, `employees`, and `calls`. Transcript, Analysis, Scorecard, and knowledge tables are still **Planned**.
+Phase 1 implemented `companies`, `employees`, and `calls`. Phase 3 added transcripts. Phase 4 added `sales_analyses`. Phase 5 added company knowledge and configurable scorecards.
+
+**Do not** treat kit CRM tables as Sales Analyzer domain.
 
 **Do not** treat kit CRM tables as Sales Analyzer domain.
 
@@ -13,7 +15,7 @@ MySQL database `sales` has Laravel + admin kit tables **and** Phase 1 domain tab
 * `users`, `sessions`, `cache`, `jobs`, …
 * **legacy kit CRM:** `customers`, `orders`, `services`, `staff`, `order_staff` (DEC-012 — retained, hidden from nav)
 * `ai_provider_settings`, `telegram_bot_settings`
-* **Sales Analyzer:** `companies`, `employees`, `calls`
+* **Sales Analyzer:** `companies`, `employees`, `calls`, `transcripts`, `transcript_segments`, `sales_analyses`, `company_profiles`, `company_offerings`, `company_objections`, `company_sales_scripts`, `company_scorecards`, `company_scorecard_criteria`
 
 ## Implemented domain (Phase 1)
 
@@ -23,7 +25,13 @@ User
 
 Company
   ├── Employee
-  └── Call
+  ├── Call
+  ├── CompanyProfile (1:1)
+  ├── CompanyOffering
+  ├── CompanyObjection
+  ├── CompanySalesScript
+  └── CompanyScorecard
+        └── CompanyScorecardCriterion
 
 Employee
   └── Call
@@ -169,19 +177,24 @@ Call hasOne Transcript. Transcript hasMany segments ordered by sequence. UI labe
 
 ## Sales Analysis
 
-**Implemented table `sales_analyses` (DEC-030).**
+**Implemented table `sales_analyses` (DEC-030, schema v2 in Phase 5).**
 
 * id
 * call_id unique → calls (cascade)
 * provider, model nullable
-* schema_version (starts at 1)
-* overall_score nullable 0–100
+* schema_version (new writes are `2`; v1 rows remain valid to display)
+* overall_score nullable 0–100 (generic sales methodology)
+* company_scorecard_score nullable 0–100 (application-weighted; not a substitute for overall_score)
 * summary
-* result JSON (source of truth)
+* result JSON (source of truth, includes `company_context_used` and `company_specific`)
 * started_at, completed_at, error_message
+* company_context_hash nullable
+* scorecard_id nullable → company_scorecards (nullOnDelete)
+* scorecard_snapshot JSON nullable
+* context_snapshot JSON nullable
 * timestamps
 
-Call hasOne SalesAnalysis. Re-analysis replaces the row only after a validated provider response.
+Call hasOne SalesAnalysis. Re-analysis replaces the row only after a validated provider response. Knowledge edits do not rewrite an existing analysis (DEC-039).
 
 Speaker roles (`seller` / `customer` / `unknown` / `other`) live in `result.speaker_roles`, not on transcript segments.
 
@@ -193,7 +206,7 @@ Implemented as `transcript_segments` rows (see Transcript). Speaker identity map
 
 Result of analyzing one call. **Must support versioning** (`schema_version`).
 
-Implemented as `sales_analyses` with JSON `result` as the structured report. Company scorecards / RAG are later (DEC-031).
+Implemented as `sales_analyses` with JSON `result` as the structured report. Generic methodology scores stay in `overall_score`. Company scorecard totals are `company_scorecard_score` (DEC-038). Public calls keep `company_context_used=false` (DEC-040).
 
 A call may be re-analyzed when prompts, models, scorecards, or company context change.
 
@@ -226,43 +239,52 @@ Per-criterion outcome for one Analysis:
 
 ## Scorecard
 
-A named scoring scheme for a company or a built-in template.
+**Implemented tables `company_scorecards` and `company_scorecard_criteria` (DEC-037).**
 
+* id
+* company_id → companies (cascade)
 * name
-* owner company (nullable for global templates) **TBD**
-* version
-* description
+* description nullable
+* is_default
+* is_active
+* timestamps
 
-Companies choose or create scorecards. There is no single universal score.
+Criteria:
 
-## Scorecard Criterion
+* id
+* scorecard_id → company_scorecards (cascade)
+* key (unique per scorecard)
+* name
+* description nullable
+* weight decimal (sum need not be 100 in the database)
+* max_score integer default 100
+* is_critical default false
+* ai_instructions nullable
+* sequence
+* is_active
+* timestamps
 
-* scorecard_id
-* key / name
-* weight
-* max score
-* description
-* critical flag
-* instructions for AI
-* sort order
+No fictitious scorecard is created for a company. Analysis uses the company’s default active scorecard, or the first active scorecard if none is marked default. Weights are not required to sum to 100; admin UI shows Total weight and warns when the sum is not 100.
 
-Built-in examples (generic sales, service, B2B) live in [AI_ANALYSIS.md](AI_ANALYSIS.md) as illustrations only.
+Per-analysis criterion results live in `result.company_specific.scorecard.criteria`. The weighted total is calculated in Laravel from the scorecard snapshot (DEC-038). Critical failure is stored as a flag and does not force total=0.
 
 ## Company Knowledge
 
-Future storage may include one or more of:
+**Implemented (DEC-036). Not RAG / embeddings.**
 
-* knowledge documents (files / chunks for RAG)
-* products
-* services
-* scripts
-* objections
-* competitors
-* sales rules (mandatory / forbidden)
+`company_profiles` (one-to-one with Company):
 
-**Final normalization TBD.** MVP may use a single context text field.
+* short_description, sales_context, target_audience, ideal_customer_profile, value_proposition, usp, pricing_context, competitors, customer_pains, sales_goals, desired_next_steps, forbidden_claims, mandatory_questions, notes
 
-Versioning of knowledge used in an analysis should be traceable (`company_context_version` on Analysis).
+`company_offerings`: type `product` | `service` | `other`, name, description, target_customer, value_proposition, pricing, differentiators, common_use_cases, is_active.
+
+`company_objections`: objection, recommended_response, notes, priority, is_active.
+
+`company_sales_scripts`: name, description, script_text, is_active. Multiple active scripts may be concatenated into analysis context.
+
+Admin-entered knowledge is trusted context. Transcripts are untrusted prompt content (DEC-041). Each analysis stores an immutable `context_snapshot` / `company_context_hash` (DEC-039). Changing knowledge does not re-analyze old calls.
+
+Documents, embeddings, and a vector store remain later / TBD.
 
 ## Relationships (summary)
 
@@ -272,17 +294,17 @@ Versioning of knowledge used in an analysis should be traceable (`company_contex
 | Company | Call | Direct, even if employee missing |
 | Employee | Call | Many calls per employee |
 | Call | Transcript | 1:1 (`call_id` unique). Retranscribe replaces the row after provider success. |
-| Call | SalesAnalysis | 1:1 (`call_id` unique). Re-analysis replaces the row after validation. |
-| Call | Analysis | Future company scorecards may version beyond the current JSON document. |
-| Scorecard | Criterion | 1:N |
-| Analysis | Criterion Result | 1:N |
-| Criterion Result | Criterion | Logical link; snapshot recommended |
+| Company | CompanyProfile | 1:1 |
+| Company | CompanyOffering / Objection / SalesScript / Scorecard | 1:N, cascade |
+| Scorecard | Criterion | 1:N, unique key per scorecard |
+| Call | SalesAnalysis | 1:1 (`call_id` unique). Re-analysis replaces the row after validation. Snapshots stay with that row. |
+| SalesAnalysis | Scorecard | nullable FK; snapshot is authoritative for that analysis |
 
 ## What we will not do yet
 
 * no deletion of kit CRM tables (DEC-012)
 * no assuming `staff` = Employee or `customers` = Company
-* no company knowledge / scorecard builder tables in this phase
+* no company document store / embeddings / vector RAG
 
 ## Open questions
 
