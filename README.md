@@ -8,9 +8,9 @@ This repository is **not** a generic Laravel demo. Product intent is in [`docs/P
 
 ## Current status
 
-**Phase 0–6 are complete (application code).** `/` is the public analyzer. Admins sign in at `/login`.
+**Phase 0–7 are complete (application code).** `/` is the public analyzer. Admins sign in at `/login`.
 
-Public upload queues transcription, then generic AI analysis when Settings → AI is configured. Admin company pages store sales knowledge and scorecards; company calls use that context. `/dashboard` aggregates calls and analyses. Live ElevenLabs/LLM smoke tests are deferred. Kit CRM screens still exist as hidden legacy routes.
+Public upload queues transcription, then deep AI analysis (schema v3) when Settings → AI is configured. Admin company pages store sales knowledge and scorecards; company calls use that context. `/dashboard` aggregates calls and analyses. Live ElevenLabs/LLM smoke tests are deferred. Kit CRM screens still exist as hidden legacy routes.
 
 Details: [`docs/STATUS.md`](docs/STATUS.md) · roadmap: [`docs/ROADMAP.md`](docs/ROADMAP.md)
 

@@ -175,16 +175,16 @@ Call hasOne Transcript. Transcript hasMany segments ordered by sequence. UI labe
 
 ## Sales Analysis
 
-**Implemented table `sales_analyses` (DEC-030, schema v2 in Phase 5).**
+**Implemented table `sales_analyses` (DEC-030). New writes use schema v3 (Phase 7). v1/v2 rows remain presentable.**
 
 * id
 * call_id unique → calls (cascade)
 * provider, model nullable
-* schema_version (new writes are `2`; v1 rows remain valid to display)
+* schema_version (new writes are `3`; v1/v2 rows remain valid to display)
 * overall_score nullable 0–100 (generic sales methodology)
 * company_scorecard_score nullable 0–100 (application-weighted; not a substitute for overall_score)
 * summary
-* result JSON (source of truth, includes `company_context_used` and `company_specific`)
+* result JSON (source of truth: v2 company_specific plus v3 deep-coaching blocks; `conversation_metrics` is application-filled)
 * started_at, completed_at, error_message
 * company_context_hash nullable
 * scorecard_id nullable → company_scorecards (nullOnDelete)

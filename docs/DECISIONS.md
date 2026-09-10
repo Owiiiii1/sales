@@ -664,10 +664,80 @@ Status values: `Accepted` | `Open` | `Superseded` | `Rejected`.
 
 ---
 
+## DEC-047
+
+**Title:** Deep Call Analysis schema v3  
+**Status:** Accepted  
+**Date:** 2026-09-10
+
+**Decision:** New analyses write `schema_version = 3`. v1/v2 rows stay displayable. Analysis remains one structured LLM call; v3 adds executive, timeline, signals, coaching, and related blocks on top of v2.
+
+**Reason:** The product is judged on a single-call report. A second LLM pass would duplicate the transcript and company context without a proven quality gain, while collection limits already bound payload size.
+
+**Consequences:** Presenter must tolerate missing v3 keys. Validator requires v3 keys on new writes.
+
+---
+
+## DEC-048
+
+**Title:** Analysis prioritizes evidence over generic coaching  
+**Status:** Accepted  
+**Date:** 2026-09-10
+
+**Decision:** Prompts and UI forbid empty advice such as “build rapport” or “ask more questions” unless tied to a moment, a reason, and a replacement action.
+
+**Reason:** Generic coaching is not useful to a sales manager.
+
+**Consequences:** Recommendations, better phrases, and coaching priorities must cite transcript evidence.
+
+---
+
+## DEC-049
+
+**Title:** Conversation metrics are calculated application-side  
+**Status:** Accepted  
+**Date:** 2026-09-10
+
+**Decision:** Talk percentages, longest seller monologue, speaker switches, and duration come from transcript segments and `speaker_roles`. The LLM must not invent them. Interruptions are not counted without overlap data.
+
+**Reason:** STT timestamps are more reliable than model guesses.
+
+**Consequences:** Missing durations are `null`. Metrics are attached after validation.
+
+---
+
+## DEC-050
+
+**Title:** Timeline contains only material call moments  
+**Status:** Accepted  
+**Date:** 2026-09-10
+
+**Decision:** `timeline` is capped at 15 items and should list turning points, objections, buying signals, and similar events — not every sentence.
+
+**Reason:** A sentence-level timeline is unreadable.
+
+**Consequences:** Validator slices modest overflow and rejects extreme arrays.
+
+---
+
+## DEC-051
+
+**Title:** Coaching output is prioritized and actionable  
+**Status:** Accepted  
+**Date:** 2026-09-10
+
+**Decision:** `coaching_priorities` is ranked and capped at 5. `what_to_repeat` / `what_to_stop` / `what_to_start` and the next-call playbook are concrete actions for the next similar call, not a long-term HR plan.
+
+**Reason:** Twenty equal tips are not coaching.
+
+**Consequences:** Validator enforces the cap. No employee coaching-plan module in this phase.
+
+---
+
 ## Template for new entries
 
 ```
-## DEC-047
+## DEC-052
 
 **Title:**  
 **Status:** Open | Accepted  

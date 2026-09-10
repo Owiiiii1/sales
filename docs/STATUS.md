@@ -13,11 +13,12 @@ Factual state of the running project. Update this file when reality changes.
 * **Phase 4 — Structured AI sales analysis:** COMPLETED (application code + mocked tests). Live LLM verification deferred by Project Manager.
 * **Phase 5 — Company knowledge & scorecards:** COMPLETED (application code + mocked tests). Live LLM verification deferred by Project Manager.
 * **Phase 6 — Sales analytics dashboard:** COMPLETED (application code + mocked tests). Live LLM verification deferred by Project Manager.
-* **Next planned work:** Phase 7 user product (accounts / personal cabinet), unless the roadmap is reordered.
+* **Phase 7 — Deep call analysis (schema v3):** COMPLETED (application code + mocked tests). Live LLM verification deferred by Project Manager.
+* **Next planned work:** Phase 8 user product (accounts / personal cabinet), unless the roadmap is reordered.
 
 ## Product vs running app
 
-Guests open `/`, upload a recording, and poll through transcription and analysis. Speakers remain `Speaker 1`, `Speaker 2` on the transcript. Seller/customer mapping is analysis metadata. Public calls use generic sales scores only.
+Guests open `/`, upload a recording, and poll through transcription and analysis. Speakers remain `Speaker 1`, `Speaker 2` on the transcript. Seller/customer mapping is analysis metadata. Public calls receive full generic deep v3 analysis (no company scorecard).
 
 Admin company pages hold Sales Knowledge, offerings, objections, scripts, and scorecards. Admin-uploaded calls with a Company use that knowledge automatically (default active scorecard). Generic Overall Sales Score and Company Scorecard scores stay separate.
 

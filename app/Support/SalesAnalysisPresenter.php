@@ -82,7 +82,9 @@ class SalesAnalysisPresenter
             'summary' => $analysis->summary ?? ($result['summary'] ?? ''),
             'call_outcome' => $result['call_outcome'] ?? null,
             'customer_intent' => $result['customer_intent'] ?? null,
+            'customer_intent_confidence' => $result['customer_intent_confidence'] ?? null,
             'speaker_roles' => $roles,
+            'speaker_roles_confidence' => $result['speaker_roles_confidence'] ?? null,
             'sections' => $sections,
             'strengths' => self::findings($result['strengths'] ?? []),
             'weaknesses' => self::findings($result['weaknesses'] ?? []),
@@ -95,6 +97,33 @@ class SalesAnalysisPresenter
             'company_context_used' => (bool) ($result['company_context_used'] ?? false),
             'company_scorecard_score' => $analysis->company_scorecard_score,
             'company_specific' => $result['company_specific'] ?? null,
+            'executive_summary' => is_array($result['executive_summary'] ?? null) ? $result['executive_summary'] : null,
+            'call_objective' => is_array($result['call_objective'] ?? null) ? $result['call_objective'] : null,
+            'conversation_control' => self::control($result['conversation_control'] ?? null),
+            'customer_signals' => self::customerSignals($result['customer_signals'] ?? null),
+            'missed_signals' => self::missedSignals($result['missed_signals'] ?? []),
+            'discovery_depth' => is_array($result['discovery_depth'] ?? null) ? $result['discovery_depth'] : null,
+            'question_analysis' => self::questionAnalysis($result['question_analysis'] ?? null),
+            'listening' => self::namedFindings($result['listening'] ?? null, ['good_listening_moments', 'interruptions_or_ignored_points', 'follow_up_quality']),
+            'value_communication' => self::namedFindings($result['value_communication'] ?? null, ['generic_pitch_moments', 'strong_value_moments']),
+            'objection_map' => self::objectionMap($result['objection_map'] ?? []),
+            'negotiation' => is_array($result['negotiation'] ?? null) ? $result['negotiation'] : null,
+            'trust_rapport' => self::namedFindings($result['trust_rapport'] ?? null, ['trust_building_moments', 'trust_reducing_moments']),
+            'closing' => self::namedFindings($result['closing'] ?? null, ['missed_closing_opportunities']),
+            'timeline' => self::timeline($result['timeline'] ?? []),
+            'turning_points' => is_array($result['turning_points'] ?? null) ? $result['turning_points'] : [],
+            'critical_mistakes' => is_array($result['critical_mistakes'] ?? null) ? $result['critical_mistakes'] : [],
+            'what_to_repeat' => self::practices($result['what_to_repeat'] ?? []),
+            'what_to_stop' => self::practices($result['what_to_stop'] ?? []),
+            'what_to_start' => self::practices($result['what_to_start'] ?? []),
+            'coaching_priorities' => is_array($result['coaching_priorities'] ?? null) ? $result['coaching_priorities'] : [],
+            'next_call_playbook' => is_array($result['next_call_playbook'] ?? null) ? $result['next_call_playbook'] : null,
+            'alternative_path' => is_array($result['alternative_path'] ?? null) ? $result['alternative_path'] : null,
+            'outcome_analysis' => is_array($result['outcome_analysis'] ?? null) ? $result['outcome_analysis'] : null,
+            'sales_stage_map' => is_array($result['sales_stage_map'] ?? null) ? $result['sales_stage_map'] : [],
+            'conversation_metrics' => is_array($result['conversation_metrics'] ?? null)
+                ? $result['conversation_metrics']
+                : SalesAnalysisSchema::emptyConversationMetrics(),
         ];
 
         unset($admin);
@@ -163,8 +192,13 @@ class SalesAnalysisPresenter
         foreach ($items as $item) {
             if (is_string($item)) {
                 $normalized[] = [
+                    'timestamp_seconds' => null,
+                    'timestamp_label' => null,
                     'original' => '',
+                    'problem' => '',
+                    'better' => $item,
                     'suggested' => $item,
+                    'why_better' => '',
                     'reason' => '',
                 ];
 
@@ -176,9 +210,269 @@ class SalesAnalysisPresenter
             }
 
             $normalized[] = [
+                'timestamp_seconds' => isset($item['timestamp_seconds']) && $item['timestamp_seconds'] !== null
+                    ? (float) $item['timestamp_seconds']
+                    : null,
+                'timestamp_label' => isset($item['timestamp_seconds']) && $item['timestamp_seconds'] !== null
+                    ? TranscriptPresenter::timestamp((float) $item['timestamp_seconds'])
+                    : null,
                 'original' => (string) ($item['original'] ?? ''),
-                'suggested' => (string) ($item['suggested'] ?? ''),
-                'reason' => (string) ($item['reason'] ?? ''),
+                'problem' => (string) ($item['problem'] ?? ''),
+                'better' => (string) ($item['better'] ?? $item['suggested'] ?? ''),
+                'suggested' => (string) ($item['better'] ?? $item['suggested'] ?? ''),
+                'why_better' => (string) ($item['why_better'] ?? $item['reason'] ?? ''),
+                'reason' => (string) ($item['why_better'] ?? $item['reason'] ?? ''),
+            ];
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param  mixed  $control
+     * @return array<string, mixed>|null
+     */
+    private static function control(mixed $control): ?array
+    {
+        if (! is_array($control)) {
+            return null;
+        }
+
+        $control['loss_of_control_moments'] = self::moments($control['loss_of_control_moments'] ?? []);
+        $control['recovery_moments'] = self::moments($control['recovery_moments'] ?? []);
+
+        return $control;
+    }
+
+    /**
+     * @param  mixed  $items
+     * @return array<int, array<string, mixed>>
+     */
+    private static function moments(mixed $items): array
+    {
+        if (! is_array($items)) {
+            return [];
+        }
+
+        $normalized = [];
+        foreach ($items as $item) {
+            if (is_string($item)) {
+                $normalized[] = [
+                    'timestamp_seconds' => null,
+                    'timestamp_label' => null,
+                    'speaker' => null,
+                    'speaker_label' => null,
+                    'explanation' => $item,
+                    'quote' => null,
+                ];
+
+                continue;
+            }
+
+            if (! is_array($item)) {
+                continue;
+            }
+
+            $speaker = isset($item['speaker']) && $item['speaker'] !== null ? (int) $item['speaker'] : null;
+            $timestamp = isset($item['timestamp_seconds']) && $item['timestamp_seconds'] !== null
+                ? (float) $item['timestamp_seconds']
+                : null;
+
+            $normalized[] = [
+                'timestamp_seconds' => $timestamp,
+                'timestamp_label' => $timestamp !== null ? TranscriptPresenter::timestamp($timestamp) : null,
+                'speaker' => $speaker,
+                'speaker_label' => $speaker !== null ? 'Speaker '.($speaker + 1) : null,
+                'explanation' => (string) ($item['explanation'] ?? $item['text'] ?? ''),
+                'quote' => isset($item['quote']) ? (string) $item['quote'] : null,
+            ];
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param  mixed  $signals
+     * @return array<string, array<int, array<string, mixed>>>|null
+     */
+    private static function customerSignals(mixed $signals): ?array
+    {
+        if (! is_array($signals)) {
+            return null;
+        }
+
+        $keys = ['positive_signals', 'negative_signals', 'buying_signals', 'hesitation_signals', 'trust_signals', 'risk_signals'];
+        $normalized = [];
+        foreach ($keys as $key) {
+            $normalized[$key] = self::signalList($signals[$key] ?? []);
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param  mixed  $items
+     * @return array<int, array<string, mixed>>
+     */
+    private static function signalList(mixed $items): array
+    {
+        if (! is_array($items)) {
+            return [];
+        }
+
+        $normalized = [];
+        foreach ($items as $item) {
+            if (is_string($item)) {
+                $normalized[] = [
+                    'timestamp_seconds' => null,
+                    'timestamp_label' => null,
+                    'speaker' => null,
+                    'speaker_label' => null,
+                    'signal' => $item,
+                    'why_it_matters' => '',
+                    'quote' => null,
+                ];
+
+                continue;
+            }
+
+            if (! is_array($item)) {
+                continue;
+            }
+
+            $speaker = isset($item['speaker']) && $item['speaker'] !== null ? (int) $item['speaker'] : null;
+            $timestamp = isset($item['timestamp_seconds']) && $item['timestamp_seconds'] !== null
+                ? (float) $item['timestamp_seconds']
+                : null;
+
+            $normalized[] = [
+                'timestamp_seconds' => $timestamp,
+                'timestamp_label' => $timestamp !== null ? TranscriptPresenter::timestamp($timestamp) : null,
+                'speaker' => $speaker,
+                'speaker_label' => $speaker !== null ? 'Speaker '.($speaker + 1) : null,
+                'signal' => (string) ($item['signal'] ?? $item['text'] ?? ''),
+                'why_it_matters' => (string) ($item['why_it_matters'] ?? ''),
+                'quote' => isset($item['quote']) ? (string) $item['quote'] : null,
+            ];
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param  mixed  $items
+     * @return array<int, array<string, mixed>>
+     */
+    private static function missedSignals(mixed $items): array
+    {
+        return is_array($items) ? array_values($items) : [];
+    }
+
+    /**
+     * @param  mixed  $analysis
+     * @return array<string, mixed>|null
+     */
+    private static function questionAnalysis(mixed $analysis): ?array
+    {
+        if (! is_array($analysis)) {
+            return null;
+        }
+
+        foreach (['open_questions', 'closed_questions', 'strong_questions', 'weak_questions', 'missed_questions'] as $key) {
+            $analysis[$key] = is_array($analysis[$key] ?? null) ? $analysis[$key] : [];
+        }
+
+        return $analysis;
+    }
+
+    /**
+     * @param  mixed  $block
+     * @param  array<int, string>  $findingKeys
+     * @return array<string, mixed>|null
+     */
+    private static function namedFindings(mixed $block, array $findingKeys): ?array
+    {
+        if (! is_array($block)) {
+            return null;
+        }
+
+        foreach ($findingKeys as $key) {
+            $block[$key] = self::findings($block[$key] ?? []);
+        }
+
+        return $block;
+    }
+
+    /**
+     * @param  mixed  $items
+     * @return array<int, array<string, mixed>>
+     */
+    private static function objectionMap(mixed $items): array
+    {
+        return is_array($items) ? array_values($items) : [];
+    }
+
+    /**
+     * @param  mixed  $items
+     * @return array<int, array<string, mixed>>
+     */
+    private static function timeline(mixed $items): array
+    {
+        if (! is_array($items)) {
+            return [];
+        }
+
+        $normalized = [];
+        foreach ($items as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+
+            $speaker = isset($item['speaker']) && $item['speaker'] !== null ? (int) $item['speaker'] : null;
+            $timestamp = isset($item['timestamp_seconds']) && $item['timestamp_seconds'] !== null
+                ? (float) $item['timestamp_seconds']
+                : null;
+
+            $normalized[] = [
+                'timestamp_seconds' => $timestamp,
+                'timestamp_label' => $timestamp !== null ? TranscriptPresenter::timestamp($timestamp) : null,
+                'type' => (string) ($item['type'] ?? 'positive'),
+                'title' => (string) ($item['title'] ?? ''),
+                'description' => (string) ($item['description'] ?? ''),
+                'speaker' => $speaker,
+                'speaker_label' => $speaker !== null ? 'Speaker '.($speaker + 1) : null,
+                'quote' => isset($item['quote']) ? (string) $item['quote'] : null,
+            ];
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param  mixed  $items
+     * @return array<int, array{text:string, why:string}>
+     */
+    private static function practices(mixed $items): array
+    {
+        if (! is_array($items)) {
+            return [];
+        }
+
+        $normalized = [];
+        foreach ($items as $item) {
+            if (is_string($item)) {
+                $normalized[] = ['text' => $item, 'why' => ''];
+
+                continue;
+            }
+
+            if (! is_array($item)) {
+                continue;
+            }
+
+            $normalized[] = [
+                'text' => (string) ($item['text'] ?? $item['practice'] ?? ''),
+                'why' => (string) ($item['why'] ?? ''),
             ];
         }
 

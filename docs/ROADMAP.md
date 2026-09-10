@@ -114,7 +114,18 @@ Scorecard builder already shipped with Phase 5. This phase adds management analy
 * no materialized aggregate tables
 * live provider verification deferred (DEC-035)
 
-## Phase 7 — User Product
+## Phase 7 — Deep Call Analysis
+
+**Status: COMPLETED**
+
+* schema version 3 (v1/v2 remain presentable)
+* executive summary, timeline, signals, objections, coaching priorities
+* application-side conversation metrics
+* one structured LLM pass (not two)
+* public + admin share `AnalysisReport`
+* live provider verification deferred (DEC-035)
+
+## Phase 8 — User Product
 
 **Status: Planned** (public upload shell shipped in Phase 2.1)
 
@@ -124,7 +135,7 @@ Scorecard builder already shipped with Phase 5. This phase adds management analy
 
 The anonymous upload/status/report shell is live. Remaining work is persistence of a user’s own analyses behind an account.
 
-## Phase 8 — Deeper coaching analytics
+## Phase 9 — Deeper coaching analytics
 
 **Status: Planned**
 
@@ -137,7 +148,7 @@ Core management dashboard shipped in Phase 6. Remaining later:
 * automatic coaching plans
 * live call monitoring
 
-## Phase 9 — Integrations
+## Phase 10 — Integrations
 
 **Status: Planned**
 

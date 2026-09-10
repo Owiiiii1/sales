@@ -1,6 +1,6 @@
 # Sales Analyzer — AI Analysis
 
-This is a design document for the analysis engine. **STT is implemented (ElevenLabs Scribe v2). Structured LLM sales analysis is implemented (schema version 2).** Company knowledge is stored as structured MySQL records and packed by `AnalysisContextBuilder`. RAG / embeddings are not used. The live LLM vendor is whichever provider an admin activates in Settings → AI (DEC-006 remains Open).
+This is a design document for the analysis engine. **STT is implemented (ElevenLabs Scribe v2). Structured LLM sales analysis is implemented (schema version 3).** Company knowledge is stored as structured MySQL records and packed by `AnalysisContextBuilder`. RAG / embeddings are not used. The live LLM vendor is whichever provider an admin activates in Settings → AI (DEC-006 remains Open). Stored v1/v2 analyses remain presentable.
 
 ## Main principle
 
@@ -51,7 +51,7 @@ Each arrow may be one or more jobs. Failures should be visible as call status, n
 
 STT and diarization are one ElevenLabs Scribe v2 call (`diarize=true`, word timestamps). Speakers are stored as integers and shown as `Speaker 1`, `Speaker 2`. Seller vs customer is assigned in analysis JSON `speaker_roles` (DEC-034), not by mutating transcript rows.
 
-Phase 4 added **one** structured LLM call with `SalesAnalysisPromptBuilder` for generic sales methodology (DEC-031). Phase 5 still uses one LLM call. `AnalysisContextBuilder` attaches company knowledge when `Call.company_id` is set. Public calls stay generic (DEC-040).
+Phase 4 added **one** structured LLM call with `SalesAnalysisPromptBuilder` for generic sales methodology (DEC-031). Phase 5 still used one LLM call. Phase 7 keeps **one** pass for schema v3 (DEC-047). A second coaching pass was considered and not shipped: collection limits keep the JSON bounded; two calls would duplicate transcript + company context and double latency/failure. `ConversationMetricsCalculator` fills talk-time metrics from transcript segments after speaker-role mapping (DEC-049). Public calls get full generic v3 analysis (DEC-040 still: no company knowledge). Company calls keep the v2 `company_specific` block plus v3 coaching.
 
 Prompt layout:
 
@@ -73,20 +73,19 @@ Needed for analysis:
 
 If a provider cannot diarize reliably, analysis quality drops. Fallback behavior is **TBD** (manual speaker labels vs “unknown speaker”).
 
-### Conversation metrics (possible)
+### Conversation metrics (application-side)
 
-These are useful if the STT/diarization output supports them. Mark unavailable metrics rather than inventing them.
+`ConversationMetricsCalculator` uses diarized segments and `speaker_roles`. It does **not** ask the LLM to guess talk time. Interruptions are not counted (no reliable overlap). Missing durations yield `null`, not 0.
 
 | Metric | Purpose | Availability |
 |---|---|---|
-| Manager / client speaking ratio | Talk dominance | Depends on diarization. **TBD** |
-| Interruptions | Call control / listening | **TBD** (needs overlap or turn-taking) |
-| Long monologues | Presentation vs dialogue | **TBD** |
-| Pauses | Awkward silence vs thinking | **TBD** |
-| Question count | Discovery quality | Usually possible from transcript |
-| Open vs closed questions | Discovery quality | LLM classification; rubric **TBD** |
-| Talk speed | Delivery | Timestamps exist on segments; metric not computed yet |
-| Sentiment / emotion | Tone | Only if technically reliable. **TBD**; do not fake precision |
+| Seller / customer talk percent | Talk balance after role mapping | Segments with positive duration |
+| Longest seller monologue | Consecutive seller turns | Same |
+| Speaker switches | Turn-taking | Always if ≥1 segment |
+| Call duration | Length | Transcript duration or max end_seconds |
+| Interruptions | Call control / listening | **Not computed** (needs overlap) |
+| Question quality | Discovery | LLM `question_analysis` (estimate) |
+| Sentiment / emotion from voice | Tone | **Not used**; wording only |
 
 ## What we analyze (minimum categories)
 
@@ -128,26 +127,21 @@ Preliminary passes (names can change):
 5. **Conversation quality** — listening, interruptions, monologues, control.
 6. **Final synthesis** — overall score, priorities, recommendations, improved phrases.
 
-Passes may be merged in MVP if cost/latency requires it. Splitting is the **architectural preference**, not a mandate to ship six billed calls on day one.
+Passes may be merged in MVP if cost/latency requires it. Phase 7 ships **one** structured call covering technique, intent, objections, company compliance, conversation quality, and coaching synthesis. Splitting remains allowed later if a single prompt becomes unreliable.
 
 Each pass should return **JSON with a schema**, not free-form prose only.
 
-## Output (preliminary report structure)
+## Output (schema v3)
 
-* overall score
-* section scores
-* summary
-* strengths
-* weaknesses
-* critical mistakes
-* missed opportunities
-* objections found
-* buying signals
-* next-step quality
-* recommendations
-* example improved phrases
-* suggested alternative handling
-* deal probability / intent — **only if** a later decision says we use that estimate
+New analyses store schema version 3. The report answers what happened, what each side wanted, who led, which signals were used or missed, and what to do on the next similar call.
+
+Executive layer: overall score, `executive_summary`, outcome, intent, biggest strength/problem, next action, material `timeline`.
+
+Deep layer: discovery depth, questions, listening, value, objection map, negotiation, rapport, closing, missed signals, better phrases, coaching priorities (max 5), next-call playbook, alternative path (short reconstruction, not a fake full transcript).
+
+Company-specific v2 keys remain. Timeline lists only material moments (DEC-050). Coaching must be evidence-tied (DEC-048 / DEC-051).
+
+Stored v1/v2 JSON is still rendered; missing v3 blocks are omitted.
 
 Do not present deal probability as a fact unless the product explicitly accepts that metric and its uncertainty.
 
@@ -157,7 +151,7 @@ Prompt version, model, scorecard version, and context version must be stored wit
 
 Before analysis, `AnalysisContextBuilder` loads relevant knowledge for that Call’s Company (if any). Public calls skip this. Context is packed with a 24,000-character budget (config `sales-analyzer.analysis.context_budget_characters`). Truncation logs a warning and does not fail.
 
-Schema v2 adds `company_context_used` and `company_specific` (script adherence, mandatory questions, forbidden claims, objection handling, offering accuracy, scorecard criteria). Laravel overwrites scorecard `total_score`. Generic `overall_score` is not replaced by the company scorecard.
+Schema v3 keeps that `company_specific` block and adds deep generic coaching on the same result JSON.
 
 Future knowledge types to store:
 
@@ -257,6 +251,6 @@ Do not ship scores we cannot explain.
 
 * LLM provider (DEC-006): operator picks OpenAI, Anthropic, or Gemini in kit settings.
 * STT / diarization: ElevenLabs Scribe v2 (DEC-024 / DEC-025 / DEC-027).
-* Whether later phases split analysis into multiple LLM passes.
+* Whether later phases split analysis into multiple LLM passes (Phase 7 kept one pass).
 * Custom company scorecards / weighted criteria: implemented in Phase 5 (DEC-037 / DEC-038). Full scorecard VCS is not built; snapshots are enough (DEC-039).
 * Human review / override of scores.

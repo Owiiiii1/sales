@@ -6,6 +6,7 @@ use App\Exceptions\Analysis\PermanentAnalysisException;
 use App\Exceptions\Analysis\TransientAnalysisException;
 use App\Models\Call;
 use App\Services\Analysis\AnalysisContextBuilder;
+use App\Services\Analysis\ConversationMetricsCalculator;
 use App\Services\Analysis\SalesAnalysisProvider;
 use App\Services\Analysis\SalesAnalysisWriter;
 use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
@@ -23,7 +24,7 @@ class AnalyzeCall implements ShouldBeUniqueUntilProcessing, ShouldQueue
     /** @var array<int, int> */
     public array $backoff = [60, 180, 600];
 
-    public int $timeout = 180;
+    public int $timeout = 240;
 
     public int $uniqueFor = 600;
 
@@ -73,6 +74,7 @@ class AnalyzeCall implements ShouldBeUniqueUntilProcessing, ShouldQueue
 
         try {
             $result = $provider->analyze($transcript, $contexts->build($call));
+            $result = app(ConversationMetricsCalculator::class)->attach($transcript, $result);
 
             $writer->replace($call, $result, $startedAt);
 

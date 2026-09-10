@@ -111,10 +111,10 @@ These are possible later capabilities. **Do not treat the list as committed scop
 | Surface | Purpose | Status |
 |---|---|---|
 | Upload Call | Submit audio | Implemented (public + admin) |
-| Analysis report | Read scores and recommendations | Implemented (Phase 4–5) |
+| Analysis report | Deep coaching report for one call | Implemented (Phase 4–7) |
 | Company context form | Admin Sales Knowledge (not a public prompt field) | Implemented (Phase 5) |
 | Admin / operator UI | Adapted from Custom Admin Kit | Implemented (Phase 1) |
-| Personal cabinet | History, companies, employees | Planned (Phase 7) |
+| Personal cabinet | History, companies, employees | Planned (Phase 8) |
 | Knowledge admin | Scripts, products, objections | Implemented (Phase 5) |
 | Scorecard admin | Criteria and weights | Implemented (Phase 5) |
 | Team analytics | Dashboard, company analytics, employee analytics | Implemented (Phase 6) |
