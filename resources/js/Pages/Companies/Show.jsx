@@ -1,9 +1,11 @@
 import AdminLayout from '@/Layouts/AdminLayout';
+import { AnalyticsFilters, AnalyticsSections } from '@/Components/Analytics/Board';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 
 const TABS = [
     { id: 'overview', label: 'Overview' },
+    { id: 'analytics', label: 'Analytics' },
     { id: 'knowledge', label: 'Knowledge' },
     { id: 'offerings', label: 'Offerings' },
     { id: 'objections', label: 'Objections' },
@@ -41,9 +43,19 @@ export default function CompanyShow({
     scorecards = [],
     employees = [],
     calls = [],
+    filters = { period: 'last_30' },
+    analytics = null,
 }) {
     const go = (nextTab) => {
-        router.get(route('companies.show', company.id), { tab: nextTab }, { preserveState: true, preserveScroll: true });
+        const params = { tab: nextTab };
+        if (nextTab === 'analytics') {
+            params.period = filters?.period || 'last_30';
+            if (filters?.period === 'custom') {
+                params.from = filters.from_date;
+                params.to = filters.to_date;
+            }
+        }
+        router.get(route('companies.show', company.id), params, { preserveState: true, preserveScroll: true });
     };
 
     return (
@@ -76,6 +88,16 @@ export default function CompanyShow({
                 </section>
 
                 {tab === 'overview' && <Overview company={company} completeness={completeness} />}
+                {tab === 'analytics' && (
+                    <div className="space-y-6">
+                        <AnalyticsFilters
+                            filters={filters}
+                            extra={{ tab: 'analytics' }}
+                            action={(params) => router.get(route('companies.show', company.id), params, { preserveState: true, preserveScroll: true })}
+                        />
+                        <AnalyticsSections analytics={{ ...(analytics || {}), hide_public: true }} variant="company" />
+                    </div>
+                )}
                 {tab === 'knowledge' && <Knowledge company={company} profile={profile} />}
                 {tab === 'offerings' && <Offerings company={company} offerings={offerings} />}
                 {tab === 'objections' && <Objections company={company} objections={objections} />}
@@ -418,7 +440,10 @@ function EmployeesList({ company, employees }) {
             </div>
             <ul className="mt-4 space-y-2 text-sm">
                 {employees.map((employee) => (
-                    <li key={employee.id}>{employee.full_name} {employee.position ? `· ${employee.position}` : ''}</li>
+                    <li key={employee.id}>
+                        <Link href={route('employees.show', employee.id)} className="text-indigo-700">{employee.full_name}</Link>
+                        {employee.position ? ` · ${employee.position}` : ''}
+                    </li>
                 ))}
                 {employees.length === 0 && <p className="text-slate-500">No employees yet.</p>}
             </ul>

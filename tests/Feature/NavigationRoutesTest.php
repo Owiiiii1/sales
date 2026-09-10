@@ -40,8 +40,10 @@ class NavigationRoutesTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Dashboard', false)
-                ->has('stats')
-                ->has('recentCalls'));
+                ->has('filters')
+                ->has('analytics')
+                ->has('analytics.kpis')
+                ->has('analytics.recent_calls'));
 
         $this->actingAs($user)->get('/companies')->assertOk();
         $this->actingAs($user)->get('/employees')->assertOk();

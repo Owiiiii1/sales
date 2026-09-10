@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Http\Requests\EmployeeRequest;
 use App\Models\Company;
 use App\Models\Employee;
+use App\Services\Analytics\AnalyticsFilter;
+use App\Services\Analytics\EmployeeAnalyticsService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -48,6 +50,27 @@ class EmployeesController extends Controller
             'filters' => [
                 'company_id' => $companyId !== null && $companyId !== '' ? (int) $companyId : null,
             ],
+        ]);
+    }
+
+    public function show(Request $request, Employee $employee, EmployeeAnalyticsService $analytics): Response
+    {
+        $employee->load('company:id,name');
+        $filter = AnalyticsFilter::fromRequest($request, $employee->company_id, $employee->id);
+
+        return Inertia::render('Employees/Show', [
+            'employee' => [
+                'id' => $employee->id,
+                'full_name' => $employee->full_name,
+                'first_name' => $employee->first_name,
+                'last_name' => $employee->last_name,
+                'position' => $employee->position,
+                'company_id' => $employee->company_id,
+                'company_name' => $employee->company?->name,
+                'is_active' => $employee->is_active,
+            ],
+            'filters' => $filter->toArray(),
+            'analytics' => $analytics->payload($employee, $filter),
         ]);
     }
 

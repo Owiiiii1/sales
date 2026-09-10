@@ -100,16 +100,19 @@ Live provider smoke is blocked until `ELEVENLABS_API_KEY` is set in this app’s
 * public calls remain generic (no extra form)
 * live external provider verification deferred by Project Manager (DEC-035)
 
-## Phase 6 — Scorecards
+## Phase 6 — Sales Analytics Dashboard
 
-**Status: COMPLETED** (shipped with Phase 5)
+**Status: COMPLETED**
 
-* custom criteria and weights
-* default/active flags
-* application-side weighted total
-* per-analysis scorecard snapshot
+Scorecard builder already shipped with Phase 5. This phase adds management analytics:
 
-Remaining later if needed: a dedicated scorecard version-control UI. Snapshots already make old reports explainable.
+* `/dashboard` KPI cards, period / company / employee filters
+* `GET /employees/{employee}` analytics
+* Company detail **Analytics** tab
+* generic vs company scorecard kept separate
+* section / outcome / scorecard snapshot aggregation
+* no materialized aggregate tables
+* live provider verification deferred (DEC-035)
 
 ## Phase 7 — User Product
 
@@ -121,15 +124,18 @@ Remaining later if needed: a dedicated scorecard version-control UI. Snapshots a
 
 The anonymous upload/status/report shell is live. Remaining work is persistence of a user’s own analyses behind an account.
 
-## Phase 8 — Management Analytics
+## Phase 8 — Deeper coaching analytics
 
 **Status: Planned**
 
-* employee dashboard;
-* team analytics;
-* trends;
-* recurring weaknesses;
-* comparisons.
+Core management dashboard shipped in Phase 6. Remaining later:
+
+* scheduled email / Slack / Telegram reports
+* CSV/PDF export
+* gamification / leaderboards
+* predictive forecasting
+* automatic coaching plans
+* live call monitoring
 
 ## Phase 9 — Integrations
 

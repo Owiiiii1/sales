@@ -594,10 +594,80 @@ Status values: `Accepted` | `Open` | `Superseded` | `Rejected`.
 
 ---
 
+## DEC-042
+
+**Title:** Analytics are computed from source-of-truth call data  
+**Status:** Accepted  
+**Date:** 2026-09-10
+
+**Decision:** Do not store daily aggregate tables in v1. Dashboard, company, and employee analytics query `calls` and `sales_analyses` and aggregate in a PHP service layer.
+
+**Reason:** Volume is small. Premature materialization would duplicate scores that already live on analyses.
+
+**Consequences:** Controllers stay thin (`AnalyticsFilter` + services). If volume grows, a later phase may add materialized aggregates.
+
+---
+
+## DEC-043
+
+**Title:** Historical scorecard analytics use analysis snapshots  
+**Status:** Accepted  
+**Date:** 2026-09-10
+
+**Decision:** Criterion averages, weights, and critical-failure counts come from each analysis `scorecard_snapshot` and `result.company_specific.scorecard`, not from the live scorecard rows.
+
+**Reason:** Editing a scorecard tomorrow must not rewrite last month’s analytics.
+
+**Consequences:** Live scorecard configuration is for new analyses only.
+
+---
+
+## DEC-044
+
+**Title:** Public calls are excluded from employee/company analytics  
+**Status:** Accepted  
+**Date:** 2026-09-10
+
+**Decision:** Anonymous public calls (`company_id` null) never appear in employee or company analytics. The global dashboard may include them in overall totals and a Public Analyses card.
+
+**Reason:** They have no employee and no company knowledge.
+
+**Consequences:** Company filters drop public rows. Employee pages only load that employee’s calls.
+
+---
+
+## DEC-045
+
+**Title:** Analytics date uses recorded_at with created_at fallback  
+**Status:** Accepted  
+**Date:** 2026-09-10
+
+**Decision:** Every analytics query and chart uses `COALESCE(recorded_at, created_at)` in `config('app.timezone')`.
+
+**Reason:** Upload time is not always call time. Mixing date columns on one screen would be misleading.
+
+**Consequences:** Period presets and previous-period comparison share the same clock.
+
+---
+
+## DEC-046
+
+**Title:** Generic score and company scorecard remain separate metrics  
+**Status:** Accepted  
+**Date:** 2026-09-10
+
+**Decision:** Dashboard KPIs and charts never blend `overall_score` and `company_scorecard_score`. Missing scorecard values display as N/A, not 0.
+
+**Reason:** They measure different rubrics (DEC-038). Mixing them would hide coaching signal.
+
+**Consequences:** Two averages, two trend series.
+
+---
+
 ## Template for new entries
 
 ```
-## DEC-042
+## DEC-047
 
 **Title:**  
 **Status:** Open | Accepted  

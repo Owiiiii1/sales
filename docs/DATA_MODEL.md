@@ -2,9 +2,7 @@
 
 This document describes the **domain model**.
 
-Phase 1 implemented `companies`, `employees`, and `calls`. Phase 3 added transcripts. Phase 4 added `sales_analyses`. Phase 5 added company knowledge and configurable scorecards.
-
-**Do not** treat kit CRM tables as Sales Analyzer domain.
+Phase 1 implemented `companies`, `employees`, and `calls`. Phase 3 added transcripts. Phase 4 added `sales_analyses`. Phase 5 added company knowledge and configurable scorecards. Phase 6 computes analytics from those tables; there is no `analytics_daily` (DEC-042).
 
 **Do not** treat kit CRM tables as Sales Analyzer domain.
 
@@ -299,6 +297,15 @@ Documents, embeddings, and a vector store remain later / TBD.
 | Scorecard | Criterion | 1:N, unique key per scorecard |
 | Call | SalesAnalysis | 1:1 (`call_id` unique). Re-analysis replaces the row after validation. Snapshots stay with that row. |
 | SalesAnalysis | Scorecard | nullable FK; snapshot is authoritative for that analysis |
+
+## Analytics (computed, no extra tables)
+
+Admin dashboard / company / employee analytics read `calls` + `sales_analyses` (DEC-042).
+
+* Date: `recorded_at` if set, else `created_at` (DEC-045), grouped in `config('app.timezone')`.
+* Generic average uses `overall_score`. Company average uses `company_scorecard_score` (DEC-046). Nulls are N/A, never a fake 0.
+* Scorecard history uses `scorecard_snapshot` + `result.company_specific.scorecard` (DEC-043), not the live scorecard rows.
+* Public calls (`company_id` null) are excluded from employee and company analytics (DEC-044). They may appear on the global dashboard, with a separate Public Analyses count.
 
 ## What we will not do yet
 

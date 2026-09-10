@@ -12,6 +12,7 @@ Factual state of the running project. Update this file when reality changes.
 * **Phase 3 — ElevenLabs transcription:** COMPLETED (code + mocked tests). Live ElevenLabs verification deferred by Project Manager.
 * **Phase 4 — Structured AI sales analysis:** COMPLETED (application code + mocked tests). Live LLM verification deferred by Project Manager.
 * **Phase 5 — Company knowledge & scorecards:** COMPLETED (application code + mocked tests). Live LLM verification deferred by Project Manager.
+* **Phase 6 — Sales analytics dashboard:** COMPLETED (application code + mocked tests). Live LLM verification deferred by Project Manager.
 * **Next planned work:** Phase 7 user product (accounts / personal cabinet), unless the roadmap is reordered.
 
 ## Product vs running app
@@ -22,7 +23,7 @@ Admin company pages hold Sales Knowledge, offerings, objections, scripts, and sc
 
 If Settings → AI has no active provider/key/model, calls stay `analysis_pending` after transcription.
 
-Admins sign in at `/login`. Company detail is tabbed. Call detail shows analysis context metadata (company, scorecard, schema version, company context used). Re-run analysis is manual after knowledge changes.
+Admins sign in at `/login`. `/dashboard` is the sales analytics view (Last 30 days by default). Company detail includes an Analytics tab. Employees have a detail/analytics page. Call detail shows analysis context metadata. Re-run analysis is manual after knowledge changes.
 
 ## Infrastructure
 
@@ -50,7 +51,9 @@ Admins sign in at `/login`. Company detail is tabbed. Call detail shows analysis
 | `/analyze` | guest | public audio upload |
 | `/analysis/{token}/status` | guest | safe status JSON |
 | `/analysis/{token}` | guest | transcript + report when ready |
-| `/companies/{company}` | auth | company knowledge tabs |
+| `/dashboard` | auth | sales analytics |
+| `/companies/{company}` | auth | company knowledge + analytics tabs |
+| `/employees/{employee}` | auth | employee analytics |
 | `POST /calls/{call}/transcribe` | auth | retry STT job |
 | `POST /calls/{call}/analyze` | auth | run / re-run analysis job |
 
@@ -66,7 +69,7 @@ Admins sign in at `/login`. Company detail is tabbed. Call detail shows analysis
 ## What is explicitly not done
 
 * no company document RAG / embeddings / vector store
-* no employee or team analytics
+* no scheduled email/Slack reports or CSV/PDF export
 * no CRM integration
 * no public audio streaming
 * no CAPTCHA

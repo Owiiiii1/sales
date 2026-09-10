@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 class Call extends Model
@@ -94,6 +95,11 @@ class Call extends Model
     public function analysis(): HasOne
     {
         return $this->hasOne(SalesAnalysis::class);
+    }
+
+    public function analyticsAt(): Carbon
+    {
+        return ($this->recorded_at ?? $this->created_at)->copy()->timezone((string) config('app.timezone'));
     }
 
     public function fileSizeLabel(): ?string

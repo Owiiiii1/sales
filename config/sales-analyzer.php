@@ -68,4 +68,14 @@ return [
         'context_budget_characters' => (int) env('SALES_ANALYSIS_CONTEXT_BUDGET', 24000),
     ],
 
+    'analytics' => [
+        'default_period' => 'last_30',
+        'score_good' => 80,
+        'score_warning' => 60,
+        'recent_calls' => 20,
+        'latest_violations' => 10,
+        'recent_findings' => 8,
+        'top_missed_questions' => 10,
+    ],
+
 ];

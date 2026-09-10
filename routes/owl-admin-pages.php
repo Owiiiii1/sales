@@ -61,6 +61,7 @@ Route::middleware(AdminRouteMiddleware::stack())->group(function () {
     Route::delete('/companies/{company}/scorecards/{scorecard}/criteria/{criterion}', [CompanyKnowledgeController::class, 'destroyCriterion'])->name('companies.scorecards.criteria.destroy');
 
     Route::get('/employees', [EmployeesController::class, 'index'])->name('employees.index');
+    Route::get('/employees/{employee}', [EmployeesController::class, 'show'])->name('employees.show');
     Route::post('/employees', [EmployeesController::class, 'store'])->name('employees.store');
     Route::patch('/employees/{employee}', [EmployeesController::class, 'update'])->name('employees.update');
     Route::patch('/employees/{employee}/toggle', [EmployeesController::class, 'toggle'])->name('employees.toggle');

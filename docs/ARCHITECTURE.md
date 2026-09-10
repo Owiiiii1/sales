@@ -31,13 +31,29 @@ Laravel 13 + Custom Admin Kit, with a public product surface and an admin founda
 
 * guest `/` → public Sales Analyzer homepage (upload, transcript, structured report);
 * `/login` → admin login;
-* authenticated `/dashboard` → admin;
-* product admin routes: `/companies`, `/companies/{company}` (knowledge tabs), `/employees`, `/calls`;
+* authenticated `/dashboard` → sales analytics (period / company / employee filters);
+* product admin routes: `/companies`, `/companies/{company}` (knowledge + analytics tabs), `/employees`, `/employees/{employee}`, `/calls`;
 * kit CRM routes still exist but are not in primary navigation.
 
 Domain models **Company**, **Employee**, **Call**, **Transcript**, **SalesAnalysis**, and company knowledge (`CompanyProfile`, offerings, objections, scripts, scorecards) exist. Audio is stored on a **private** Laravel disk (`calls` → `storage/app/private/calls`). Public uploads reuse that disk and are **not** streamed to anonymous users.
 
 Pipeline: upload → `TranscribeCall` (ElevenLabs Scribe v2) → `AnalyzeCall`. `AnalyzeCall` uses `AnalysisContextBuilder` then the active kit AI provider. Public calls (`company_id` null) get generic methodology only. Admin calls with a Company also receive that company’s knowledge and default active scorecard. If no AI key/model is configured, the Call stays `analysis_pending`.
+
+Admin analytics (`DashboardAnalyticsService`, `CompanyAnalyticsService`, `EmployeeAnalyticsService`) aggregate existing `calls` / `sales_analyses` rows. No analytics tables. Date basis is `COALESCE(recorded_at, created_at)` in the application timezone (DEC-042 / DEC-045). JSON section scores are aggregated in PHP, not via opaque MySQL JSON SQL. Charts are lightweight SVG (no extra chart library).
+
+Analytics formulas (shared `AnalyticsAggregator`):
+
+* Analyzed = calls with `status = completed`
+* Completion rate = completed / total calls in the period
+* Failed rate = failed / total
+* Pending rate = (total − completed − failed) / total
+* Analysis success rate = completed / (completed + failed); N/A when none finished
+* Average sales score = mean of `overall_score` (nulls ignored)
+* Average company scorecard = mean of `company_scorecard_score` (nulls ignored; never mixed with generic score)
+* Average duration = mean of non-null `calls.duration_seconds`
+* Trend % = current period vs previous window of the same length; N/A for `all_time` or when the previous window has no comparable data
+
+Score bands (`config/sales-analyzer.php` `analytics.score_good` / `score_warning`): 80–100 good, 60–79 warning, below 60 poor. Empty scores render as **N/A**, never `NaN` or a fake 0.
 
 Audio path pattern on the `calls` disk:
 

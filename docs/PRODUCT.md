@@ -117,7 +117,7 @@ These are possible later capabilities. **Do not treat the list as committed scop
 | Personal cabinet | History, companies, employees | Planned (Phase 7) |
 | Knowledge admin | Scripts, products, objections | Implemented (Phase 5) |
 | Scorecard admin | Criteria and weights | Implemented (Phase 5) |
-| Team analytics | Trends and comparisons | Planned (Phase 8) |
+| Team analytics | Dashboard, company analytics, employee analytics | Implemented (Phase 6) |
 
 ## What we reuse from the admin kit
 

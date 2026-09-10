@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\CompanyRequest;
 use App\Models\Company;
+use App\Services\Analytics\AnalyticsFilter;
+use App\Services\Analytics\CompanyAnalyticsService;
 use App\Support\CompanyKnowledgeCompleteness;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -41,10 +43,14 @@ class CompaniesController extends Controller
         ]);
     }
 
-    public function show(Request $request, Company $company, CompanyKnowledgeCompleteness $completeness): Response
-    {
+    public function show(
+        Request $request,
+        Company $company,
+        CompanyKnowledgeCompleteness $completeness,
+        CompanyAnalyticsService $analytics,
+    ): Response {
         $tab = $request->query('tab', 'overview');
-        $allowed = ['overview', 'knowledge', 'offerings', 'objections', 'scripts', 'scorecard', 'employees', 'calls'];
+        $allowed = ['overview', 'analytics', 'knowledge', 'offerings', 'objections', 'scripts', 'scorecard', 'employees', 'calls'];
         if (! in_array($tab, $allowed, true)) {
             $tab = 'overview';
         }
@@ -72,6 +78,10 @@ class CompaniesController extends Controller
                 'show_url' => route('calls.show', $call),
             ])
             ->all();
+
+        $filter = $tab === 'analytics'
+            ? AnalyticsFilter::fromRequest($request, $company->id)
+            : null;
 
         $scorecards = $company->scorecards->map(function ($scorecard): array {
             $weight = (float) $scorecard->criteria->where('is_active', true)->sum('weight');
@@ -142,6 +152,8 @@ class CompaniesController extends Controller
                 'is_active' => $employee->is_active,
             ])->all(),
             'calls' => $calls,
+            'filters' => $filter?->toArray(),
+            'analytics' => $filter !== null ? $analytics->payload($company, $filter) : null,
         ]);
     }
 

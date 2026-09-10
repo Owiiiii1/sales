@@ -1,5 +1,5 @@
 import AdminLayout from '@/Layouts/AdminLayout';
-import { Head, router, useForm, usePage } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 
 const DEFAULT_FORM = {
@@ -113,6 +113,7 @@ export default function EmployeesIndex({ employees = [], companies = [], filters
                                         <Td>{employee.is_active ? 'active' : 'inactive'}</Td>
                                         <Td>
                                             <div className="flex flex-wrap gap-3">
+                                                <Link href={route('employees.show', employee.id)} className="text-indigo-700">View</Link>
                                                 <button type="button" className="text-indigo-700" onClick={() => startEdit(employee)}>Edit</button>
                                                 <button
                                                     type="button"
