@@ -248,11 +248,11 @@ Accepted:
 
 ## Changed Files
 
-`git diff --stat 555029d3ef9e6fb09a1023181f2de50332b7f49d`
+`git diff --stat 555029d3ef9e6fb09a1023181f2de50332b7f49d..0342d15a2cc327528a2c31ef6ca29254a1327f83`
 
 ```
  README.md                                          |   4 +-
- REPORT.md                                          | 335 +++++++-------
+ REPORT.md                                          | 388 ++++++++--------
  app/Http/Controllers/CallsController.php           |   6 +
  app/Http/Controllers/CompaniesController.php       | 108 ++++-
  .../Controllers/CompanyKnowledgeController.php     | 183 ++++++++
@@ -310,14 +310,18 @@ Accepted:
  tests/Feature/SalesAnalysisTest.php                | 220 ++++++++-
  tests/Unit/CompanyScoreCalculatorTest.php          |  50 ++
  tests/Unit/SalesAnalysisResultValidatorTest.php    | 146 ++++++
- 59 files changed, 3987 insertions(+), 319 deletions(-)
+ 59 files changed, 4045 insertions(+), 314 deletions(-)
 ```
 
 ## Git
 
 * branch: `main`
 * remote: `https://github.com/Owiiiii1/sales.git`
-* implementation commit: pending
+* implementation commit: `0342d15a2cc327528a2c31ef6ca29254a1327f83`
+* REPORT SHA/files commit: pending
+* first successful push: pending
+* commit messages:
+  * `Add company knowledge, scorecards, and company-aware analysis context.`
 * push result: pending
 
 ## Problems / Warnings
