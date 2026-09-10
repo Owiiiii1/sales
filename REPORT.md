@@ -183,11 +183,65 @@ Accepted:
 
 ## Changed Files
 
-Recorded after commit (baseline `33583e3` .. HEAD).
+ALL changes `33583e3fc487191ef611894ece9409c7c0ef6724`..`c0c1e5c4e7a462cc251dcaae62ba378b258347d7`:
+
+```
+ REPORT.md                                          | 245 +++++++---------
+ app/Http/Controllers/CallsController.php           |  12 +
+ app/Http/Controllers/PublicAnalyzerController.php  |  17 +-
+ .../Controllers/Settings/AiSettingsController.php  |  17 +-
+ .../Settings/AnalysisSettingsController.php        |  50 ++++
+ .../Controllers/Settings/SettingsController.php    |  25 +-
+ .../Settings/TranscriptionSettingsController.php   | 102 +++++++
+ app/Models/AiProviderSetting.php                   |   4 +
+ app/Models/AnalysisSetting.php                     |  25 ++
+ app/Models/TranscriptionProviderSetting.php        |  40 +++
+ app/Services/Ai/AiProviderManager.php              |   3 +-
+ app/Services/Ai/Clients/AnthropicClient.php        |   5 +-
+ app/Services/Ai/Clients/GeminiClient.php           |   4 +-
+ app/Services/Ai/Clients/OpenAiClient.php           |   4 +-
+ app/Services/Ai/Contracts/AiProviderClient.php     |   1 +
+ .../Analysis/AnalysisSettingsRepository.php        |  40 +++
+ .../Analysis/ConfiguredSalesAnalysisProvider.php   |   2 +
+ app/Services/Pipeline/AnalysisPipelineHealth.php   | 152 ++++++++++
+ .../Transcription/ActiveTranscriptionProvider.php  |  72 +++++
+ .../Transcription/DTO/TranscriptionCredentials.php |  29 ++
+ .../Transcription/ElevenLabsConnectionChecker.php  |  42 +++
+ .../ElevenLabsTranscriptionClient.php              |  14 +-
+ app/Support/SecretMask.php                         |  36 +++
+ config/sales-analyzer.php                          |  14 +
+ ..._create_transcription_and_analysis_settings.php |  64 ++++
+ docs/AI_ANALYSIS.md                                |  15 +-
+ docs/ARCHITECTURE.md                               |  23 +-
+ docs/DATA_MODEL.md                                 |  32 +-
+ docs/DECISIONS.md                                  |  74 ++++-
+ docs/PRODUCT.md                                    |   3 +-
+ docs/ROADMAP.md                                    |  15 +-
+ docs/STATUS.md                                     |  18 +-
+ resources/js/Pages/Calls/Show.jsx                  |  30 +-
+ resources/js/Pages/Public/Home.jsx                 |  24 +-
+ .../js/Pages/Settings/AnalysisBehaviorPanel.jsx    |  70 +++++
+ resources/js/Pages/Settings/Index.jsx              |  22 +-
+ resources/js/Pages/Settings/PipelineStatus.jsx     |  95 ++++++
+ resources/js/Pages/Settings/TranscriptionPanel.jsx | 139 +++++++++
+ routes/owl-admin-pages.php                         |   6 +
+ tests/Feature/PipelineHealthTest.php               | 144 +++++++++
+ tests/Feature/ProviderSettingsTest.php             | 325 +++++++++++++++++++++
+ tests/Feature/PublicAnalyzerTest.php               |   1 +
+ tests/Feature/SalesAnalysisTest.php                |   4 +-
+ tests/Unit/ActiveTranscriptionProviderTest.php     |  91 ++++++
+ tests/Unit/AnalysisSettingsRepositoryTest.php      |  24 ++
+ tests/Unit/ConversationMetricsCalculatorTest.php   |   2 +
+ 46 files changed, 1960 insertions(+), 216 deletions(-)
+```
 
 ## Git
 
-Pending commit + push on `main`.
+* branch: `main`
+* remote: `https://github.com/Owiiiii1/sales.git`
+* implementation commit: `c0c1e5c4e7a462cc251dcaae62ba378b258347d7`
+* commit message: `Add transcription settings and pipeline readiness to admin.`
+* push result: pending
 
 ## Problems / Warnings
 
