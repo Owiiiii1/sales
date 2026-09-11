@@ -142,11 +142,11 @@ Scorecard builder already shipped with Phase 5. This phase adds management analy
 
 **Status: COMPLETED**
 
-* Company select on `/` (optional; default generic)
-* Employee select depends on Company (optional)
+* Company / Generic select on `/` is required and explicit (DEC-063); empty placeholder is not Generic
+* Employee select depends on Company (optional); disabled in Generic
 * `POST /analyze` validates active company/employee ownership
 * existing `AnalysisContextBuilder` used as-is
-* DEC-057 accepted; DEC-040 superseded
+* DEC-057 accepted; DEC-040 superseded; DEC-063 records explicit Generic mode
 * live provider verification deferred (DEC-035)
 
 ## Phase 7.3 — Methodology Alignment & Context Reliability

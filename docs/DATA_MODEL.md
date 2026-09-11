@@ -126,7 +126,7 @@ An uploaded or imported conversation.
 * public_token unique UUID (DEC-019) — public status/report identifier
 * company_id → companies nullable (DEC-018); **required** for admin uploads; analyzer uploads are null (generic) or the selected company (DEC-057)
 * employee_id → employees nullable (restrict); analyzer may set it only with a matching company
-* source string (`manual` for admin, `public` for analyzer workspace uploads)
+* source string (`manual` for admin, `public` for analyzer workspace uploads). `public` is historical and now means upload through the Main Analyzer Workspace. A future suitable migration may rename it to `manual_analyzer`; do not migrate only for this rename (DEC-063).
 * external_id nullable
 * original_filename — client name only; not used as the physical filename
 * storage_path — relative path on the private `calls` disk

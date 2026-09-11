@@ -257,7 +257,7 @@ function SignalGroups({ signals }) {
     );
 }
 
-function ModeBadge({ mode, companyName }) {
+function ModeBadge({ mode, companyName, employeeName }) {
     const t = useT();
 
     if (mode !== 'generic' && mode !== 'company') {
@@ -265,20 +265,23 @@ function ModeBadge({ mode, companyName }) {
     }
 
     return (
-        <p className="mt-2">
+        <p className="mt-2 flex flex-wrap gap-2">
             <Badge tone={mode === 'company' ? 'good' : 'neutral'}>
                 {mode === 'company'
                     ? t('report.companyBadge', { name: companyName || '' })
                     : t('report.genericBadge')}
             </Badge>
+            {mode === 'company' && employeeName ? (
+                <Badge tone="neutral">{t('report.employeeBadge', { name: employeeName })}</Badge>
+            ) : null}
         </p>
     );
 }
 
-export default function AnalysisReport({ status, report, message, error, analysisMode, companyName }) {
+export default function AnalysisReport({ status, report, message, error, analysisMode, companyName, employeeName }) {
     const t = useT();
     const dash = t('common.na');
-    const badge = <ModeBadge mode={analysisMode} companyName={companyName} />;
+    const badge = <ModeBadge mode={analysisMode} companyName={companyName} employeeName={employeeName} />;
 
     if (status === 'uploading' || status === 'processing' || status === 'analyzing') {
         const label = {

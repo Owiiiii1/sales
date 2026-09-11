@@ -2,7 +2,7 @@
 
 This document describes the product we intend to build. It is not a description of the current UI.
 
-The live site has a **main analyzer workspace** at `/` for uploading a sales call (generic or company-specific), plus an admin at `/login`. Transcription is queued through ElevenLabs Scribe v2. Admins configure the STT key and LLM providers in Settings without editing `.env`. The operator selects a Company (optional) and Employee (optional) before upload. Generic AI sales analysis runs when no company is selected. Analyzer uploads with a Company use that company’s knowledge, default scorecard, facts, and report language. See [STATUS.md](STATUS.md).
+The live site has a **main analyzer workspace** at `/` for uploading a sales call (generic or company-specific), plus an admin at `/login`. Transcription is queued through ElevenLabs Scribe v2. Admins configure the STT key and LLM providers in Settings without editing `.env`. Main Analyzer requires explicit analysis context selection before upload. Generic remains a first-class explicit mode. Employee is optional and only after a Company is chosen. Analyzer uploads with a Company use that company’s knowledge, default scorecard, facts, and report language. See [STATUS.md](STATUS.md).
 
 ## Problem
 
@@ -70,7 +70,7 @@ Which of those is **TBD**.
 
 A person can upload one call, optionally give company/product context, and receive a structured sales analysis they can act on.
 
-Exact public URL, branding, and whether analysis is behind a gate (email, waitlist, payment) are **Open questions**. The live analyzer is `https://sales.owlsolutions.net/` (DEC-017, DEC-057). Generic analysis remains available when no Company is selected. Company-specific analysis is chosen explicitly before upload.
+Exact public URL, branding, and whether analysis is behind a gate (email, waitlist, payment) are **Open questions**. The live analyzer is `https://sales.owlsolutions.net/` (DEC-017, DEC-057, DEC-063). Main Analyzer requires explicit analysis context selection before upload. Generic remains a first-class explicit mode.
 
 ## Phase 2
 

@@ -273,7 +273,13 @@ export default function CallsShow({ call, companies = [], employees = [] }) {
                                     </ul>
                                 </div>
                             )}
-                            <AnalysisReport status="completed" report={call.analysis} />
+                            <AnalysisReport
+                                status="completed"
+                                report={call.analysis}
+                                analysisMode={call.company_id ? 'company' : 'generic'}
+                                companyName={call.company_name}
+                                employeeName={call.employee_name}
+                            />
                             {call.analysis.context_snapshot && (
                                 <div className="rounded-xl border border-slate-200 p-4">
                                     <button type="button" className="text-sm font-medium text-indigo-700" onClick={() => setShowSnapshot((open) => !open)}>

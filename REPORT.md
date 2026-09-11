@@ -1,131 +1,108 @@
-# Sales Analyzer — Phase 7.3 Methodology Alignment & Context Reliability Report
+# Sales Analyzer — Phase 7.2 Correction: Explicit Analysis Context
 
 ## Baseline
 
-Phase 7.2 already let the main analyzer choose a Company before upload. YFS company knowledge is filled in production. The remaining failure mode was analysis reliability: context packing used byte `strlen`/`substr` (unsafe for Ukrainian/Cyrillic), core profile packed too late, facts were mixed into free-text knowledge, score caps did not exist, and company report language could not override the call language.
+Phase 7.2 already put Company and optional Employee on `/`. Empty `<select>` value was Generic, so Generic was pre-selected and **Analyze Call** was enabled immediately. This correction makes context an explicit choice. No new modules. No migration.
 
-This phase is a reliability fix for the current one-call analyzer. It is not a new product layer.
+## What changed
 
-## UTF-8 Context Fix
+### 1. Company / context select
 
-`AnalysisContextBuilder` now measures and truncates with `mb_strlen(..., 'UTF-8')` and `mb_substr(..., ..., ..., 'UTF-8')`. Truncation cannot split a UTF-8 character. Packed context remains valid UTF-8 and JSON-encodable.
+The Main Analyzer select starts unselected:
 
-## Context Budget
+* placeholder: `Select analysis context`
+* explicit Generic: `No company — Generic analysis` (sentinel `generic`, never sent as `company_id`)
+* explicit Company: a named active company
 
-Default `sales-analyzer.analysis.context_budget_characters` is **50,000**, still overridable with `SALES_ANALYSIS_CONTEXT_BUDGET`. No tokenizer-specific system was added.
+`company_id = null` remains valid on `POST /analyze` only after the operator chooses Generic. Upload is not submitted until a context is selected.
 
-## Context Priority
+### 2. Employee
 
-Fixed v1 order:
+Still optional.
 
-1. Scorecard
-2. Verifiable company facts
-3. Core profile
-4. Mandatory questions
-5. Forbidden claims
-6. Offerings / pricing
-7. Sales scripts
-8. Objections
-9. Competitors / notes
+* Generic: Employee disabled, value null
+* Company: Employee optional, list filtered to that company
+* Changing context still resets Employee (`changeCompany` clears `employeeId`)
 
-Under budget pressure, facts and core profile survive before scripts and notes. There is no drag-and-drop priority UI.
+### 3. Analyze button
 
-## Company Facts
+Disabled until context is selected. Hint:
 
-New table `company_facts` (`label`, `value`, `status` current/outdated, `valid_until`, `source`, `is_active`). Company detail has a Facts tab with CRUD. Current and outdated rows are visually distinct.
+`Select a company or Generic analysis first.`
 
-Active facts are packed as:
+Label is `Analyze Call`.
+
+### 4. Context summary
+
+Shown only after a context is chosen, before upload.
+
+Generic:
 
 ```
-VERIFIABLE COMPANY FACTS
-CURRENT:
-...
-OUTDATED:
-...
+Generic analysis
+General sales methodology
+No company-specific rules will be used
 ```
 
-The prompt treats CURRENT facts as authoritative, forbids presenting OUTDATED facts as current, and forbids inventing facts missing from context.
+Company:
 
-## Score Caps
+```
+{Company} · Company analysis
+Knowledge: {percent}%
+Scorecard: {name}
+Employee: {name}   // only if selected
+```
 
-New table `company_scorecard_caps`. Trigger types: `criterion_critical_failure`, `forbidden_claim_violation`. After the weighted company score:
+Home payload still exposes only `id`, `name`, `knowledge_completeness`, `scorecard_name` for companies and `id`, `company_id`, `name` for employees. No scripts, forbidden claims, notes, or other knowledge secrets.
 
-`final = min(weighted_score, lowest_triggered_cap)`
+### 5. Report badge
 
-The LLM does not calculate caps. A forbidden-claim cap fires only when company-specific analysis recorded at least one confirmed violation, not because forbidden-claim text exists in knowledge.
+* Generic: `Generic analysis`
+* Company: `Company analysis · {Company Name}`
+* If Employee: nearby `Employee · {Employee Name}`
 
-The scorecard snapshot stores the cap rules used for that analysis. Result JSON stores `weighted_score`, `total_score` (final), and `triggered_caps`. Older analyses are left unchanged. Re-run uses current cap rules.
+Admin call show passes `analysisMode`, `companyName`, and `employeeName` into the shared report.
 
-Company → Scorecard includes a Score Caps CRUD block and optional score bands (90/75/60/40). Missing custom bands fall back to the existing generic 80/60 bands. Global analytics bands are unchanged.
+### 6. Source
 
-## Score Display
+`calls.source = public` is unchanged. No migration.
 
-If the call has a Company and the analysis used a custom scorecard, the report primary number is **Company Score**. Generic **General Sales Score** remains secondary. Generic calls still show **Overall Sales Score**. Cap UI can show weighted vs final and the triggered cap name.
+Technical debt: `public` is historical and now means upload through the Main Analyzer Workspace. On a later suitable migration, consider `manual_analyzer`. Do not migrate only for this rename.
 
-## Report Language
+## Backend
 
-`company_profiles.report_language`: `same_as_call` | `en` | `ru` | `uk` (default `same_as_call`). Generic calls use `analysis_settings.report_language_mode`. Company calls use the company setting. Evidence quotes stay in the original transcript language even when the narrative is Russian.
+Unchanged contract:
 
-## Stage Talk Metrics
+* omitted / null `company_id` → generic (`company_id` and `employee_id` null)
+* company + optional employee still validated (active company, active employee of that company, employee requires company)
+* inactive company/employee rejected
 
-`ConversationMetricsCalculator` now intersects segments, speaker roles, and `sales_stage_map`. Each valid stage gets seller/customer talk %, duration, and switches. `discovery_talk_balance` is `{seller_talk_percent, customer_talk_percent}` or `null` when discovery bounds are missing or invalid. Interruptions are not calculated.
+Explicitness is UI-only. The `generic` sentinel is not posted.
 
-## Tests
+## Files
 
-Added/updated coverage for UTF-8 budgets, packing priority, facts CRUD and context inclusion, score caps (none / one / lowest of many / forbidden violation / snapshot immutability / rerun), company Russian report override, generic same-as-call, original quotes, discovery talk ratio, invalid timestamps, truncated JSON retry, and a large valid v3 payload.
+* `resources/js/Pages/Public/Home.jsx`
+* `resources/js/i18n/catalog.js`
+* `resources/js/Components/Public/AnalysisReport.jsx`
+* `resources/js/Pages/Calls/Show.jsx`
+* `tests/Feature/PublicAnalyzerTest.php`
+* `docs/PRODUCT.md`, `docs/STATUS.md`, `docs/DECISIONS.md` (DEC-063), `docs/ROADMAP.md`, `docs/DATA_MODEL.md`, `docs/PROJECT.md`, `docs/ARCHITECTURE.md`
 
-`php artisan test`: **205 passed**, 1440 assertions.
+## Tests added
 
-## Database Changes
+* initial home state has no selected context
+* Home UI requires explicit context before Analyze (source contract: placeholder, disabled Analyze, Generic sentinel, Employee reset)
+* explicit Generic upload keeps `company_id` / `employee_id` null
+* explicit Company upload without Employee is allowed
+* home company/employee payload shape is only safe metadata (nested Inertia assert without extra keys)
+* existing generic, company+employee, and validation tests remain
 
-Migration `2026_09_11_120000_phase_73_facts_caps_language_bands.php`:
+## Docs
 
-* `company_facts`
-* `company_scorecard_caps`
-* `company_profiles.report_language`
-* `company_scorecards.score_bands`
+Recorded: **Main Analyzer requires explicit analysis context selection before upload. Generic remains a first-class explicit mode.**
 
-## Production Sentinel
+DEC-063 accepted. DEC-057 consequences updated so empty select is no longer Generic.
 
-Backup: `/home/deploy/backups/sales/sales-pre-phase73-20260911-120034.sql` (outside the repo).
+## Database
 
-| | Before | After |
-|---|---|---|
-| database | `sales` | `sales` |
-| users | 1 | 1 |
-| companies | 1 | 1 |
-| employees | 1 | 1 |
-| calls | 0 | 0 |
-| company_facts | missing | 0 |
-| company_scorecard_caps | missing | 0 |
-| admin | id 1 / admin@admin.com | unchanged |
-
-Production row counts for users/companies/employees/calls did not change. New tables exist and are empty until operators add facts and caps.
-
-## Documentation
-
-Updated AI_ANALYSIS, ARCHITECTURE, DATA_MODEL, PRODUCT, STATUS, ROADMAP, DECISIONS.
-
-Added:
-
-* DEC-058 — Context character budgets are UTF-8 safe
-* DEC-059 — Critical score caps are applied application-side
-* DEC-060 — Verifiable company facts are authoritative analysis context
-* DEC-061 — Company report language may differ from call language
-* DEC-062 — Stage talk metrics are calculated application-side
-
-## Changed Files
-
-See git commit. Principal areas: analysis context/prompt/validator/metrics, company facts and score caps, company/report UI, tests, docs.
-
-## Git
-
-Commit and push to `main` after tests, build, production backup, migrate, sentinel, and secret scan. Secret scan: no literal secrets in the diff.
-
-## Problems / Warnings
-
-None known at write time. Live LLM verification remains deferred. YFS facts/caps are not auto-seeded; operators add them in Admin → Company → Facts / Scorecard.
-
-## Final Status
-
-PHASE 7.3 PASSED
+None. No production backup or migrate for this correction.

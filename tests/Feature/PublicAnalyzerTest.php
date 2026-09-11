@@ -118,13 +118,96 @@ class PublicAnalyzerTest extends TestCase
                 ->where('employees.0.company_id', $active->id)
                 ->where('employees.0.name', 'Ada Sales')
                 ->missing('employees.0.email')
-                ->missing('employees.0.phone'))
+                ->missing('employees.0.phone')
+                ->has('companies.0', fn (Assert $company) => $company
+                    ->where('id', $active->id)
+                    ->where('name', 'Visible Co')
+                    ->where('scorecard_name', 'Main Sales Scorecard')
+                    ->has('knowledge_completeness'))
+                ->has('employees.0', fn (Assert $employee) => $employee
+                    ->where('id', $activeEmployee->id)
+                    ->where('company_id', $active->id)
+                    ->where('name', 'Ada Sales')))
             ->assertDontSee('SECRET_SALES_CONTEXT')
             ->assertDontSee('SECRET_FORBIDDEN_CLAIM')
             ->assertDontSee('SECRET_INTERNAL_NOTE')
             ->assertDontSee('ada-secret@example.com');
 
         $this->assertNotNull($scorecard);
+    }
+
+    public function test_home_has_no_preselected_analysis_context(): void
+    {
+        Company::factory()->create(['name' => 'YFS']);
+
+        $this->get('/')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Public/Home', false)
+                ->missing('company_id')
+                ->missing('employee_id')
+                ->missing('selected_company_id')
+                ->missing('analysis_mode')
+                ->has('companies', 1)
+                ->has('employees'));
+    }
+
+    public function test_home_ui_requires_explicit_context_before_analyze(): void
+    {
+        $source = file_get_contents(resource_path('js/Pages/Public/Home.jsx'));
+
+        $this->assertStringContainsString("const GENERIC_CONTEXT = 'generic'", $source);
+        $this->assertStringContainsString("useState('')", $source);
+        $this->assertStringContainsString("t('home.selectContext')", $source);
+        $this->assertStringContainsString('<option value={GENERIC_CONTEXT}>', $source);
+        $this->assertStringContainsString("t('home.genericOption')", $source);
+        $this->assertStringContainsString('disabled={!uploadAvailable || !contextSelected}', $source);
+        $this->assertStringContainsString("t('home.selectContextFirst')", $source);
+        $this->assertStringContainsString('disabled={!selectedCompany}', $source);
+        $this->assertStringContainsString('companyIdRef.current !== GENERIC_CONTEXT', $source);
+        $this->assertStringContainsString("setEmployeeId('')", $source);
+        $this->assertStringContainsString('{contextSelected && (', $source);
+        $this->assertStringContainsString("t('home.genericSummaryMethod')", $source);
+        $this->assertStringContainsString("t('home.genericSummaryRules')", $source);
+        $this->assertStringNotContainsString("<option value=\"\">{t('home.genericOption')}</option>", $source);
+    }
+
+    public function test_explicit_generic_upload_keeps_company_and_employee_null(): void
+    {
+        $response = $this->post('/analyze', [
+            'audio' => $this->fakeAudio('generic-explicit.mp3'),
+        ], ['Accept' => 'application/json']);
+
+        $response->assertCreated()
+            ->assertJsonPath('analysis_mode', 'generic')
+            ->assertJsonPath('company_name', null)
+            ->assertJsonPath('employee_name', null);
+
+        $call = Call::query()->where('public_token', $response->json('public_token'))->first();
+        $this->assertNotNull($call);
+        $this->assertNull($call->company_id);
+        $this->assertNull($call->employee_id);
+        $this->assertSame('public', $call->source);
+    }
+
+    public function test_explicit_company_upload_without_employee_is_allowed(): void
+    {
+        $company = Company::factory()->create(['name' => 'YFS']);
+
+        $response = $this->post('/analyze', [
+            'audio' => $this->fakeAudio('company-only.mp3'),
+            'company_id' => $company->id,
+        ], ['Accept' => 'application/json']);
+
+        $response->assertCreated()
+            ->assertJsonPath('analysis_mode', 'company')
+            ->assertJsonPath('company_name', 'YFS')
+            ->assertJsonPath('employee_name', null);
+
+        $call = Call::query()->where('public_token', $response->json('public_token'))->first();
+        $this->assertSame($company->id, $call->company_id);
+        $this->assertNull($call->employee_id);
+        $this->assertSame('public', $call->source);
     }
 
     public function test_public_tokens_are_unique(): void

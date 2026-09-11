@@ -61,7 +61,7 @@ Basic first-version flow:
 
 This repository currently hosts a **deployed Laravel 13 application** with **OwlSolutions Custom Admin Kit v0.5.0**, a **main analyzer workspace** at `/`, and an admin at `/login` (Companies, Employees, Calls, private audio).
 
-Transcription and structured analysis are implemented. The operator may run generic analysis or select a Company (and optional Employee) before upload (DEC-057).
+Transcription and structured analysis are implemented. Main Analyzer requires explicit analysis context selection before upload. Generic remains a first-class explicit mode (DEC-057, DEC-063).
 
 See:
 

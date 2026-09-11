@@ -15,13 +15,13 @@ Factual state of the running project. Update this file when reality changes.
 * **Phase 6 — Sales analytics dashboard:** COMPLETED (application code + mocked tests). Live LLM verification deferred by Project Manager.
 * **Phase 7 — Deep call analysis (schema v3):** COMPLETED (application code + mocked tests). Live LLM verification deferred by Project Manager.
 * **Phase 7.1 — Provider settings completion:** COMPLETED (application code + mocked tests). Live ElevenLabs / LLM verification deferred by Project Manager.
-* **Phase 7.2 — Main analyzer company selection:** COMPLETED (application code + mocked tests).
+* **Phase 7.2 — Main analyzer company selection:** COMPLETED (application code + mocked tests). Explicit context selection required before upload (DEC-063).
 * **Phase 7.3 — Methodology alignment & context reliability:** COMPLETED (application code + mocked tests).
 * **Next planned work:** Phase 8 user product (accounts / personal cabinet), unless the roadmap is reordered.
 
 ## Product vs running app
 
-Guests open `/`, optionally select a Company and Employee, upload a recording, and poll through transcription and analysis. Default is generic analysis (no company). If a Company is selected, existing company knowledge and the default scorecard are used (DEC-057). If transcription is not configured, the analyzer UI shows `Audio analysis is temporarily unavailable.` Speakers remain `Speaker 1`, `Speaker 2` on the transcript. Seller/customer mapping is analysis metadata.
+Guests open `/`, must explicitly select Generic analysis or a Company (DEC-063), optionally pick an Employee when a Company is selected, upload a recording, and poll through transcription and analysis. Empty context is not a default. If a Company is selected, existing company knowledge and the default scorecard are used (DEC-057). If transcription is not configured, the analyzer UI shows `Audio analysis is temporarily unavailable.` Speakers remain `Speaker 1`, `Speaker 2` on the transcript. Seller/customer mapping is analysis metadata.
 
 Admin company pages hold Sales Knowledge, verifiable facts, offerings, objections, scripts, scorecards, and score caps. Analysis context usage is shown on Knowledge. Admin-uploaded calls with a Company use that knowledge automatically (default active scorecard). Company Score is the primary report number when a custom scorecard was used; generic Overall / General Sales Score stays visible. Caps can lower the final company score without changing older analyses.
 

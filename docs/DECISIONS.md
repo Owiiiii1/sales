@@ -811,11 +811,11 @@ Status values: `Accepted` | `Open` | `Superseded` | `Rejected`.
 **Status:** Accepted  
 **Date:** 2026-09-11
 
-**Decision:** Main analyzer allows explicit Company and optional Employee selection before upload. Generic analysis remains available by selecting no Company. The system never guesses Company from audio or transcript.
+**Decision:** Main analyzer allows explicit Company and optional Employee selection before upload. Generic analysis remains a first-class explicit mode (DEC-063). The system never guesses Company from audio or transcript.
 
 **Reason:** Sales Analyzer is an operator workspace, not an anonymous SaaS upload. Company knowledge already exists in Admin; the analyzer must be able to use it on demand. Guessing a company from audio would hallucinate context.
 
-**Consequences:** `POST /analyze` accepts nullable `company_id` and `employee_id` with backend validation (active company, active employee belonging to that company, employee requires company). `source` stays `public`. Generic uploads keep `company_id` null and use `AnalysisContextBuilder::generic()`. Company uploads reuse existing Phase 5 company-specific analysis. Frontend receives only selector metadata (id, name, completeness %, scorecard name), never scripts, forbidden claims, or scorecard instructions.
+**Consequences:** `POST /analyze` accepts nullable `company_id` and `employee_id` with backend validation (active company, active employee belonging to that company, employee requires company). `source` stays `public`. Generic uploads keep `company_id` null and use `AnalysisContextBuilder::generic()`. Company uploads reuse existing Phase 5 company-specific analysis. Frontend receives only selector metadata (id, name, completeness %, scorecard name), never scripts, forbidden claims, or scorecard instructions. Empty select is not Generic; the operator must choose Generic or a Company (DEC-063).
 
 ---
 
@@ -889,10 +889,24 @@ Status values: `Accepted` | `Open` | `Superseded` | `Rejected`.
 
 ---
 
+## DEC-063
+
+**Title:** Main Analyzer requires explicit analysis context selection before upload  
+**Status:** Accepted  
+**Date:** 2026-09-11
+
+**Decision:** Main Analyzer requires explicit analysis context selection before upload. Generic remains a first-class explicit mode. The Company select starts with placeholder `Select analysis context`. The operator must choose either `No company — Generic analysis` or a specific Company. `company_id = null` is valid only after that explicit Generic choice. Analyze stays disabled until a context is selected.
+
+**Reason:** An empty select previously meant Generic, so Generic was pre-selected and Analyze was enabled immediately. Context must be a conscious choice, not an accidental default.
+
+**Consequences:** The UI uses a `generic` sentinel that is never sent as `company_id`. Backend `POST /analyze` still accepts omitted/null `company_id` as generic. Employee is disabled and null in Generic mode. Context summary shows only safe metadata (company name, knowledge %, scorecard name, optional employee name). `calls.source = public` is historical and now means Main Analyzer Workspace upload; consider renaming to `manual_analyzer` on a later suitable migration, not a dedicated one.
+
+---
+
 ## Template for new entries
 
 ```
-## DEC-063
+## DEC-064
 
 **Title:**  
 **Status:** Open | Accepted  

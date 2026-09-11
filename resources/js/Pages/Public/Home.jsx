@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useT } from '@/i18n';
 
 const csrfToken = () => document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+const GENERIC_CONTEXT = 'generic';
 
 export default function PublicHome({ upload = {}, companies = [], employees = [] }) {
     const t = useT();
@@ -40,6 +41,14 @@ export default function PublicHome({ upload = {}, companies = [], employees = []
         () => employees.filter((employee) => String(employee.company_id) === String(companyId)),
         [employees, companyId],
     );
+
+    const selectedEmployee = useMemo(
+        () => employeesForCompany.find((employee) => String(employee.id) === String(employeeId)) ?? null,
+        [employeesForCompany, employeeId],
+    );
+
+    const contextSelected = companyId !== '';
+    const isGenericContext = companyId === GENERIC_CONTEXT;
 
     const stopPolling = () => {
         if (pollRef.current) {
@@ -98,6 +107,10 @@ export default function PublicHome({ upload = {}, companies = [], employees = []
 
     const submit = async (nextFile) => {
         const audio = nextFile ?? file;
+        if (!contextSelected) {
+            setError(t('home.selectContextFirst'));
+            return;
+        }
         if (!audio) {
             setError(t('home.chooseAudio'));
             return;
@@ -105,7 +118,7 @@ export default function PublicHome({ upload = {}, companies = [], employees = []
 
         const data = new FormData();
         data.append('audio', audio);
-        if (companyIdRef.current) {
+        if (companyIdRef.current && companyIdRef.current !== GENERIC_CONTEXT) {
             data.append('company_id', companyIdRef.current);
             if (employeeIdRef.current) {
                 data.append('employee_id', employeeIdRef.current);
@@ -154,7 +167,6 @@ export default function PublicHome({ upload = {}, companies = [], employees = []
     };
 
     const statusLabel = t.status(uiStatus);
-    const companySelected = Boolean(selectedCompany);
 
     return (
         <PublicLayout>
@@ -180,7 +192,8 @@ export default function PublicHome({ upload = {}, companies = [], employees = []
                                 onChange={(event) => changeCompany(event.target.value)}
                                 className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900"
                             >
-                                <option value="">{t('home.genericOption')}</option>
+                                <option value="">{t('home.selectContext')}</option>
+                                <option value={GENERIC_CONTEXT}>{t('home.genericOption')}</option>
                                 {companies.map((company) => (
                                     <option key={company.id} value={company.id}>{company.name}</option>
                                 ))}
@@ -195,7 +208,7 @@ export default function PublicHome({ upload = {}, companies = [], employees = []
                             <span className="mb-1.5 block text-sm font-semibold text-slate-800">{t('home.employee')}</span>
                             <select
                                 value={employeeId}
-                                disabled={!companyId}
+                                disabled={!selectedCompany}
                                 onChange={(event) => setEmployeeId(event.target.value)}
                                 className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
                             >
@@ -207,28 +220,38 @@ export default function PublicHome({ upload = {}, companies = [], employees = []
                         </label>
                     </div>
 
-                    <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left">
-                        {companySelected ? (
-                            <>
-                                <p className="text-sm font-semibold text-slate-900">{t('home.companyMode')}</p>
-                                <p className="mt-1 text-sm leading-6 text-slate-600">{t('home.companyHint')}</p>
-                                <p className="mt-2 text-xs text-slate-500">
-                                    {t('home.companyContext', { name: selectedCompany.name })}
-                                    {selectedCompany.knowledge_completeness !== null && selectedCompany.knowledge_completeness !== undefined
-                                        ? ` · ${t('home.knowledge', { percent: selectedCompany.knowledge_completeness })}`
-                                        : ''}
-                                    {selectedCompany.scorecard_name
-                                        ? ` · ${t('home.scorecardName', { name: selectedCompany.scorecard_name })}`
-                                        : ''}
-                                </p>
-                            </>
-                        ) : (
-                            <>
-                                <p className="text-sm font-semibold text-slate-900">{t('home.genericMode')}</p>
-                                <p className="mt-1 text-sm leading-6 text-slate-600">{t('home.genericHint')}</p>
-                            </>
-                        )}
-                    </div>
+                    {contextSelected && (
+                        <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left">
+                            {isGenericContext ? (
+                                <>
+                                    <p className="text-sm font-semibold text-slate-900">{t('home.genericMode')}</p>
+                                    <p className="mt-1 text-sm leading-6 text-slate-600">{t('home.genericSummaryMethod')}</p>
+                                    <p className="mt-1 text-sm leading-6 text-slate-600">{t('home.genericSummaryRules')}</p>
+                                </>
+                            ) : (
+                                <>
+                                    <p className="text-sm font-semibold text-slate-900">
+                                        {t('home.companyMode', { name: selectedCompany?.name ?? '' })}
+                                    </p>
+                                    {selectedCompany?.knowledge_completeness !== null && selectedCompany?.knowledge_completeness !== undefined && (
+                                        <p className="mt-1 text-sm leading-6 text-slate-600">
+                                            {t('home.knowledge', { percent: selectedCompany.knowledge_completeness })}
+                                        </p>
+                                    )}
+                                    {selectedCompany?.scorecard_name && (
+                                        <p className="mt-1 text-sm leading-6 text-slate-600">
+                                            {t('home.scorecardName', { name: selectedCompany.scorecard_name })}
+                                        </p>
+                                    )}
+                                    {selectedEmployee && (
+                                        <p className="mt-1 text-sm leading-6 text-slate-600">
+                                            {t('home.summaryEmployee', { name: selectedEmployee.name })}
+                                        </p>
+                                    )}
+                                </>
+                            )}
+                        </div>
+                    )}
 
                     <div
                         className={`mt-6 rounded-2xl border-2 border-dashed p-6 transition sm:p-8 ${
@@ -289,13 +312,16 @@ export default function PublicHome({ upload = {}, companies = [], employees = []
                                     </button>
                                     <button
                                         type="button"
-                                        disabled={!uploadAvailable}
+                                        disabled={!uploadAvailable || !contextSelected}
                                         onClick={() => submit()}
                                         className="rounded-full bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
                                     >
                                         {t('home.analyze')}
                                     </button>
                                 </div>
+                                {!contextSelected && uploadAvailable && (
+                                    <p className="mt-3 text-sm text-slate-500">{t('home.selectContextFirst')}</p>
+                                )}
                                 <input
                                     ref={inputRef}
                                     type="file"
@@ -317,6 +343,7 @@ export default function PublicHome({ upload = {}, companies = [], employees = []
                         error={result?.error}
                         analysisMode={result?.analysis_mode}
                         companyName={result?.company_name}
+                        employeeName={result?.employee_name}
                     />
                     {(uiStatus === 'transcribed' || uiStatus === 'analysis_pending' || uiStatus === 'analyzing' || uiStatus === 'completed' || uiStatus === 'failed') && result?.transcript && (
                         <CallTranscript transcript={result.transcript} heading={t('calls.transcript')} />
