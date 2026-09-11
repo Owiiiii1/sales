@@ -182,6 +182,16 @@ class PublicAnalyzerTest extends TestCase
         $this->assertStringContainsString('ProcessingProgress', $source);
     }
 
+    public function test_home_scrolls_to_result_after_analyze(): void
+    {
+        $source = file_get_contents(resource_path('js/Pages/Public/Home.jsx'));
+
+        $this->assertStringContainsString('resultAnchorRef', $source);
+        $this->assertStringContainsString("uiStatus !== 'uploading'", $source);
+        $this->assertStringContainsString('scrollIntoView', $source);
+        $this->assertStringContainsString("behavior: 'smooth'", $source);
+    }
+
     public function test_explicit_generic_upload_keeps_company_and_employee_null(): void
     {
         $response = $this->post('/analyze', [

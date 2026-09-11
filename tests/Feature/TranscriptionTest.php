@@ -14,6 +14,8 @@ use App\Services\Transcription\TranscriptionProvider;
 use App\Services\Transcription\TranscriptWriter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Log\Events\MessageLogged;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
@@ -87,9 +89,126 @@ class TranscriptionTest extends TestCase
 
         $call->refresh();
         $this->assertSame('failed', $call->status);
-        $this->assertSame('This language is not supported yet.', $call->error_message);
+        $this->assertSame('Could not detect a supported call language.', $call->error_message);
         $this->assertSame(0, Transcript::query()->count());
         Storage::disk(config('sales-analyzer.storage_disk'))->assertExists($call->storage_path);
+    }
+
+    public function test_ukrainian_iso_and_bcp47_codes_are_accepted(): void
+    {
+        foreach (['ukr', 'uk-UA'] as $language) {
+            $call = $this->callWithAudio();
+            Http::fake([
+                'api.elevenlabs.io/*' => Http::response($this->providerPayload(language: $language, text: 'Добрий день.'), 200),
+            ]);
+
+            $this->runJob($call);
+
+            $call->refresh();
+            $this->assertSame('transcribed', $call->status, $language);
+            $this->assertSame('uk', $call->transcript->language, $language);
+        }
+    }
+
+    public function test_russian_locale_code_is_accepted(): void
+    {
+        $call = $this->callWithAudio();
+        Http::fake([
+            'api.elevenlabs.io/*' => Http::response($this->providerPayload(language: 'ru-RU', text: 'Здравствуйте.'), 200),
+        ]);
+        $this->runJob($call);
+        $this->assertSame('ru', $call->fresh()->transcript->language);
+    }
+
+    public function test_english_locale_code_is_accepted(): void
+    {
+        $call = $this->callWithAudio();
+        Http::fake([
+            'api.elevenlabs.io/*' => Http::response($this->providerPayload(language: 'en-US'), 200),
+        ]);
+        $this->runJob($call);
+        $this->assertSame('en', $call->fresh()->transcript->language);
+    }
+
+    public function test_spanish_without_ukrainian_letters_is_rejected_and_not_retried(): void
+    {
+        $logged = [];
+        Event::listen(MessageLogged::class, function (MessageLogged $event) use (&$logged): void {
+            $logged[] = $event;
+        });
+
+        $call = $this->callWithAudio();
+        Http::fake([
+            'api.elevenlabs.io/*' => Http::response($this->providerPayload(language: 'spa', text: 'Hola, ¿cómo estás?'), 200),
+        ]);
+
+        $this->runJob($call);
+
+        Http::assertSentCount(1);
+        $call->refresh();
+        $this->assertSame('failed', $call->status);
+        $this->assertSame('Could not detect a supported call language.', $call->error_message);
+
+        $warning = collect($logged)->first(function (MessageLogged $event) use ($call): bool {
+            return $event->level === 'error'
+                && $event->message === 'Unsupported transcription language returned by ElevenLabs.'
+                && ($event->context['call_id'] ?? null) === $call->id
+                && ($event->context['raw_language_code'] ?? null) === 'spa'
+                && ($event->context['normalized_language_code'] ?? null) === 'spa'
+                && array_key_exists('language_probability', $event->context);
+        });
+        $this->assertNotNull($warning);
+
+        $this->getJson('/analysis/'.$call->public_token)
+            ->assertOk()
+            ->assertJsonPath('status', 'failed')
+            ->assertJsonPath('error', 'Could not detect a supported call language.')
+            ->assertJsonMissingPath('raw_language_code')
+            ->assertJsonMissingPath('provider_metadata');
+
+        $payload = $this->getJson('/analysis/'.$call->public_token)->json();
+        $this->assertStringNotContainsString('spa', json_encode($payload));
+        $this->assertStringNotContainsString('Unsupported transcription language returned by ElevenLabs', json_encode($payload));
+    }
+
+    public function test_unsupported_code_with_ukrainian_letters_retries_with_ukr(): void
+    {
+        $call = $this->callWithAudio();
+        Http::fake([
+            'api.elevenlabs.io/*' => Http::sequence()
+                ->push($this->providerPayload(language: 'spa', text: 'Скажіть, будь ласка, про тур.'), 200)
+                ->push($this->providerPayload(language: 'ukr', text: 'Скажіть, будь ласка, про тур.'), 200, ['request-id' => 'req_uk']),
+        ]);
+
+        $this->runJob($call);
+
+        Http::assertSentCount(2);
+        Http::assertSent(function ($request): bool {
+            return str_contains($request->body(), 'ukr') || ($request->data()['language_code'] ?? null) === 'ukr';
+        });
+        $this->assertSame('transcribed', $call->fresh()->status);
+        $this->assertSame('uk', $call->fresh()->transcript->language);
+    }
+
+    public function test_language_hint_sends_explicit_provider_code(): void
+    {
+        $call = $this->callWithAudio();
+        Http::fake([
+            'api.elevenlabs.io/*' => Http::response($this->providerPayload(language: 'ukr', text: 'Скажіть, будь ласка.'), 200),
+        ]);
+
+        $job = new TranscribeCall($call->id, 'uk');
+        $job->handle(
+            app(TranscriptionProvider::class),
+            app(TranscriptWriter::class),
+            app(CallAudioStorage::class),
+        );
+
+        Http::assertSentCount(1);
+        Http::assertSent(function ($request): bool {
+            return str_contains($request->body(), 'ukr') || ($request->data()['language_code'] ?? null) === 'ukr';
+        });
+        $this->assertSame('uk', $call->fresh()->transcript->language);
     }
 
     public function test_provider_5xx_is_retryable_and_does_not_mark_failed(): void
@@ -236,12 +355,12 @@ class TranscriptionTest extends TestCase
     /**
      * @return array<string, mixed>
      */
-    private function providerPayload(string $language = 'en'): array
+    private function providerPayload(string $language = 'en', string $text = 'Hello there. Hi.'): array
     {
         return [
             'language_code' => $language,
             'language_probability' => 0.97,
-            'text' => 'Hello there. Hi.',
+            'text' => $text,
             'audio_duration_secs' => 8.2,
             'transcription_id' => 'tr_1',
             'words' => [

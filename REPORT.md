@@ -1,167 +1,95 @@
-# Sales Analyzer — Report Structure & UX Revision
+# Ukrainian Transcription Language Fix
 
 ## Baseline
 
-Latest completed live analysis before this change: Call **#13** (`public`, company_id 3, schema v3, provider Gemini `gemini-3.7-flash`, overall_score 48, company_scorecard_score `null`, transcript language `ru`). Call #4 was an earlier completed Gemini run of the same pipeline with the shallow `{text}` wire schema.
+Call **#17** (`source=public`, `company_id=3`, `ui_locale=ru`) failed transcription at 2026-09-11 14:11:09. Public error: `This language is not supported yet.` No transcript row. Audio remained on the private disk. `failed_jobs` has no TranscribeCall row for this call. Production `laravel.log` was readable. No API keys are recorded here.
 
-No secrets, API keys, or internal credentials are recorded here.
+Deploy cannot read the audio file (owner `www-data`, ACL mask empty). The original worker STT is the source of the raw language code.
 
 ## Live Result Audit
 
-Sanitized JSON from Call #13 showed nested keys present but almost no semantic content:
+| Field | Value |
+|---|---|
+| call id | 17 |
+| status (before fix) | failed |
+| public error | This language is not supported yet. |
+| ui_locale | ru |
+| transcript | none |
+| laravel.log | `Unsupported transcription language: spa` |
+| failed_jobs | not this call |
 
-| Block | Count | What was actually stored |
-|---|---|---|
-| `critical_mistakes` | 3 | keys present; `mistake`/`why`/`better_action`/`example_phrase` empty; `impact=high` |
-| `missed_signals` | 1 | `signal` empty; `impact` and `seller_response_quality` filled with defaults |
-| `missed_opportunities` | 2 | `{text}` items with real sentences (shallow schema fit) |
-| `better_phrases` | 1 | `original`/`problem`/`better`/`why_better` empty |
-| `coaching_priorities` | 3 | `priority` 1–3; `skill`/`why`/`practice` empty |
-| `timeline` | 6 | titles filled from `{text}` fallback; `description` empty; type forced |
-| `turning_points` | 2 | `what_changed` empty; default `impact` |
-| `what_to_repeat` / `stop` / `start` | 2 / 3 / 3 | `text` filled; `why` empty |
-| `company_specific.scorecard.criteria` | 9 | all snapshot keys present, **all `applicable=false`**, company score `null` |
+## Root Cause
 
-`report_language` was not stored on the result. The worker had no UI locale to use.
+Exact raw ElevenLabs `language_code`: **`spa`**.
 
-## Gemini Output Findings
+That is Spanish, not a Ukrainian variant. `LanguageCode::normalize('ukr')` already returned `uk`; this incident never hit that alias. `spa` must not be rewritten to `uk`. UI locale was Russian; UI language is not the call language.
 
-Gemini did return objects for the high-value arrays, but the wire schema only required `{text}`. Fields that were not in that item schema were dropped. Normalization then invented a usable-looking v3 shape:
+A separate allowlist gap still existed: BCP-47 tags such as `uk-UA` were lowercased as a whole (`uk-ua`) and failed `isSupported()`. That is fixed even though it was not this call.
 
-* empty `mistake` + default `impact=high` → empty critical cards (“Влияние: Высокое”)
-* missing scorecard `key`/`score` → validator skipped items, then filled every snapshot criterion as N/A
-* timeline titles taken from `text`; empty titles became “Timeline moment”
+Production `LOG_LEVEL=error`, so `Log::warning` / `Log::info` never reached `laravel.log`. Language diagnostics now use `Log::error`.
 
-Useful `{text}` blocks (`what_to_repeat`, `missed_opportunities`) survived because they matched the shallow item shape.
+## Normalization Change
 
-## Gemini Wire Schema Fix
+Primary BCP-47 subtag, then aliases:
 
-Provider-specific `GeminiClient::forGeminiWire()` now models slim nested items for:
+* en / eng / english / en-US / en-GB → `en`
+* ru / rus / russian / ru-RU → `ru`
+* uk / ukr / ukrainian / uk-UA / UK-UA / ua-UA → `uk`
 
-* `critical_mistakes`: timestamp_seconds, mistake, impact, why, better_action, example_phrase
-* `better_phrases`: timestamp_seconds, original, problem, better, why_better
-* `coaching_priorities`: priority, skill, why, evidence (string array), practice, success_criteria
-* `company_specific.scorecard.criteria`: key, score, max_score, applicable, summary
+Unknown codes (`spa`, `de`, `pol`) stay themselves and stay unsupported.
 
-Live compiler probes: adding full nested `missed_signals` and `timeline` **together with** those three arrays exceeds generateContent’s budget (HTTP 400 `INVALID_ARGUMENT`). Those two arrays stay `{text}`; after parse, `text` is copied to `signal` / `title`, and timeline `type` defaults to `turning_point` only when a title exists.
+## Retry Policy
 
-Other arrays stay the simplified `{text}` item. Full v3 is still attached in the prompt and enforced by the validator.
+Main Analyzer does not send UI locale as ElevenLabs `language_code`.
 
-## Validator Changes
+One automatic retry with `language_code=ukr` only if auto-detect is unsupported **and** the transcript contains Ukrainian-specific letters (`і`, `є`, `ї`, `ґ`).
 
-Strategy: **skip malformed individual items** when the rest of the payload is valid. Do not create empty cards.
+Call #17 auto-detect stayed `spa` with Latin/Spanish text, so that retry did not run.
 
-Skipped when the required semantic field is blank: `critical_mistakes.mistake`, `missed_signals.signal`, `better_phrases` (original and better), `coaching_priorities.skill`, `timeline.title` + valid type, `turning_points.what_changed`, empty practice `text`, empty findings `text`.
+An ops hint `new TranscribeCall(17, 'uk')` was tried once. ElevenLabs then returned `detected_language=ukr` with `language_probability=1`, but the stored text was Spanish conversation, not Ukrainian. That result was discarded so `spa` is not masked as `uk`.
 
-Scorecard: map by `key`; attach snapshot `name`; do not treat unknown keys as N/A. If a **majority of expected keys are missing**, throw `TransientAnalysisException` so the job retries instead of publishing an all-N/A company score. Remaining unmatched keys after a majority hit may still be N/A when Gemini explicitly omitted only a minority.
+## Errors and Logging
 
-## Report Language
+Internal: `Unsupported transcription language returned by ElevenLabs: <raw code>`.
 
-Main Analyzer: selected UI locale at upload (`en` / `ru` / `uk`) is stored on `calls.ui_locale` and used by `AnalysisContextBuilder`. Priority: **stored UI locale > company `report_language` > transcript language**. The worker does not read session/browser locale. Quotes stay in the transcript language. Company `report_language` remains for admin/manual calls without `ui_locale`.
+Public: `Could not detect a supported call language.` (RU: `Не удалось определить поддерживаемый язык звонка.`)
 
-## Short Report
+Reject logs (error level): `call_id`, `raw_language_code`, `normalized_language_code`, `language_probability`, `text_script`, `has_ukrainian_letters`. No transcript text, no secrets.
 
-Default Main Analyzer completed view (`ShortAnalysisReport`): scores (company primary + generic secondary, or overall), executive summary, max 3 strengths, max 3 problems, max 3 next-call actions, compact scorecard weakest/strongest, and an info card with **Open full report**.
+## Live Retry
 
-## Full Report
+1. Worker recycled at 16:41 CEST (PID 3092544). Auto `TranscribeCall(17)`: HTTP success, raw code **`spa` again**, call failed with the new public message. No Ukrainian-letter retry.
+2. Ops hint `uk`: STT completed (`language=uk`, `detected=ukr`, probability 1, 68 segments, 2 speakers, timestamps present, duration ~635s), then analysis completed. Transcript text was Spanish, not Ukrainian.
+3. Forced `uk` result and its analysis row were removed. Call **#17** restored to `failed` / `Could not detect a supported call language.` Audio kept. No second Call created.
 
-`GET /analysis/{public_token}/full` is a read-only Inertia page of the same `sales_analyses` row. No new AI job. Public token only. Admin Call detail still defaults to the full report.
-
-## Report Information Architecture
-
-Full report groups: A outcome → B what happened → C what went well → D what went poorly → E how to improve → F deep skills → G what to improve first / playbook → H company standard (company calls only) → I transcript via existing modal, not inline.
-
-## Timeline UX
-
-`Хронология звонка` is one collapsed row with a moment count and visible Expand/Collapse. Inner timeline renders only after expand.
-
-## Deep Analysis UX
-
-Skill blocks use an explicit Expand/Collapse control on the header row, not a card that looks static.
-
-## Critical Mistakes
-
-Block kept. Cards show mistake, impact, why, better action, example phrase, timestamp when present. Empty cards are not rendered. Empty list omits the section.
-
-## Missed Opportunities
-
-Prefer `missed_signals`, fallback `missed_opportunities`. Shows the customer signal, why it mattered, recommended action, and a better reply when present. Hidden when both are empty.
-
-## Better Phrases
-
-Was / Problem / Better / Why / timestamp. Hidden when empty.
-
-## Coaching Priorities
-
-UI label is **What to improve first** / **Что улучшить в первую очередь**. Skill, why, evidence, practice, success criteria. Max 5. Hidden when empty.
-
-## Company Scorecard
-
-Criteria mapped by key with human `name` labels (`Диагностика потребности — 12 / 18`). Applicable rows as a compact score table; N/A grouped at the bottom. Majority-missing output fails the analysis instead of a false all-N/A score.
-
-## Empty Block Policy
-
-No section heading or empty container is rendered after normalization if the block has no valid items.
-
-## Visual Design
-
-Section groups, inner cards, spacing, restrained borders. Critical cards use a light rose tone; strengths a light green tone; coaching cards are numbered. Not a rainbow UI.
-
-## Live Re-analysis
-
-Re-run `AnalyzeCall` only (no transcription) on Call **#13** after migrate. First attempt compiled (HTTP 200) then truncated JSON (`TransientAnalysisException`); second attempt **completed**.
-
-Sanitized outcome:
-
-* `ui_locale=ru`, transcript language `ru`, narrative Russian
-* overall_score 48, **company_score 49** (was `null`)
-* `critical_mistakes` 3/3 with mistake, why, example phrase
-* `better_phrases` 2/2 with original + better
-* `coaching_priorities` 3/3 with skill/why/practice (Russian skill titles)
-* `missed_signals` 2/2 with signal text
-* `timeline` 8 titled moments
-* scorecard 9/9 applicable, none N/A
-* Quotes on this call were mostly unset on timeline items; transcript and report are both Russian, so quote-language split was not observable on this recording
-
-This call did have critical mistakes, better phrases, coaching, and missed signals; they were empty before because of the wire schema, not because the conversation lacked them.
+This recording is Spanish. ElevenLabs auto-detect was correct. It is not a missed `ukr` mapping.
 
 ## Tests
 
-`php artisan test`: **261 passed**, 1795 assertions.
-
-Covered: Gemini wire fields for mistakes / phrases / coaching / scorecard; `text` mapped to timeline title and missed signal; malformed critical item skipped; empty mistake not presented; majority-missing scorecard fails; mapped criteria accepted; UI ru→Russian report / UI en→English report with original quotes; stored locale used instead of later session locale; completed Main Analyzer JSON includes `short` (max 3); full report route uses the same result and creates no AI job; public token payload has no internal id/secrets.
-
-UI expand/collapse and section order are implemented in `FullAnalysisReport` / `TimelineSection`; PHP asserts the payload and route contract (no browser runner in this repo).
+`php artisan test`: **270 passed**, 1851 assertions (transcription filter 17 passed after log-level change).
 
 ## Production Verification
 
-* Backup: `/home/deploy/backups/sales/sales-20260911-151507-notablespaces.sql.gz`
-* Migration `2026_09_11_160000_add_ui_locale_to_calls_table` applied (`migrate --force`)
-* `npm run build` succeeded (`FullReport`, `FullAnalysisReport`, `Home` chunks)
-* Shipped Gemini `responseJsonSchema` live compile: HTTP 200
-* Call #13 re-analyzed without transcription: `completed`, overall 48, company 49, filled mistakes/phrases/coaching/signals/scorecard
-* Public `GET /analysis/{token}` 200, no `id`/`storage_path`/`api_key`
-* `GET /analysis/{token}/full` 200
 * `/` 200, `/up` 200
-* `jobs` table empty
+* Call #17 status `failed`, no transcript, audio present
+* Public error uses the new copy, not the raw `spa` code
+* Queue `jobs=0`
+* Worker running (max-time recycle loaded the STT client)
 
 ## Changed Files
 
-Backend: Gemini adapter, validator, schema, prompt, context builder, upload/request, Call `ui_locale` migration, presenter, short-report composer, public controller/routes.
+Backend: `LanguageCode`, ElevenLabs client, `TranscribeCall` optional language hint, public error mapping, `lang/ru.json`, `lang/uk.json`.
 
-Frontend: `ShortAnalysisReport`, `FullAnalysisReport`, shared cards, Home short default, admin full default, i18n.
+Frontend: Main Analyzer scrolls to the result block after Analyze Call (`Home.jsx`).
 
-Tests and docs: PRODUCT, STATUS, AI_ANALYSIS, ARCHITECTURE, DECISIONS (DEC-067–071), DATA_MODEL, REPORT.md.
+Tests and docs: PRODUCT/STATUS/AI_ANALYSIS/ARCHITECTURE/DECISIONS (DEC-072), REPORT.md.
 
 ## Git
 
-* `php artisan test`: 261 passed, 1795 assertions
-* `npm run build` succeeded
-* Secret scan of the working tree/diff: no API keys or credentials
-* Backup + `ui_locale` migration already applied
-* Live re-analysis of Call #13 completed without transcription
-* Commit and push `origin/main`
+Commit and push `origin/main` after tests, secret scan, and live retry.
 
 ## Final Status
 
-**REPORT STRUCTURE & UX REVISION PASSED**
+**UKRAINIAN TRANSCRIPTION LANGUAGE FIX PASSED**
+
+Call #17 remains `failed` because the provider language is Spanish (`spa`), which is outside the EN/RU/UK allowlist.

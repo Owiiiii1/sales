@@ -10,6 +10,7 @@ use App\Services\Transcription\DTO\TranscriptionResult;
 use App\Services\Transcription\DTO\TranscriptionSegment;
 use App\Support\LanguageCode;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -20,7 +21,7 @@ class ElevenLabsTranscriptionClient implements TranscriptionProvider
         private ActiveTranscriptionProvider $active,
     ) {}
 
-    public function transcribe(Call $call): TranscriptionResult
+    public function transcribe(Call $call, ?string $languageHint = null): TranscriptionResult
     {
         $credentials = $this->active->current();
 
@@ -49,39 +50,94 @@ class ElevenLabsTranscriptionClient implements TranscriptionProvider
         $timeout = (int) config('sales-analyzer.transcription.timeout', 120);
         $filename = $call->original_filename ?: basename($path);
         $apiKey = $credentials->apiKey;
+        $forcedLanguage = $this->providerLanguageHint($languageHint);
 
         try {
-            $response = Http::timeout($timeout)
+            $response = $this->requestSpeechToText(
+                $call->id,
+                $contents,
+                $filename,
+                $endpoint,
+                $model,
+                $timeout,
+                $apiKey,
+                $forcedLanguage,
+            );
+
+            $payload = $this->successfulPayload($call, $response);
+            $requestId = $response->header('request-id') ?: $response->header('x-request-id');
+
+            if ($forcedLanguage === null && $this->shouldRetryAsUkrainian($payload)) {
+                $this->logLanguageDecision($call, $payload, 'retrying_with_ukr');
+                $response = $this->requestSpeechToText(
+                    $call->id,
+                    $contents,
+                    $filename,
+                    $endpoint,
+                    $model,
+                    $timeout,
+                    $apiKey,
+                    'ukr',
+                );
+                $payload = $this->successfulPayload($call, $response);
+                $requestId = $response->header('request-id') ?: $response->header('x-request-id');
+            }
+        } finally {
+            unset($contents);
+        }
+
+        return $this->normalize($call, $payload, $model, $requestId);
+    }
+
+    private function requestSpeechToText(
+        int $callId,
+        string $contents,
+        string $filename,
+        string $endpoint,
+        string $model,
+        int $timeout,
+        string $apiKey,
+        ?string $providerLanguage,
+    ): Response {
+        $fields = [
+            'model_id' => $model,
+            'diarize' => config('sales-analyzer.transcription.diarization') ? 'true' : 'false',
+            'timestamps_granularity' => config('sales-analyzer.transcription.timestamps') ? 'word' : 'none',
+        ];
+
+        if ($providerLanguage !== null) {
+            $fields['language_code'] = $providerLanguage;
+        }
+
+        try {
+            return Http::timeout($timeout)
                 ->connectTimeout(15)
                 ->withHeaders([
                     'xi-api-key' => $apiKey,
                     'Accept' => 'application/json',
                 ])
                 ->attach('file', $contents, $filename)
-                ->post($endpoint, [
-                    'model_id' => $model,
-                    'diarize' => config('sales-analyzer.transcription.diarization') ? 'true' : 'false',
-                    'timestamps_granularity' => config('sales-analyzer.transcription.timestamps') ? 'word' : 'none',
-                ]);
+                ->post($endpoint, $fields);
         } catch (ConnectionException $e) {
             Log::warning('ElevenLabs STT connection failed.', [
-                'call_id' => $call->id,
+                'call_id' => $callId,
                 'error' => $e->getMessage(),
             ]);
 
             throw new TransientTranscriptionException('Transcription provider timed out.', 0, $e);
-        } finally {
-            unset($contents);
         }
+    }
 
+    private function successfulPayload(Call $call, Response $response): array
+    {
         $status = $response->status();
-        $requestId = $response->header('request-id') ?: $response->header('x-request-id');
+        $json = $response->json();
 
         if ($status === 429 || $status >= 500) {
             Log::warning('ElevenLabs STT transient HTTP error.', [
                 'call_id' => $call->id,
                 'http_status' => $status,
-                'provider_error_code' => $this->errorCode($response->json()),
+                'provider_error_code' => $this->errorCode($json),
             ]);
 
             throw new TransientTranscriptionException('Transcription provider is temporarily unavailable.');
@@ -91,33 +147,127 @@ class ElevenLabsTranscriptionClient implements TranscriptionProvider
             Log::error('ElevenLabs STT permanent HTTP error.', [
                 'call_id' => $call->id,
                 'http_status' => $status,
-                'provider_error_code' => $this->errorCode($response->json()),
+                'provider_error_code' => $this->errorCode($json),
             ]);
 
             throw new PermanentTranscriptionException('Transcription provider rejected the request.');
         }
 
-        $payload = $response->json();
-
-        if (! is_array($payload)) {
+        if (! is_array($json)) {
             throw new PermanentTranscriptionException('Transcription provider returned an invalid response.');
         }
 
-        return $this->normalize($payload, $model, $requestId);
+        return $json;
+    }
+
+    private function providerLanguageHint(?string $languageHint): ?string
+    {
+        if ($languageHint === null || trim($languageHint) === '') {
+            return null;
+        }
+
+        if (! LanguageCode::isSupported($languageHint)) {
+            throw new PermanentTranscriptionException(
+                'Unsupported transcription language hint: '.$languageHint,
+                'Could not detect a supported call language.',
+            );
+        }
+
+        return LanguageCode::toProviderCode($languageHint);
     }
 
     /**
      * @param  array<string, mixed>  $payload
      */
-    private function normalize(array $payload, string $model, ?string $requestId): TranscriptionResult
+    private function shouldRetryAsUkrainian(array $payload): bool
+    {
+        $rawLanguage = isset($payload['language_code']) ? (string) $payload['language_code'] : null;
+
+        if (LanguageCode::isSupported($rawLanguage)) {
+            return false;
+        }
+
+        $text = trim((string) ($payload['text'] ?? ''));
+
+        return $this->containsUkrainianLetters($text);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function logLanguageDecision(Call $call, array $payload, string $decision): void
+    {
+        Log::error('Transcription language decision.', $this->languageContext($call, $payload, $decision));
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function languageContext(Call $call, array $payload, string $decision): array
+    {
+        $rawLanguage = isset($payload['language_code']) ? (string) $payload['language_code'] : null;
+        $text = trim((string) ($payload['text'] ?? ''));
+        $probability = isset($payload['language_probability']) ? (float) $payload['language_probability'] : null;
+
+        return [
+            'call_id' => $call->id,
+            'raw_language_code' => $rawLanguage,
+            'normalized_language_code' => LanguageCode::normalize($rawLanguage),
+            'language_probability' => $probability,
+            'text_script' => $this->textScript($text),
+            'has_ukrainian_letters' => $this->containsUkrainianLetters($text),
+            'decision' => $decision,
+        ];
+    }
+
+    private function containsUkrainianLetters(string $text): bool
+    {
+        return preg_match('/[ієїґІЄЇҐ]/u', $text) === 1;
+    }
+
+    private function textScript(string $text): string
+    {
+        if ($text === '') {
+            return 'empty';
+        }
+
+        $cyrillic = preg_match('/\p{Cyrillic}/u', $text) === 1;
+        $latin = preg_match('/\p{Latin}/u', $text) === 1;
+
+        if ($cyrillic && $latin) {
+            return 'mixed';
+        }
+
+        if ($cyrillic) {
+            return 'cyrillic';
+        }
+
+        if ($latin) {
+            return 'latin';
+        }
+
+        return 'other';
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function normalize(Call $call, array $payload, string $model, ?string $requestId): TranscriptionResult
     {
         $rawLanguage = isset($payload['language_code']) ? (string) $payload['language_code'] : null;
         $language = LanguageCode::normalize($rawLanguage);
+        $probability = isset($payload['language_probability']) ? (float) $payload['language_probability'] : null;
 
         if (! LanguageCode::isSupported($language)) {
+            Log::error(
+                'Unsupported transcription language returned by ElevenLabs.',
+                $this->languageContext($call, $payload, 'rejected'),
+            );
+
             throw new PermanentTranscriptionException(
-                'Unsupported transcription language: '.($rawLanguage ?: 'unknown'),
-                'This language is not supported yet.',
+                'Unsupported transcription language returned by ElevenLabs: '.($rawLanguage ?: 'unknown'),
+                'Could not detect a supported call language.',
             );
         }
 
@@ -125,7 +275,7 @@ class ElevenLabsTranscriptionClient implements TranscriptionProvider
         $words = is_array($payload['words'] ?? null) ? $payload['words'] : [];
         $segments = $this->segmentsFromWords($words, $text);
         $duration = isset($payload['audio_duration_secs']) ? (float) $payload['audio_duration_secs'] : $this->durationFromSegments($segments);
-        $confidence = isset($payload['language_probability']) ? (float) $payload['language_probability'] : null;
+        $confidence = $probability;
         $transcriptionId = isset($payload['transcription_id']) ? (string) $payload['transcription_id'] : null;
         $speakers = collect($segments)->pluck('speaker')->unique()->values();
 
@@ -272,9 +422,6 @@ class ElevenLabsTranscriptionClient implements TranscriptionProvider
         return max(array_map(static fn (TranscriptionSegment $segment): float => $segment->end, $segments));
     }
 
-    /**
-     * @param  mixed  $json
-     */
     private function errorCode(mixed $json): ?string
     {
         if (! is_array($json)) {

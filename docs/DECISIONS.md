@@ -380,7 +380,7 @@ Status values: `Accepted` | `Open` | `Superseded` | `Rejected`.
 
 **Reason:** Those are the languages the product is built for.
 
-**Consequences:** Other detected languages fail the call as unsupported. Public copy: `This language is not supported yet.`
+**Consequences:** Other detected languages fail the call as unsupported. Public copy: `Could not detect a supported call language.` Raw provider codes are logged internally (`raw_language_code`, `normalized_language_code`, `language_probability`, `call_id`) and are not exposed on the public analyzer payload. BCP-47 tags such as `uk-UA` normalize to the primary subtag before the allowlist check (DEC-072).
 
 ---
 
@@ -1015,10 +1015,24 @@ Status values: `Accepted` | `Open` | `Superseded` | `Rejected`.
 
 ---
 
+## DEC-072
+
+**Title:** STT language uses BCP-47 primary subtags; UI locale is not the call language  
+**Status:** Accepted  
+**Date:** 2026-09-11
+
+**Decision:** Normalize transcription `language_code` values by the BCP-47 primary subtag (`uk-UA` → `uk`, `ru-RU` → `ru`, `en-US` → `en`) plus ISO 639-2/3 and name aliases (`ukr`, `rus`, `eng`, `ua`). Do not map an unknown code such as `spa` onto a supported language. Main Analyzer UI locale is not used as the expected audio language. If auto-detect returns an unsupported code and the transcript text contains Ukrainian-specific letters (`і`, `є`, `ї`, `ґ`), make one retry with ElevenLabs `language_code=ukr`. Otherwise fail.
+
+**Reason:** Call #17 was Ukrainian audio; ElevenLabs returned `spa`. Mapping `spa` to `uk` would hide a real Spanish call. Guessing Ukrainian from a Russian UI locale would be wrong. A retry is justified only when the transcript itself contains Ukrainian letters, or when an operator passes an explicit language hint on `TranscribeCall`.
+
+**Consequences:** Public error is `Could not detect a supported call language.` Internal error includes the raw ElevenLabs code. Ops can retry a known-language call with `new TranscribeCall($id, 'uk')`.
+
+---
+
 ## Template for new entries
 
 ```
-## DEC-072
+## DEC-073
 
 **Title:**  
 **Status:** Open | Accepted  

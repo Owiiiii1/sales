@@ -19,6 +19,7 @@ Factual state of the running project. Update this file when reality changes.
 * **Phase 7.3 — Methodology alignment & context reliability:** COMPLETED (application code + mocked tests).
 * **Production fix — Gemini structured output & failure reliability:** COMPLETED. Live Gemini analysis of Call #4 completed on `gemini-3.7-flash` (schema v3, overall_score 48). `responseJsonSchema` is used instead of OpenAPI `responseSchema` (DEC-065). Call status transitions do not depend on the logger (DEC-066). Stuck processing/analyzing calls can be recovered with `php artisan sales:recover-stuck-calls`.
 * **Report structure & UX revision:** COMPLETED. Gemini wire schema now models high-value nested blocks (DEC-071). Main Analyzer default output is the short report (DEC-067); full report is `/analysis/{public_token}/full` (DEC-068). Empty sections are omitted (DEC-069). Main Analyzer report language is the UI locale stored at upload (DEC-070).
+* **Production fix — Ukrainian STT language codes:** COMPLETED. `LanguageCode` normalizes BCP-47 tags (`uk-UA` → `uk`). Call #17 failed because ElevenLabs returned `spa` (Spanish audio), not because `ukr` was missing from the allowlist. Public copy is `Could not detect a supported call language.` Raw codes are logged at error level (DEC-072).
 * **Next planned work:** Phase 8 user product (accounts / personal cabinet), unless the roadmap is reordered.
 
 ## Product vs running app
@@ -74,7 +75,7 @@ Admins sign in at `/login`. `/dashboard` is the sales analytics view (Last 30 da
 ## Known issues (non-critical)
 
 * Live ElevenLabs verification deferred by Project Manager. Live Gemini structured analysis verified on Call #13 (`gemini-3.7-flash`, schema v3, status `completed`, overall 48, company 49, filled critical mistakes / better phrases / coaching / scorecard).
-* `sales-worker.service` uses `--max-time=3600`. PHP job/client changes need a worker recycle (`sudo systemctl restart sales-worker.service`); the deploy user cannot sudo without a password. Current worker PID 3071367 started 14:41 CEST; auto-recycle ~15:41 CEST picks up this Gemini adapter. Call #13 re-analysis used `dispatchSync`, so it already ran the new code.
+* `sales-worker.service` uses `--max-time=3600`. PHP job/client changes need a worker recycle (`sudo systemctl restart sales-worker.service`); the deploy user cannot sudo without a password. Current worker PID 3092544 started 16:41 CEST; auto-recycle ~17:41 CEST. The STT language client used for Call #17 retries was loaded at that recycle. `Log::error` language diagnostics land after the next recycle.
 * Without an active AI provider, analysis stays `analysis_pending`.
 * Analyzer upload requires a ready transcription provider (DB key + connection check, or env fallback).
 * ffprobe/ffmpeg not installed; duration often comes from STT.

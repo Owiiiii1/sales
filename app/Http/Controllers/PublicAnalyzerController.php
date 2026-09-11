@@ -218,7 +218,10 @@ class PublicAnalyzerController extends Controller
             return null;
         }
 
-        if ($call->error_message === 'This language is not supported yet.') {
+        if (in_array($call->error_message, [
+            'This language is not supported yet.',
+            'Could not detect a supported call language.',
+        ], true)) {
             return __($call->error_message);
         }
 

@@ -8,6 +8,7 @@
     "Analyzing your sales call…": "Розбираємо продажний дзвінок…",
     "Analysis complete.": "Розбір готовий.",
     "This language is not supported yet.": "Цю мову поки не підтримуємо.",
+    "Could not detect a supported call language.": "Не вдалося визначити підтримувану мову дзвінка.",
     "Analysis is not available yet.": "Розбір поки недоступний.",
     "Analysis failed. Please try again.": "Розбір не вдався. Спробуйте ще раз.",
     "Transcription failed. Please try again.": "Розшифрування не вдалося. Спробуйте ще раз.",

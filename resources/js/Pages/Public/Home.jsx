@@ -21,6 +21,7 @@ export default function PublicHome({ upload = {}, companies = [], employees = []
     const unavailableMessage = upload.unavailable_message ?? t('home.unavailable');
     const inputRef = useRef(null);
     const pollRef = useRef(null);
+    const resultAnchorRef = useRef(null);
     const companyIdRef = useRef('');
     const employeeIdRef = useRef('');
 
@@ -64,6 +65,14 @@ export default function PublicHome({ upload = {}, companies = [], employees = []
     };
 
     useEffect(() => () => stopPolling(), []);
+
+    useEffect(() => {
+        if (uiStatus !== 'uploading') {
+            return;
+        }
+
+        resultAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, [uiStatus]);
 
     const assignFile = (nextFile) => {
         setFile(nextFile);
@@ -368,7 +377,7 @@ export default function PublicHome({ upload = {}, companies = [], employees = []
                     </div>
                 </section>
 
-                <div className="mt-10 space-y-6">
+                <div ref={resultAnchorRef} className="mt-10 scroll-mt-8 space-y-6">
                     {progress && uiStatus !== 'idle' && (
                         <ProcessingProgress
                             progress={progress}

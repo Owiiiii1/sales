@@ -49,7 +49,7 @@ Final report
 
 Each arrow may be one or more jobs. Failures should be visible as call status, not silent.
 
-STT and diarization are one ElevenLabs Scribe v2 call (`diarize=true`, word timestamps). Speakers are stored as integers and shown as `Speaker 1`, `Speaker 2`. Seller vs customer is assigned in analysis JSON `speaker_roles` (DEC-034), not by mutating transcript rows.
+STT and diarization are one ElevenLabs Scribe v2 call (`diarize=true`, word timestamps). Speakers are stored as integers and shown as `Speaker 1`, `Speaker 2`. Seller vs customer is assigned in analysis JSON `speaker_roles` (DEC-034), not by mutating transcript rows. Detected `language_code` is normalized by BCP-47 primary subtag (`uk-UA` → `uk`, `ukr` → `uk`). Unsupported codes fail with a public “could not detect a supported call language” message; the raw code stays in logs only. UI locale is not treated as the call language. If auto-detect returns an unsupported code and the text contains Ukrainian-specific letters, one retry uses `language_code=ukr` (DEC-072).
 
 Transcription credentials come from `ActiveTranscriptionProvider` (database first, `ELEVENLABS_API_KEY` / `config('sales-analyzer.transcription.api_key')` as fallback). The supported model list is application-side (`scribe_v2`); there is no fake ElevenLabs STT model discovery. Connection check is `POST /v1/speech-to-text` with the stored key and no audio. A validation error (missing file) means the key is accepted. Restricted keys must include the `speech_to_text` permission.
 

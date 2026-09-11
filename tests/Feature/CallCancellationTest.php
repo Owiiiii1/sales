@@ -154,7 +154,7 @@ class CallCancellationTest extends TestCase
 
         $this->app->instance(TranscriptionProvider::class, new class implements TranscriptionProvider
         {
-            public function transcribe(Call $call): TranscriptionResult
+            public function transcribe(Call $call, ?string $languageHint = null): TranscriptionResult
             {
                 $call->forceFill([
                     'status' => 'cancelled',
@@ -216,9 +216,9 @@ class CallCancellationTest extends TestCase
                 return true;
             }
 
-            public function analyze(\App\Models\Transcript $transcript, AnalysisContext $context): SalesAnalysisResult
+            public function analyze(Transcript $transcript, AnalysisContext $context): SalesAnalysisResult
             {
-                \App\Models\Call::query()->whereKey($this->callId)->update([
+                Call::query()->whereKey($this->callId)->update([
                     'status' => 'cancelled',
                     'cancelled_at' => now(),
                     'cancelled_stage' => 'analysis',

@@ -28,7 +28,10 @@ class TranscribeCall implements ShouldBeUniqueUntilProcessing, ShouldQueue
 
     public int $uniqueFor = 600;
 
-    public function __construct(public int $callId) {}
+    public function __construct(
+        public int $callId,
+        public ?string $languageHint = null,
+    ) {}
 
     public function uniqueId(): string
     {
@@ -68,7 +71,7 @@ class TranscribeCall implements ShouldBeUniqueUntilProcessing, ShouldQueue
         }
 
         try {
-            $result = $provider->transcribe($call);
+            $result = $provider->transcribe($call, $this->languageHint);
 
             $shouldDispatch = DB::transaction(function () use ($writer, $result): bool {
                 $call = Call::query()->whereKey($this->callId)->lockForUpdate()->first();

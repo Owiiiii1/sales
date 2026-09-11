@@ -24,11 +24,18 @@ class LanguageCode
             return null;
         }
 
-        return match ($code) {
+        $code = str_replace('_', '-', $code);
+        $primary = explode('-', $code)[0];
+
+        if ($primary === '') {
+            return null;
+        }
+
+        return match ($primary) {
             'en', 'eng', 'english' => 'en',
             'ru', 'rus', 'russian' => 'ru',
-            'uk', 'ukr', 'ukrainian' => 'uk',
-            default => $code,
+            'uk', 'ukr', 'ukrainian', 'ua' => 'uk',
+            default => $primary,
         };
     }
 
@@ -37,5 +44,17 @@ class LanguageCode
         $normalized = self::normalize($code);
 
         return $normalized !== null && in_array($normalized, self::supported(), true);
+    }
+
+    public static function toProviderCode(?string $code): ?string
+    {
+        $normalized = self::normalize($code);
+
+        return match ($normalized) {
+            'en' => 'eng',
+            'ru' => 'rus',
+            'uk' => 'ukr',
+            default => $normalized,
+        };
     }
 }

@@ -7,5 +7,5 @@ use App\Services\Transcription\DTO\TranscriptionResult;
 
 interface TranscriptionProvider
 {
-    public function transcribe(Call $call): TranscriptionResult;
+    public function transcribe(Call $call, ?string $languageHint = null): TranscriptionResult;
 }
