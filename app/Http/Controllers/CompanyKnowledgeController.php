@@ -2,17 +2,21 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\CompanyFactRequest;
 use App\Http\Requests\CompanyObjectionRequest;
 use App\Http\Requests\CompanyOfferingRequest;
 use App\Http\Requests\CompanyProfileRequest;
 use App\Http\Requests\CompanySalesScriptRequest;
+use App\Http\Requests\CompanyScorecardCapRequest;
 use App\Http\Requests\CompanyScorecardCriterionRequest;
 use App\Http\Requests\CompanyScorecardRequest;
 use App\Models\Company;
+use App\Models\CompanyFact;
 use App\Models\CompanyObjection;
 use App\Models\CompanyOffering;
 use App\Models\CompanySalesScript;
 use App\Models\CompanyScorecard;
+use App\Models\CompanyScorecardCap;
 use App\Models\CompanyScorecardCriterion;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
@@ -135,6 +139,65 @@ class CompanyKnowledgeController extends Controller
     {
         $this->assertCompany($company, $scorecard->company_id);
         $scorecard->delete();
+
+        return back();
+    }
+
+    public function storeCap(CompanyScorecardCapRequest $request, Company $company, CompanyScorecard $scorecard): RedirectResponse
+    {
+        $this->assertCompany($company, $scorecard->company_id);
+        $data = $request->validated();
+        $data['sequence'] = $data['sequence'] ?? ((int) $scorecard->caps()->max('sequence') + 1);
+        $data['is_active'] = $request->boolean('is_active', true);
+        $scorecard->caps()->create($data);
+
+        return back();
+    }
+
+    public function updateCap(
+        CompanyScorecardCapRequest $request,
+        Company $company,
+        CompanyScorecard $scorecard,
+        CompanyScorecardCap $cap,
+    ): RedirectResponse {
+        $this->assertCompany($company, $scorecard->company_id);
+        abort_unless($cap->scorecard_id === $scorecard->id, 404);
+        $cap->update($request->validated());
+
+        return back();
+    }
+
+    public function destroyCap(
+        Company $company,
+        CompanyScorecard $scorecard,
+        CompanyScorecardCap $cap,
+    ): RedirectResponse {
+        $this->assertCompany($company, $scorecard->company_id);
+        abort_unless($cap->scorecard_id === $scorecard->id, 404);
+        $cap->delete();
+
+        return back();
+    }
+
+    public function storeFact(CompanyFactRequest $request, Company $company): RedirectResponse
+    {
+        $company->facts()->create($request->validated() + ['is_active' => $request->boolean('is_active', true)]);
+
+        return back();
+    }
+
+    public function updateFact(CompanyFactRequest $request, Company $company, CompanyFact $fact): RedirectResponse
+    {
+        $this->assertCompany($company, $fact->company_id);
+        $fact->update($request->validated());
+
+        return back();
+    }
+
+    public function destroyFact(Company $company, CompanyFact $fact): RedirectResponse
+    {
+        $this->assertCompany($company, $fact->company_id);
+        $fact->delete();
 
         return back();
     }

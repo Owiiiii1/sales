@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\CompanyRequest;
 use App\Models\Company;
+use App\Services\Analysis\AnalysisContextBuilder;
 use App\Services\Analytics\AnalyticsFilter;
 use App\Services\Analytics\CompanyAnalyticsService;
 use App\Support\CompanyKnowledgeCompleteness;
@@ -48,19 +49,22 @@ class CompaniesController extends Controller
         Company $company,
         CompanyKnowledgeCompleteness $completeness,
         CompanyAnalyticsService $analytics,
+        AnalysisContextBuilder $contexts,
     ): Response {
         $tab = $request->query('tab', 'overview');
-        $allowed = ['overview', 'analytics', 'knowledge', 'offerings', 'objections', 'scripts', 'scorecard', 'employees', 'calls'];
+        $allowed = ['overview', 'analytics', 'knowledge', 'facts', 'offerings', 'objections', 'scripts', 'scorecard', 'employees', 'calls'];
         if (! in_array($tab, $allowed, true)) {
             $tab = 'overview';
         }
 
         $company->load([
             'profile',
+            'facts' => fn ($query) => $query->orderBy('id'),
             'offerings' => fn ($query) => $query->orderBy('name'),
             'objections' => fn ($query) => $query->orderBy('priority')->orderBy('id'),
             'salesScripts' => fn ($query) => $query->orderBy('name'),
             'scorecards.criteria',
+            'scorecards.caps',
             'employees' => fn ($query) => $query->orderBy('first_name'),
         ]);
 
@@ -94,6 +98,7 @@ class CompaniesController extends Controller
                 'is_active' => $scorecard->is_active,
                 'total_weight' => $weight,
                 'weight_warning' => abs($weight - 100) > 0.01,
+                'score_bands' => $scorecard->score_bands ?: [],
                 'criteria' => $scorecard->criteria->map(fn ($criterion): array => [
                     'id' => $criterion->id,
                     'key' => $criterion->key,
@@ -105,6 +110,16 @@ class CompaniesController extends Controller
                     'ai_instructions' => $criterion->ai_instructions,
                     'sequence' => $criterion->sequence,
                     'is_active' => $criterion->is_active,
+                ])->all(),
+                'caps' => $scorecard->caps->map(fn ($cap): array => [
+                    'id' => $cap->id,
+                    'name' => $cap->name,
+                    'criterion_key' => $cap->criterion_key,
+                    'trigger_type' => $cap->trigger_type,
+                    'max_total_score' => $cap->max_total_score,
+                    'description' => $cap->description,
+                    'is_active' => $cap->is_active,
+                    'sequence' => $cap->sequence,
                 ])->all(),
             ];
         })->all();
@@ -139,8 +154,19 @@ class CompaniesController extends Controller
                 'forbidden_claims',
                 'mandatory_questions',
                 'notes',
+                'report_language',
             ]) ?? [],
+            'context_usage' => $contexts->usage($company),
             'completeness' => $completeness->for($company),
+            'facts' => $company->facts->map(fn ($fact): array => [
+                'id' => $fact->id,
+                'label' => $fact->label,
+                'value' => $fact->value,
+                'status' => $fact->status,
+                'valid_until' => optional($fact->valid_until)->toDateString(),
+                'source' => $fact->source,
+                'is_active' => $fact->is_active,
+            ])->all(),
             'offerings' => $company->offerings,
             'objections' => $company->objections,
             'scripts' => $company->salesScripts,

@@ -124,7 +124,28 @@ class SalesAnalysisPresenter
             'conversation_metrics' => is_array($result['conversation_metrics'] ?? null)
                 ? $result['conversation_metrics']
                 : SalesAnalysisSchema::emptyConversationMetrics(),
+            'stage_talk_metrics' => is_array($result['stage_talk_metrics'] ?? null) ? $result['stage_talk_metrics'] : [],
+            'discovery_talk_balance' => is_array($result['discovery_talk_balance'] ?? null)
+                ? $result['discovery_talk_balance']
+                : null,
         ];
+
+        $companySpecific = is_array($result['company_specific'] ?? null) ? $result['company_specific'] : [];
+        $scorecard = is_array($companySpecific['scorecard'] ?? null) ? $companySpecific['scorecard'] : [];
+        $hasCustomScorecard = $payload['company_context_used']
+            && ($analysis->company_scorecard_score !== null || ! empty($analysis->scorecard_snapshot['criteria'] ?? null));
+
+        $payload['primary_score_kind'] = $hasCustomScorecard ? 'company' : 'generic';
+        $payload['weighted_company_score'] = isset($scorecard['weighted_score']) && $scorecard['weighted_score'] !== null
+            ? (int) $scorecard['weighted_score']
+            : null;
+        $payload['triggered_caps'] = is_array($scorecard['triggered_caps'] ?? null) ? $scorecard['triggered_caps'] : [];
+        $payload['company_score_band'] = CompanyScoreBands::label(
+            $analysis->company_scorecard_score,
+            is_array($analysis->scorecard_snapshot['score_bands'] ?? null)
+                ? $analysis->scorecard_snapshot['score_bands']
+                : null,
+        );
 
         unset($admin);
 
@@ -132,7 +153,6 @@ class SalesAnalysisPresenter
     }
 
     /**
-     * @param  mixed  $items
      * @return array<int, array{text:string, speaker:?int, speaker_label:?string, timestamp_seconds:?float, timestamp_label:?string, quote:?string}>
      */
     private static function findings(mixed $items): array
@@ -179,7 +199,6 @@ class SalesAnalysisPresenter
     }
 
     /**
-     * @param  mixed  $items
      * @return array<int, array{original:string, suggested:string, reason:string}>
      */
     private static function phrases(mixed $items): array
@@ -229,7 +248,6 @@ class SalesAnalysisPresenter
     }
 
     /**
-     * @param  mixed  $control
      * @return array<string, mixed>|null
      */
     private static function control(mixed $control): ?array
@@ -245,7 +263,6 @@ class SalesAnalysisPresenter
     }
 
     /**
-     * @param  mixed  $items
      * @return array<int, array<string, mixed>>
      */
     private static function moments(mixed $items): array
@@ -292,7 +309,6 @@ class SalesAnalysisPresenter
     }
 
     /**
-     * @param  mixed  $signals
      * @return array<string, array<int, array<string, mixed>>>|null
      */
     private static function customerSignals(mixed $signals): ?array
@@ -311,7 +327,6 @@ class SalesAnalysisPresenter
     }
 
     /**
-     * @param  mixed  $items
      * @return array<int, array<string, mixed>>
      */
     private static function signalList(mixed $items): array
@@ -360,7 +375,6 @@ class SalesAnalysisPresenter
     }
 
     /**
-     * @param  mixed  $items
      * @return array<int, array<string, mixed>>
      */
     private static function missedSignals(mixed $items): array
@@ -369,7 +383,6 @@ class SalesAnalysisPresenter
     }
 
     /**
-     * @param  mixed  $analysis
      * @return array<string, mixed>|null
      */
     private static function questionAnalysis(mixed $analysis): ?array
@@ -386,7 +399,6 @@ class SalesAnalysisPresenter
     }
 
     /**
-     * @param  mixed  $block
      * @param  array<int, string>  $findingKeys
      * @return array<string, mixed>|null
      */
@@ -404,7 +416,6 @@ class SalesAnalysisPresenter
     }
 
     /**
-     * @param  mixed  $items
      * @return array<int, array<string, mixed>>
      */
     private static function objectionMap(mixed $items): array
@@ -413,7 +424,6 @@ class SalesAnalysisPresenter
     }
 
     /**
-     * @param  mixed  $items
      * @return array<int, array<string, mixed>>
      */
     private static function timeline(mixed $items): array
@@ -449,7 +459,6 @@ class SalesAnalysisPresenter
     }
 
     /**
-     * @param  mixed  $items
      * @return array<int, array{text:string, why:string}>
      */
     private static function practices(mixed $items): array

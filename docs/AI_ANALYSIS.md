@@ -55,19 +55,19 @@ Transcription credentials come from `ActiveTranscriptionProvider` (database firs
 
 Application analysis settings (`analysis_settings`) apply to every LLM provider:
 
-* `report_language_mode = same_as_call` (the report follows the detected call language; no language selector)
+* `report_language_mode = same_as_call` globally. A company profile may set `report_language` to `same_as_call`, `en`, `ru`, or `uk` (DEC-061). Quotes stay in the original transcript language.
 * `max_output_tokens` default **16384** (min 4096, max 32768), with provider caps (OpenAI 32768, Anthropic 16384, Gemini 16384)
 
 Temperature is **not** a Settings field. Adapters keep `temperature = 0.2` so structured JSON stays stable. A user-facing temperature control would trade reliability for creativity on schema v3.
 
-Phase 4 added **one** structured LLM call with `SalesAnalysisPromptBuilder` for generic sales methodology (DEC-031). Phase 5 still used one LLM call. Phase 7 keeps **one** pass for schema v3 (DEC-047). A second coaching pass was considered and not shipped: collection limits keep the JSON bounded; two calls would duplicate transcript + company context and double latency/failure. `ConversationMetricsCalculator` fills talk-time metrics from transcript segments after speaker-role mapping (DEC-049). Analyzer calls without a Company get full generic v3 analysis. Analyzer calls with a selected Company use that company’s knowledge and scorecard (DEC-057). Company calls keep the v2 `company_specific` block plus v3 coaching.
+Phase 4 added **one** structured LLM call with `SalesAnalysisPromptBuilder` for generic sales methodology (DEC-031). Phase 5 still used one LLM call. Phase 7 keeps **one** pass for schema v3 (DEC-047). A second coaching pass was considered and not shipped: collection limits keep the JSON bounded; two calls would duplicate transcript + company context and double latency/failure. Truncated JSON from the provider is a retry-safe error, not a two-pass split. `ConversationMetricsCalculator` fills talk-time metrics, per-stage talk ratios, and `discovery_talk_balance` from transcript segments after speaker-role mapping (DEC-049 / DEC-062). Analyzer calls without a Company get full generic v3 analysis. Analyzer calls with a selected Company use that company’s knowledge, facts, and scorecard (DEC-057 / DEC-060). Company calls keep the v2 `company_specific` block plus v3 coaching. Company score caps are applied in Laravel after the weighted score (DEC-059).
 
 Prompt layout:
 
 1. SYSTEM RULES
 2. GENERIC SALES METHODOLOGY
 3. COMPANY-SPECIFIC INSTRUCTIONS (only when company context is used)
-4. COMPANY CONTEXT (trusted admin text, character budget 24,000)
+4. COMPANY CONTEXT (trusted admin text, UTF-8 character budget 50,000)
 5. CALL TRANSCRIPT (untrusted) (DEC-041)
 
 Priority when packing company context: scorecard → mandatory questions → forbidden claims → scripts → offerings → objections → core profile → competitors/notes. Overflow is truncated, logged, and does not fail the job.
@@ -158,7 +158,9 @@ Prompt version, model, scorecard version, and context version must be stored wit
 
 ## Company knowledge
 
-Before analysis, `AnalysisContextBuilder` loads relevant knowledge for that Call’s Company (if any). Generic analyzer calls (`company_id` null) skip this. Context is packed with a 24,000-character budget (config `sales-analyzer.analysis.context_budget_characters`). Truncation logs a warning and does not fail.
+Before analysis, `AnalysisContextBuilder` loads relevant knowledge for that Call’s Company (if any). Generic analyzer calls (`company_id` null) skip this. Context is packed with a 50,000-character UTF-8 budget (config `sales-analyzer.analysis.context_budget_characters`, DEC-058). Truncation logs a warning and does not fail. Packing uses `mb_strlen` / `mb_substr` so Cyrillic/Ukrainian is not cut mid-character.
+
+Priority: scorecard → verifiable facts → core profile → mandatory questions → forbidden claims → offerings → scripts → objections → competitors/notes.
 
 Schema v3 keeps that `company_specific` block and adds deep generic coaching on the same result JSON.
 
@@ -183,7 +185,7 @@ Future knowledge types to store:
 * examples of good calls
 * examples of bad calls
 
-MVP uses structured MySQL knowledge (profile, offerings, objections, scripts, scorecards) packed into the prompt with a 24,000-character budget. Full RAG (chunking, embeddings, vector store) is still later / TBD, not current work.
+MVP uses structured MySQL knowledge (profile, facts, offerings, objections, scripts, scorecards) packed into the prompt with a 50,000-character UTF-8 budget. Full RAG (chunking, embeddings, vector store) is still later / TBD, not current work.
 
 Retrieval quality (chunking, embeddings, filters) is **TBD**.
 

@@ -755,6 +755,8 @@ final class SalesAnalysisSchema
             ],
             'scorecard' => [
                 'total_score' => null,
+                'weighted_score' => null,
+                'triggered_caps' => [],
                 'criteria' => [],
             ],
         ];

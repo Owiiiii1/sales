@@ -34,6 +34,7 @@ class CompanyProfileFactory extends Factory
             'forbidden_claims' => 'Do not promise lifetime warranties.',
             'mandatory_questions' => 'Ask about current system age.',
             'notes' => null,
+            'report_language' => 'same_as_call',
         ];
     }
 }

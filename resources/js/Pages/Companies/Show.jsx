@@ -3,7 +3,7 @@ import { AnalyticsFilters, AnalyticsSections } from '@/Components/Analytics/Boar
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { useT } from '@/i18n';
 
-const TABS = ['overview', 'analytics', 'knowledge', 'offerings', 'objections', 'scripts', 'scorecard', 'employees', 'calls'];
+const TABS = ['overview', 'analytics', 'knowledge', 'facts', 'offerings', 'objections', 'scripts', 'scorecard', 'employees', 'calls'];
 
 const PROFILE_FIELDS = [
     'short_description',
@@ -31,6 +31,8 @@ export default function CompanyShow({
     objections = [],
     scripts = [],
     scorecards = [],
+    facts = [],
+    context_usage = null,
     employees = [],
     calls = [],
     filters = { period: 'last_30' },
@@ -90,7 +92,8 @@ export default function CompanyShow({
                         <AnalyticsSections analytics={{ ...(analytics || {}), hide_public: true }} variant="company" />
                     </div>
                 )}
-                {tab === 'knowledge' && <Knowledge company={company} profile={profile} />}
+                {tab === 'knowledge' && <Knowledge company={company} profile={profile} contextUsage={context_usage} />}
+                {tab === 'facts' && <Facts company={company} facts={facts} />}
                 {tab === 'offerings' && <Offerings company={company} offerings={offerings} />}
                 {tab === 'objections' && <Objections company={company} objections={objections} />}
                 {tab === 'scripts' && <Scripts company={company} scripts={scripts} />}
@@ -133,7 +136,7 @@ function Overview({ company, completeness }) {
     );
 }
 
-function Knowledge({ company, profile }) {
+function Knowledge({ company, profile, contextUsage = null }) {
     const t = useT();
     const form = useForm({
         short_description: profile.short_description ?? '',
@@ -150,12 +153,31 @@ function Knowledge({ company, profile }) {
         forbidden_claims: profile.forbidden_claims ?? '',
         mandatory_questions: profile.mandatory_questions ?? '',
         notes: profile.notes ?? '',
+        report_language: profile.report_language ?? 'same_as_call',
     });
+    const usage = contextUsage || {};
+    const used = Number(usage.used || 0);
+    const budget = Number(usage.budget || 0);
+    const percent = Number(usage.percent || 0);
 
     return (
         <section className="app-widget p-4">
             <h3 className="text-base font-semibold text-slate-900">{t('companies.knowledgeTitle')}</h3>
             <p className="mt-1 text-sm text-slate-500">{t('companies.knowledgeHint')}</p>
+            {budget > 0 && (
+                <div className={`mt-4 rounded-xl border p-3 text-sm ${usage.warning || usage.truncated ? 'border-amber-300 bg-amber-50 text-amber-900' : 'border-slate-200 bg-slate-50 text-slate-700'}`}>
+                    <p className="font-medium">{t('companies.contextUsage')}</p>
+                    <p className="mt-1">
+                        {t('companies.contextUsageValue', {
+                            used: used.toLocaleString(),
+                            budget: budget.toLocaleString(),
+                            percent,
+                        })}
+                    </p>
+                    {usage.truncated ? <p className="mt-1">{t('companies.contextTruncated')}</p> : null}
+                    {!usage.truncated && usage.warning ? <p className="mt-1">{t('companies.contextWarning')}</p> : null}
+                </div>
+            )}
             <form
                 className="mt-4 space-y-3"
                 onSubmit={(e) => {
@@ -163,6 +185,17 @@ function Knowledge({ company, profile }) {
                     form.patch(route('companies.profile.update', company.id), { preserveScroll: true });
                 }}
             >
+                <Select
+                    label={t('companies.profile.report_language')}
+                    value={form.data.report_language}
+                    onChange={(v) => form.setData('report_language', v)}
+                    options={[
+                        { value: 'same_as_call', label: t('companies.reportLanguages.same_as_call') },
+                        { value: 'en', label: t('companies.reportLanguages.en') },
+                        { value: 'ru', label: t('companies.reportLanguages.ru') },
+                        { value: 'uk', label: t('companies.reportLanguages.uk') },
+                    ]}
+                />
                 {PROFILE_FIELDS.map((key) => (
                     <div key={key}>
                         <label className="mb-1 block text-sm font-medium text-slate-600">{t(`companies.profile.${key}`)}</label>
@@ -178,6 +211,82 @@ function Knowledge({ company, profile }) {
                     <button type="submit" disabled={form.processing} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">{t('companies.saveKnowledge')}</button>
                 </div>
             </form>
+        </section>
+    );
+}
+
+function Facts({ company, facts }) {
+    const t = useT();
+    const create = useForm({
+        label: '',
+        value: '',
+        status: 'current',
+        valid_until: '',
+        source: '',
+        is_active: true,
+    });
+
+    return (
+        <section className="app-widget p-4 space-y-6">
+            <h3 className="text-base font-semibold text-slate-900">{t('companies.factsTitle')}</h3>
+            <p className="text-sm text-slate-500">{t('companies.factsHint')}</p>
+            <form
+                className="grid grid-cols-1 gap-3 md:grid-cols-2"
+                onSubmit={(e) => {
+                    e.preventDefault();
+                    create.post(route('companies.facts.store', company.id), {
+                        preserveScroll: true,
+                        onSuccess: () => create.reset(),
+                    });
+                }}
+            >
+                <Field label={t('companies.factLabel')} value={create.data.label} onChange={(v) => create.setData('label', v)} error={create.errors.label} />
+                <Select
+                    label={t('companies.factStatus')}
+                    value={create.data.status}
+                    onChange={(v) => create.setData('status', v)}
+                    options={[
+                        { value: 'current', label: t('companies.factStatuses.current') },
+                        { value: 'outdated', label: t('companies.factStatuses.outdated') },
+                    ]}
+                />
+                <div className="md:col-span-2">
+                    <Textarea label={t('companies.factValue')} value={create.data.value} onChange={(v) => create.setData('value', v)} error={create.errors.value} />
+                </div>
+                <Field label={t('companies.factValidUntil')} value={create.data.valid_until} onChange={(v) => create.setData('valid_until', v)} />
+                <Field label={t('companies.factSource')} value={create.data.source} onChange={(v) => create.setData('source', v)} />
+                <div className="md:col-span-2 flex justify-end">
+                    <button type="submit" className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">{t('companies.addFact')}</button>
+                </div>
+            </form>
+            <div className="space-y-3">
+                {facts.map((item) => (
+                    <div
+                        key={item.id}
+                        className={`rounded-xl border p-4 ${item.status === 'outdated' ? 'border-amber-200 bg-amber-50' : 'border-emerald-200 bg-emerald-50'}`}
+                    >
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div>
+                                <p className="font-semibold text-slate-900">{item.label}</p>
+                                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                                    {t(`companies.factStatuses.${item.status}`)}
+                                    {item.is_active ? '' : ` · ${t('common.inactive')}`}
+                                    {item.valid_until ? ` · ${item.valid_until}` : ''}
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                className="text-sm text-red-700"
+                                onClick={() => router.delete(route('companies.facts.destroy', [company.id, item.id]), { preserveScroll: true })}
+                            >
+                                {t('common.delete')}
+                            </button>
+                        </div>
+                        <p className="mt-2 text-sm text-slate-800">{item.value}</p>
+                        {item.source ? <p className="mt-1 text-xs text-slate-500">{t('companies.factSource')}: {item.source}</p> : null}
+                    </div>
+                ))}
+            </div>
         </section>
     );
 }
@@ -327,6 +436,22 @@ function Scorecards({ company, scorecards }) {
         ai_instructions: '',
         is_active: true,
     });
+    const cap = useForm({
+        scorecard_id: scorecards[0]?.id ?? '',
+        name: '',
+        criterion_key: '',
+        trigger_type: 'criterion_critical_failure',
+        max_total_score: 70,
+        description: '',
+        is_active: true,
+    });
+    const defaultBands = [
+        { min: 90, max: 100, label: 'Excellent' },
+        { min: 75, max: 89, label: 'Good' },
+        { min: 60, max: 74, label: 'Average' },
+        { min: 40, max: 59, label: 'Weak' },
+        { min: 0, max: 39, label: 'Critical' },
+    ];
 
     return (
         <section className="app-widget p-4 space-y-6">
@@ -389,6 +514,68 @@ function Scorecards({ company, scorecards }) {
                             </li>
                         ))}
                     </ul>
+                    <div className="mt-4 rounded-lg border border-slate-100 p-3">
+                        <p className="text-sm font-semibold text-slate-900">{t('companies.scoreCaps')}</p>
+                        <ul className="mt-2 space-y-2 text-sm">
+                            {(scorecard.caps || []).map((item) => (
+                                <li key={item.id} className="flex justify-between gap-3">
+                                    <span>
+                                        {item.name} · {t(`companies.capTriggers.${item.trigger_type}`)}
+                                        {item.criterion_key ? ` · ${item.criterion_key}` : ''}
+                                        {` · ${t('companies.capMax', { score: item.max_total_score })}`}
+                                        {item.is_active ? '' : ` · ${t('common.inactive')}`}
+                                    </span>
+                                    <button
+                                        type="button"
+                                        className="text-red-700"
+                                        onClick={() => router.delete(route('companies.scorecards.caps.destroy', [company.id, scorecard.id, item.id]), { preserveScroll: true })}
+                                    >
+                                        {t('common.remove')}
+                                    </button>
+                                </li>
+                            ))}
+                            {(scorecard.caps || []).length === 0 && <li className="text-slate-500">{t('companies.noCaps')}</li>}
+                        </ul>
+                    </div>
+                    <div className="mt-4 rounded-lg border border-slate-100 p-3">
+                        <p className="text-sm font-semibold text-slate-900">{t('companies.scoreBands')}</p>
+                        {(scorecard.score_bands || []).length > 0 ? (
+                            <>
+                                <ul className="mt-2 space-y-1 text-sm text-slate-700">
+                                    {scorecard.score_bands.map((band, index) => (
+                                        <li key={`${band.min}-${band.max}-${index}`}>{band.min}–{band.max}: {band.label}</li>
+                                    ))}
+                                </ul>
+                                <button
+                                    type="button"
+                                    className="mt-2 text-sm text-red-700"
+                                    onClick={() => router.patch(route('companies.scorecards.update', [company.id, scorecard.id]), {
+                                        name: scorecard.name,
+                                        description: scorecard.description ?? '',
+                                        is_default: scorecard.is_default,
+                                        is_active: scorecard.is_active,
+                                        score_bands: [],
+                                    }, { preserveScroll: true })}
+                                >
+                                    {t('companies.clearBands')}
+                                </button>
+                            </>
+                        ) : (
+                            <button
+                                type="button"
+                                className="mt-2 text-sm text-indigo-700"
+                                onClick={() => router.patch(route('companies.scorecards.update', [company.id, scorecard.id]), {
+                                    name: scorecard.name,
+                                    description: scorecard.description ?? '',
+                                    is_default: scorecard.is_default,
+                                    is_active: scorecard.is_active,
+                                    score_bands: defaultBands,
+                                }, { preserveScroll: true })}
+                            >
+                                {t('companies.applyDefaultBands')}
+                            </button>
+                        )}
+                    </div>
                 </div>
             ))}
 
@@ -422,6 +609,49 @@ function Scorecards({ company, scorecards }) {
                     </div>
                     <div className="md:col-span-2 flex justify-end">
                         <button type="submit" className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">{t('companies.addCriterion')}</button>
+                    </div>
+                </form>
+            )}
+
+            {scorecards.length > 0 && (
+                <form
+                    className="grid grid-cols-1 gap-3 md:grid-cols-2"
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        const scorecardId = cap.data.scorecard_id || scorecards[0]?.id;
+                        if (!scorecardId) {
+                            return;
+                        }
+                        cap.post(route('companies.scorecards.caps.store', [company.id, scorecardId]), {
+                            preserveScroll: true,
+                            onSuccess: () => cap.reset('name', 'criterion_key', 'description'),
+                        });
+                    }}
+                >
+                    <h4 className="md:col-span-2 text-sm font-semibold text-slate-900">{t('companies.addCap')}</h4>
+                    <Select
+                        label={t('companies.scorecard')}
+                        value={String(cap.data.scorecard_id || scorecards[0]?.id || '')}
+                        onChange={(v) => cap.setData('scorecard_id', v)}
+                        options={scorecards.map((item) => ({ value: item.id, label: item.name }))}
+                    />
+                    <Field label={t('common.name')} value={cap.data.name} onChange={(v) => cap.setData('name', v)} error={cap.errors.name} />
+                    <Select
+                        label={t('companies.capTrigger')}
+                        value={cap.data.trigger_type}
+                        onChange={(v) => cap.setData('trigger_type', v)}
+                        options={[
+                            { value: 'criterion_critical_failure', label: t('companies.capTriggers.criterion_critical_failure') },
+                            { value: 'forbidden_claim_violation', label: t('companies.capTriggers.forbidden_claim_violation') },
+                        ]}
+                    />
+                    <Field label={t('companies.capCriterion')} value={cap.data.criterion_key} onChange={(v) => cap.setData('criterion_key', v)} />
+                    <Field label={t('companies.capMaxScore')} value={cap.data.max_total_score} onChange={(v) => cap.setData('max_total_score', v)} error={cap.errors.max_total_score} />
+                    <div className="md:col-span-2">
+                        <Textarea label={t('common.description')} value={cap.data.description} onChange={(v) => cap.setData('description', v)} />
+                    </div>
+                    <div className="md:col-span-2 flex justify-end">
+                        <button type="submit" className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">{t('companies.addCap')}</button>
                     </div>
                 </form>
             )}

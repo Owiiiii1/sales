@@ -28,10 +28,15 @@ class CompanyProfileRequest extends FormRequest
             'forbidden_claims',
             'mandatory_questions',
             'notes',
+            'report_language',
         ] as $field) {
             if ($this->input($field) === '') {
                 $this->merge([$field => null]);
             }
+        }
+
+        if ($this->input('report_language') === null || $this->input('report_language') === '') {
+            $this->merge(['report_language' => 'same_as_call']);
         }
     }
 
@@ -55,6 +60,7 @@ class CompanyProfileRequest extends FormRequest
             'forbidden_claims' => ['nullable', 'string', 'max:5000'],
             'mandatory_questions' => ['nullable', 'string', 'max:5000'],
             'notes' => ['nullable', 'string', 'max:5000'],
+            'report_language' => ['nullable', 'string', 'in:same_as_call,en,ru,uk'],
         ];
     }
 }

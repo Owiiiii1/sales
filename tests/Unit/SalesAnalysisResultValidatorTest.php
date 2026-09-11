@@ -129,7 +129,71 @@ class SalesAnalysisResultValidatorTest extends TestCase
         $this->assertSame(72, $result->overallScore);
         $this->assertSame(80, $result->companyScorecardScore);
         $this->assertSame(80, $result->payload['company_specific']['scorecard']['total_score']);
+        $this->assertSame(80, $result->payload['company_specific']['scorecard']['weighted_score']);
+        $this->assertSame([], $result->payload['company_specific']['scorecard']['triggered_caps']);
         $this->assertFalse($result->payload['company_specific']['scorecard']['criteria'][1]['applicable']);
+    }
+
+    public function test_snapshot_caps_are_applied_and_llm_total_is_ignored(): void
+    {
+        $context = $this->scorecardContext();
+        $context->scorecardSnapshot['caps'] = [[
+            'id' => 1,
+            'name' => 'Critical factual error',
+            'criterion_key' => 'system_age',
+            'trigger_type' => 'criterion_critical_failure',
+            'max_total_score' => 70,
+            'description' => 'Outdated event date',
+        ]];
+        $payload = $this->companyPayload([
+            $this->criterion('system_age', 92, applicable: true, critical: true),
+            $this->criterion('estimate', 92),
+        ]);
+        $payload['company_specific']['scorecard']['total_score'] = 99;
+
+        $result = app(SalesAnalysisResultValidator::class)->validate($payload, 'openai', 'gpt-4o-mini', $context);
+
+        $this->assertSame(92, $result->payload['company_specific']['scorecard']['weighted_score']);
+        $this->assertSame(70, $result->payload['company_specific']['scorecard']['total_score']);
+        $this->assertSame(70, $result->companyScorecardScore);
+        $this->assertSame('Critical factual error', $result->payload['company_specific']['scorecard']['triggered_caps'][0]['name']);
+    }
+
+    public function test_large_valid_v3_payload_is_accepted(): void
+    {
+        $timeline = [];
+        for ($i = 0; $i < 15; $i++) {
+            $timeline[] = [
+                'timestamp_seconds' => $i * 10,
+                'type' => 'positive',
+                'title' => 'Moment '.$i,
+                'description' => str_repeat('Detail about this moment. ', 20),
+                'speaker' => 0,
+                'quote' => 'Original quote stays in English '.$i,
+            ];
+        }
+
+        $payload = SalesAnalysisFactory::validPayload([
+            'timeline' => $timeline,
+            'summary' => str_repeat('The seller kept the original quote. ', 80),
+        ]);
+
+        $result = app(SalesAnalysisResultValidator::class)->validate($payload, 'openai', 'gpt-4o-mini');
+
+        $this->assertCount(15, $result->payload['timeline']);
+        $this->assertSame(3, $result->schemaVersion);
+        $this->assertStringContainsString('Original quote stays in English', $result->payload['timeline'][0]['quote']);
+    }
+
+    public function test_max_output_tokens_have_provider_caps(): void
+    {
+        $caps = config('sales-analyzer.analysis.max_output_tokens');
+
+        $this->assertSame(16384, $caps['default']);
+        $this->assertSame(32768, $caps['providers']['openai']);
+        $this->assertSame(16384, $caps['providers']['anthropic']);
+        $this->assertSame(16384, $caps['providers']['gemini']);
+        $this->assertSame(50000, (int) config('sales-analyzer.analysis.context_budget_characters'));
     }
 
     public function test_company_context_used_mismatch_is_rejected(): void
@@ -283,7 +347,7 @@ class SalesAnalysisResultValidatorTest extends TestCase
     /**
      * @return array<string, mixed>
      */
-    private function criterion(string $key, int $score, bool $applicable = true): array
+    private function criterion(string $key, int $score, bool $applicable = true, bool $critical = false): array
     {
         return [
             'key' => $key,
@@ -292,7 +356,7 @@ class SalesAnalysisResultValidatorTest extends TestCase
             'applicable' => $applicable,
             'summary' => '',
             'evidence' => [],
-            'critical_failure' => false,
+            'critical_failure' => $critical,
         ];
     }
 

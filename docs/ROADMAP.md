@@ -94,7 +94,7 @@ Live provider smoke for STT can use either Settings → Transcription or the env
 * `company_profiles` (1:1)
 * offerings, objections, sales scripts
 * configurable company scorecards + criteria
-* `AnalysisContextBuilder` + 24,000-character budget
+* `AnalysisContextBuilder` + 50,000-character UTF-8 budget
 * schema version 2 with `company_specific`
 * immutable analysis context / scorecard snapshots
 * public calls remain generic (no extra form)
@@ -147,6 +147,20 @@ Scorecard builder already shipped with Phase 5. This phase adds management analy
 * `POST /analyze` validates active company/employee ownership
 * existing `AnalysisContextBuilder` used as-is
 * DEC-057 accepted; DEC-040 superseded
+* live provider verification deferred (DEC-035)
+
+## Phase 7.3 — Methodology Alignment & Context Reliability
+
+**Status: COMPLETED**
+
+* UTF-8-safe context packing (DEC-058)
+* default context budget 50,000 characters
+* packing priority: scorecard, facts, core profile, then lower-priority knowledge
+* `company_facts` as authoritative verifiable context (DEC-060)
+* application-side score caps (DEC-059)
+* company report language override (DEC-061)
+* application-side stage talk metrics / discovery talk balance (DEC-062)
+* Company Score is the primary number when a custom scorecard was used
 * live provider verification deferred (DEC-035)
 
 ## Phase 8 — User Product

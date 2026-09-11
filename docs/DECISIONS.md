@@ -819,10 +819,80 @@ Status values: `Accepted` | `Open` | `Superseded` | `Rejected`.
 
 ---
 
+## DEC-058
+
+**Title:** Context character budgets are UTF-8 safe  
+**Status:** Accepted  
+**Date:** 2026-09-11
+
+**Decision:** `AnalysisContextBuilder` measures and truncates company context with `mb_strlen` / `mb_substr` in UTF-8. The default budget is 50,000 characters and remains configurable via `config/sales-analyzer.php`.
+
+**Reason:** Real company knowledge is often Cyrillic or Ukrainian. Byte-based `strlen`/`substr` under-counted the budget and could split a character, breaking JSON encoding.
+
+**Consequences:** Tests cover Cyrillic and Ukrainian truncation. Knowledge UI shows analysis context usage against the character budget. Tokenizer-specific packing is not used.
+
+---
+
+## DEC-059
+
+**Title:** Critical score caps are applied application-side  
+**Status:** Accepted  
+**Date:** 2026-09-11
+
+**Decision:** After the weighted company score is calculated, active scorecard caps may lower the final score to `min(weighted_score, lowest_triggered_cap)`. The LLM does not compute caps. Trigger types are `criterion_critical_failure` and `forbidden_claim_violation`. Forbidden-claim caps fire only when analysis found a confirmed violation.
+
+**Reason:** A critical factual error (for example an outdated event date) must not remain a high company score even if other criteria are strong.
+
+**Consequences:** Cap rules are snapshotted with the scorecard. Stored analyses keep the caps that applied at write time. Re-run uses current cap rules. UI can show weighted score, final score, and the triggered cap name.
+
+---
+
+## DEC-060
+
+**Title:** Verifiable company facts are authoritative analysis context  
+**Status:** Accepted  
+**Date:** 2026-09-11
+
+**Decision:** Companies store `company_facts` (label, value, current/outdated, optional valid_until/source). Active facts are packed as a high-priority `VERIFIABLE COMPANY FACTS` block. CURRENT facts are authoritative; OUTDATED facts must not be presented as current.
+
+**Reason:** Dates, cities, prices, and package names change. Free-text knowledge is easy to leave stale. The analyzer needs an explicit fact list to check claims against.
+
+**Consequences:** Inactive facts are excluded. The model must not invent facts missing from supplied context. This is not a knowledge graph.
+
+---
+
+## DEC-061
+
+**Title:** Company report language may differ from call language  
+**Status:** Accepted  
+**Date:** 2026-09-11
+
+**Decision:** `company_profiles.report_language` may be `same_as_call`, `en`, `ru`, or `uk`. Generic calls use global `analysis_settings.report_language_mode`. Company calls use the company setting. Evidence quotes stay in the original transcript language.
+
+**Reason:** Operators may want a Russian coaching report of an English or Ukrainian call without translating the evidence.
+
+**Consequences:** The prompt says to analyze the transcript as-is, write narrative in the report language, and never translate quotes.
+
+---
+
+## DEC-062
+
+**Title:** Stage talk metrics are calculated application-side  
+**Status:** Accepted  
+**Date:** 2026-09-11
+
+**Decision:** After LLM analysis, `ConversationMetricsCalculator` intersects transcript segments, speaker roles, and `sales_stage_map` to compute per-stage seller/customer talk percent, duration, and switches. `discovery_talk_balance` is derived from the discovery stage. Missing or invalid stage bounds yield `null`, not a guessed ratio.
+
+**Reason:** Talk balance during discovery is a coaching signal. The LLM already returns stage boundaries; the application can measure time without asking the model to invent percentages.
+
+**Consequences:** Interruptions are not calculated. Invalid timestamps are skipped. One-pass analysis is unchanged.
+
+---
+
 ## Template for new entries
 
 ```
-## DEC-058
+## DEC-063
 
 **Title:**  
 **Status:** Open | Accepted  

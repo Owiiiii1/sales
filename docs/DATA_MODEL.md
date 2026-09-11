@@ -13,7 +13,7 @@ MySQL database `sales` has Laravel + admin kit tables **and** Phase 1 domain tab
 * `users`, `sessions`, `cache`, `jobs`, …
 * **legacy kit CRM:** `customers`, `orders`, `services`, `staff`, `order_staff` (DEC-012 — retained, hidden from nav)
 * `ai_provider_settings`, `telegram_bot_settings`, `transcription_provider_settings`, `analysis_settings`
-* **Sales Analyzer:** `companies`, `employees`, `calls`, `transcripts`, `transcript_segments`, `sales_analyses`, `company_profiles`, `company_offerings`, `company_objections`, `company_sales_scripts`, `company_scorecards`, `company_scorecard_criteria`
+* **Sales Analyzer:** `companies`, `employees`, `calls`, `transcripts`, `transcript_segments`, `sales_analyses`, `company_profiles`, `company_offerings`, `company_objections`, `company_sales_scripts`, `company_scorecards`, `company_scorecard_criteria`, `company_scorecard_caps`, `company_facts`
 
 ## Implemented domain (Phase 1)
 
@@ -28,8 +28,10 @@ Company
   ├── CompanyOffering
   ├── CompanyObjection
   ├── CompanySalesScript
+  ├── CompanyFact
   └── CompanyScorecard
-        └── CompanyScorecardCriterion
+        ├── CompanyScorecardCriterion
+        └── CompanyScorecardCap
 
 Employee
   └── Call
@@ -232,7 +234,7 @@ Implemented as `transcript_segments` rows (see Transcript). Speaker identity map
 
 Result of analyzing one call. **Must support versioning** (`schema_version`).
 
-Implemented as `sales_analyses` with JSON `result` as the structured report. Generic methodology scores stay in `overall_score`. Company scorecard totals are `company_scorecard_score` (DEC-038). Generic analyzer calls keep `company_context_used=false`. Company analyzer calls use `AnalysisContextBuilder` company context (DEC-057).
+Implemented as `sales_analyses` with JSON `result` as the structured report. Generic methodology scores stay in `overall_score`. Company scorecard totals are `company_scorecard_score` (DEC-038), which is the final score after application-side caps (DEC-059). Weighted score and triggered caps are stored in `result.company_specific.scorecard`. Generic analyzer calls keep `company_context_used=false`. Company analyzer calls use `AnalysisContextBuilder` company context (DEC-057). Report language for company calls may override the global setting (DEC-061). `conversation_metrics`, `stage_talk_metrics`, and `discovery_talk_balance` are application-filled (DEC-049 / DEC-062).
 
 A call may be re-analyzed when prompts, models, scorecards, or company context change.
 
@@ -273,6 +275,7 @@ Per-criterion outcome for one Analysis:
 * description nullable
 * is_default
 * is_active
+* score_bands json nullable (company-specific 90/75/60/40 labels; generic 80/60 bands remain the fallback)
 * timestamps
 
 Criteria:
@@ -290,9 +293,24 @@ Criteria:
 * is_active
 * timestamps
 
+Caps (`company_scorecard_caps`, DEC-059):
+
+* id
+* scorecard_id → company_scorecards (cascade)
+* name
+* criterion_key nullable
+* trigger_type `criterion_critical_failure` | `forbidden_claim_violation`
+* max_total_score 0–100
+* description nullable
+* is_active
+* sequence
+* timestamps
+
+Caps are snapshotted with the scorecard. After the weighted total is calculated, `final = min(weighted, lowest triggered cap)`. Forbidden-claim caps fire only on confirmed analysis violations, not on knowledge text.
+
 No fictitious scorecard is created for a company. Analysis uses the company’s default active scorecard, or the first active scorecard if none is marked default. Weights are not required to sum to 100; admin UI shows Total weight and warns when the sum is not 100.
 
-Per-analysis criterion results live in `result.company_specific.scorecard.criteria`. The weighted total is calculated in Laravel from the scorecard snapshot (DEC-038). Critical failure is stored as a flag and does not force total=0.
+Per-analysis criterion results live in `result.company_specific.scorecard.criteria`. The weighted total is calculated in Laravel from the scorecard snapshot (DEC-038). Critical failure is stored as a flag and does not force total=0 unless a cap rule says so.
 
 ## Company Knowledge
 
@@ -300,7 +318,9 @@ Per-analysis criterion results live in `result.company_specific.scorecard.criter
 
 `company_profiles` (one-to-one with Company):
 
-* short_description, sales_context, target_audience, ideal_customer_profile, value_proposition, usp, pricing_context, competitors, customer_pains, sales_goals, desired_next_steps, forbidden_claims, mandatory_questions, notes
+* short_description, sales_context, target_audience, ideal_customer_profile, value_proposition, usp, pricing_context, competitors, customer_pains, sales_goals, desired_next_steps, forbidden_claims, mandatory_questions, notes, report_language (`same_as_call` | `en` | `ru` | `uk`, default `same_as_call`)
+
+`company_facts`: label, value, status `current` | `outdated`, valid_until nullable, source nullable, is_active. Active facts are packed as VERIFIABLE COMPANY FACTS (DEC-060).
 
 `company_offerings`: type `product` | `service` | `other`, name, description, target_customer, value_proposition, pricing, differentiators, common_use_cases, is_active.
 
@@ -321,8 +341,8 @@ Documents, embeddings, and a vector store remain later / TBD.
 | Employee | Call | Many calls per employee |
 | Call | Transcript | 1:1 (`call_id` unique). Retranscribe replaces the row after provider success. |
 | Company | CompanyProfile | 1:1 |
-| Company | CompanyOffering / Objection / SalesScript / Scorecard | 1:N, cascade |
-| Scorecard | Criterion | 1:N, unique key per scorecard |
+| Company | CompanyOffering / Objection / SalesScript / Fact / Scorecard | 1:N, cascade |
+| Scorecard | Criterion / Cap | 1:N, unique key per scorecard for criteria |
 | Call | SalesAnalysis | 1:1 (`call_id` unique). Re-analysis replaces the row after validation. Snapshots stay with that row. |
 | SalesAnalysis | Scorecard | nullable FK; snapshot is authoritative for that analysis |
 

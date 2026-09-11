@@ -34,6 +34,10 @@ class CompanyScorecardRequest extends FormRequest
             'description' => ['nullable', 'string', 'max:2000'],
             'is_default' => ['sometimes', 'boolean'],
             'is_active' => ['sometimes', 'boolean'],
+            'score_bands' => ['sometimes', 'nullable', 'array'],
+            'score_bands.*.min' => ['required_with:score_bands', 'integer', 'min:0', 'max:100'],
+            'score_bands.*.max' => ['required_with:score_bands', 'integer', 'min:0', 'max:100'],
+            'score_bands.*.label' => ['required_with:score_bands', 'string', 'max:100'],
         ];
     }
 }

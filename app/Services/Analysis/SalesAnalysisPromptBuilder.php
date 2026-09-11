@@ -13,8 +13,9 @@ class SalesAnalysisPromptBuilder
      */
     public function messages(Transcript $transcript, AnalysisContext $context): array
     {
-        $language = LanguageCode::normalize($context->language ?: $transcript->language) ?: 'en';
-        $languageName = match ($language) {
+        $transcriptLanguage = LanguageCode::normalize($context->language ?: $transcript->language) ?: 'en';
+        $reportLanguage = LanguageCode::normalize($context->reportLanguage ?: $transcriptLanguage) ?: 'en';
+        $languageName = match ($reportLanguage) {
             'ru' => 'Russian',
             'uk' => 'Ukrainian',
             default => 'English',
@@ -38,6 +39,9 @@ class SalesAnalysisPromptBuilder
             '- Recommendations must be actionable and tied to a moment in this call. Forbidden fluff: “Build rapport”, “Ask more questions”, “Listen actively”, “Focus on customer needs” unless you say where, why, and what to do instead.',
             '- Do not hallucinate business objectives that are not in the transcript.',
             '- Quotes must be short and from the transcript. Include speaker and timestamp_seconds when available.',
+            '- Analyze the original transcript as-is. Do not translate the conversation in order to understand it.',
+            '- Write the narrative report in '.$languageName.'.',
+            '- Preserve evidence quotes in the original transcript language. Never translate quotes.',
             '',
             'Scores are integers 0–100. Generic overall_score is 0–100.',
             'Map speakers to seller, customer, unknown, or other. If unsure, use unknown and set speaker_roles_confidence to low or medium.',
@@ -72,7 +76,9 @@ class SalesAnalysisPromptBuilder
                 .'Generic recommendations must not contradict explicit company rules.'."\n"
                 .'Check forbidden claims, mandatory questions, script adherence, objection handling vs expected responses, and offering accuracy vs listed offerings.'."\n"
                 .'Evaluate each provided scorecard criterion. Use the criterion key. Set applicable=false when the criterion cannot be judged from the transcript.'."\n"
-                .'Do not invent products, prices, guarantees, or script steps that are not in COMPANY CONTEXT.';
+                .'Numeric values, dates, locations, package names, and other factual claims in the transcript must be checked against VERIFIABLE COMPANY FACTS.'."\n"
+                .'CURRENT facts are authoritative. OUTDATED facts must not be presented by the seller as current.'."\n"
+                .'Report discrepancies with evidence from the transcript. Never invent a fact that is not in the supplied COMPANY CONTEXT.';
         }
 
         return [
@@ -85,7 +91,9 @@ class SalesAnalysisPromptBuilder
     {
         $lines = [
             'Analyze this sales call as a rigorous sales coach.',
+            'Analyze the original transcript as-is.',
             'Output language: '.$languageName,
+            'Preserve evidence quotes in the original transcript language. Do not translate quotes.',
             'schema_version: '.SalesAnalysisSchema::VERSION,
         ];
 

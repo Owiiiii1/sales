@@ -70,4 +70,9 @@ class Company extends Model
     {
         return $this->hasMany(CompanyScorecard::class);
     }
+
+    public function facts(): HasMany
+    {
+        return $this->hasMany(CompanyFact::class);
+    }
 }

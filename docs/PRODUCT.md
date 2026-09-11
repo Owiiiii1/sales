@@ -2,7 +2,7 @@
 
 This document describes the product we intend to build. It is not a description of the current UI.
 
-The live site has a **main analyzer workspace** at `/` for uploading a sales call (generic or company-specific), plus an admin at `/login`. Transcription is queued through ElevenLabs Scribe v2. Admins configure the STT key and LLM providers in Settings without editing `.env`. The operator selects a Company (optional) and Employee (optional) before upload. Generic AI sales analysis runs when no company is selected. Analyzer uploads with a Company use that company’s knowledge and default scorecard. See [STATUS.md](STATUS.md).
+The live site has a **main analyzer workspace** at `/` for uploading a sales call (generic or company-specific), plus an admin at `/login`. Transcription is queued through ElevenLabs Scribe v2. Admins configure the STT key and LLM providers in Settings without editing `.env`. The operator selects a Company (optional) and Employee (optional) before upload. Generic AI sales analysis runs when no company is selected. Analyzer uploads with a Company use that company’s knowledge, default scorecard, facts, and report language. See [STATUS.md](STATUS.md).
 
 ## Problem
 
@@ -116,8 +116,8 @@ These are possible later capabilities. **Do not treat the list as committed scop
 | Admin / operator UI | Adapted from Custom Admin Kit | Implemented (Phase 1) |
 | Settings | Pipeline health, Transcription, AI providers, analysis behavior | Implemented (Phase 7.1) |
 | Personal cabinet | History, companies, employees | Planned (Phase 8) |
-| Knowledge admin | Scripts, products, objections | Implemented (Phase 5) |
-| Scorecard admin | Criteria and weights | Implemented (Phase 5) |
+| Knowledge admin | Scripts, products, objections, facts | Implemented (Phase 5 / 7.3) |
+| Scorecard admin | Criteria, weights, score caps, optional bands | Implemented (Phase 5 / 7.3) |
 | Team analytics | Dashboard, company analytics, employee analytics | Implemented (Phase 6) |
 
 ## What we reuse from the admin kit

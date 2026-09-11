@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
+use Database\Factories\CompanyProfileFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class CompanyProfile extends Model
 {
-    /** @use HasFactory<\Database\Factories\CompanyProfileFactory> */
+    /** @use HasFactory<CompanyProfileFactory> */
     use HasFactory;
 
     protected $fillable = [
@@ -27,6 +28,7 @@ class CompanyProfile extends Model
         'forbidden_claims',
         'mandatory_questions',
         'notes',
+        'report_language',
     ];
 
     public function company(): BelongsTo

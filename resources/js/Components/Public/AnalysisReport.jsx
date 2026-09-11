@@ -347,17 +347,36 @@ export default function AnalysisReport({ status, report, message, error, analysi
             {badge}
 
             <div className="mt-6 flex flex-wrap items-end gap-8">
-                <div>
-                    <p className="text-5xl font-semibold tracking-tight text-slate-900">{na(report.overall_score, dash)}</p>
-                    <p className="mt-1 text-sm font-medium text-slate-500">{t('report.overall')}</p>
-                </div>
-                {report.company_scorecard_score !== null && report.company_scorecard_score !== undefined && (
+                {report.primary_score_kind === 'company' ? (
+                    <>
+                        <div>
+                            <p className="text-5xl font-semibold tracking-tight text-slate-900">{na(report.company_scorecard_score, dash)}</p>
+                            <p className="mt-1 text-sm font-medium text-slate-500">{t('report.companyScore')}</p>
+                            {report.company_score_band ? (
+                                <p className="mt-1 text-xs text-slate-500">{report.company_score_band}</p>
+                            ) : null}
+                        </div>
+                        <div>
+                            <p className="text-3xl font-semibold tracking-tight text-slate-700">{na(report.overall_score, dash)}</p>
+                            <p className="mt-1 text-sm font-medium text-slate-500">{t('report.generalSalesScore')}</p>
+                        </div>
+                    </>
+                ) : (
                     <div>
-                        <p className="text-5xl font-semibold tracking-tight text-slate-900">{report.company_scorecard_score}</p>
-                        <p className="mt-1 text-sm font-medium text-slate-500">{t('report.companyScorecard')}</p>
+                        <p className="text-5xl font-semibold tracking-tight text-slate-900">{na(report.overall_score, dash)}</p>
+                        <p className="mt-1 text-sm font-medium text-slate-500">{t('report.overall')}</p>
                     </div>
                 )}
             </div>
+            {report.primary_score_kind === 'company' && (report.weighted_company_score !== null && report.weighted_company_score !== undefined) && (
+                <div className="mt-3 space-y-1 text-sm text-slate-600">
+                    <p>{t('report.weightedScore', { score: report.weighted_company_score })}</p>
+                    <p>{t('report.finalScore', { score: report.company_scorecard_score })}</p>
+                    {(report.triggered_caps || []).map((cap) => (
+                        <p key={cap.id || cap.name}>{t('report.capApplied', { name: cap.name || cap.description || cap.trigger_type })}</p>
+                    ))}
+                </div>
+            )}
 
             {exec ? (
                 <div className="mt-6 space-y-4">
@@ -413,6 +432,10 @@ export default function AnalysisReport({ status, report, message, error, analysi
                 <p className="mt-4 text-xs text-slate-500">
                     {t('report.talkBalance', { seller: metrics.seller_talk_percent, customer: metrics.customer_talk_percent })}
                     {metrics.speaker_switches !== null ? ` · ${t('report.speakerSwitches', { count: metrics.speaker_switches })}` : ''}
+                    {report.discovery_talk_balance ? ` · ${t('report.discoveryTalk', {
+                        seller: report.discovery_talk_balance.seller_talk_percent,
+                        customer: report.discovery_talk_balance.customer_talk_percent,
+                    })}` : ''}
                 </p>
             )}
 

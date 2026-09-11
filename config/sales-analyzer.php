@@ -69,7 +69,7 @@ return [
     'analysis' => [
         'schema_version' => 3,
         // Character budget for company knowledge packed into the LLM prompt.
-        'context_budget_characters' => (int) env('SALES_ANALYSIS_CONTEXT_BUDGET', 24000),
+        'context_budget_characters' => (int) env('SALES_ANALYSIS_CONTEXT_BUDGET', 50000),
         'max_output_tokens' => [
             'default' => 16384,
             'min' => 4096,

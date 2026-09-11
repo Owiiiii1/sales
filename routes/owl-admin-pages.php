@@ -64,6 +64,12 @@ Route::middleware(AdminRouteMiddleware::stack())->group(function () {
     Route::post('/companies/{company}/scorecards/{scorecard}/criteria', [CompanyKnowledgeController::class, 'storeCriterion'])->name('companies.scorecards.criteria.store');
     Route::patch('/companies/{company}/scorecards/{scorecard}/criteria/{criterion}', [CompanyKnowledgeController::class, 'updateCriterion'])->name('companies.scorecards.criteria.update');
     Route::delete('/companies/{company}/scorecards/{scorecard}/criteria/{criterion}', [CompanyKnowledgeController::class, 'destroyCriterion'])->name('companies.scorecards.criteria.destroy');
+    Route::post('/companies/{company}/scorecards/{scorecard}/caps', [CompanyKnowledgeController::class, 'storeCap'])->name('companies.scorecards.caps.store');
+    Route::patch('/companies/{company}/scorecards/{scorecard}/caps/{cap}', [CompanyKnowledgeController::class, 'updateCap'])->name('companies.scorecards.caps.update');
+    Route::delete('/companies/{company}/scorecards/{scorecard}/caps/{cap}', [CompanyKnowledgeController::class, 'destroyCap'])->name('companies.scorecards.caps.destroy');
+    Route::post('/companies/{company}/facts', [CompanyKnowledgeController::class, 'storeFact'])->name('companies.facts.store');
+    Route::patch('/companies/{company}/facts/{fact}', [CompanyKnowledgeController::class, 'updateFact'])->name('companies.facts.update');
+    Route::delete('/companies/{company}/facts/{fact}', [CompanyKnowledgeController::class, 'destroyFact'])->name('companies.facts.destroy');
 
     Route::get('/employees', [EmployeesController::class, 'index'])->name('employees.index');
     Route::get('/employees/{employee}', [EmployeesController::class, 'show'])->name('employees.show');

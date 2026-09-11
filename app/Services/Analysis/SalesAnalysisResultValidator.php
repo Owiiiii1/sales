@@ -145,7 +145,12 @@ class SalesAnalysisResultValidator
         $offerings = is_array($raw['offering_accuracy'] ?? null) ? $raw['offering_accuracy'] : [];
 
         $criteria = $this->scorecardCriteria($raw['scorecard']['criteria'] ?? [], $context);
-        $total = app(CompanyScoreCalculator::class)->total($criteria, $context->scorecardSnapshot ?? ['criteria' => []]);
+        $forbiddenViolations = $this->findings($claims['violations'] ?? [], 'company_specific.forbidden_claims.violations');
+        $scored = app(CompanyScoreCalculator::class)->scored(
+            $criteria,
+            $context->scorecardSnapshot ?? ['criteria' => [], 'caps' => []],
+            ['forbidden_claims' => ['violations' => $forbiddenViolations]],
+        );
 
         return [
             'script_adherence' => [
@@ -161,7 +166,7 @@ class SalesAnalysisResultValidator
                 'missed' => $this->stringList($questions['missed'] ?? [], 'company_specific.mandatory_questions.missed'),
             ],
             'forbidden_claims' => [
-                'violations' => $this->findings($claims['violations'] ?? [], 'company_specific.forbidden_claims.violations'),
+                'violations' => $forbiddenViolations,
             ],
             'objection_handling' => [
                 'matched' => $this->matchedObjections($objections['matched'] ?? []),
@@ -170,14 +175,15 @@ class SalesAnalysisResultValidator
                 'issues' => $this->findings($offerings['issues'] ?? [], 'company_specific.offering_accuracy.issues'),
             ],
             'scorecard' => [
-                'total_score' => $total,
+                'weighted_score' => $scored['weighted_score'],
+                'total_score' => $scored['total_score'],
+                'triggered_caps' => $scored['triggered_caps'],
                 'criteria' => $criteria,
             ],
         ];
     }
 
     /**
-     * @param  mixed  $items
      * @return array<int, array<string, mixed>>
      */
     private function scorecardCriteria(mixed $items, AnalysisContext $context): array
@@ -242,7 +248,6 @@ class SalesAnalysisResultValidator
     }
 
     /**
-     * @param  mixed  $items
      * @return array<int, string>
      */
     private function stringList(mixed $items, string $path): array
@@ -260,7 +265,6 @@ class SalesAnalysisResultValidator
     }
 
     /**
-     * @param  mixed  $items
      * @return array<int, array{objection:string, handled:bool, summary:string}>
      */
     private function matchedObjections(mixed $items): array

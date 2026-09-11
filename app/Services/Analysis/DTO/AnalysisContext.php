@@ -10,6 +10,7 @@ class AnalysisContext
      */
     public function __construct(
         public ?string $language = null,
+        public ?string $reportLanguage = null,
         public ?string $companyName = null,
         public bool $companyContextUsed = false,
         public ?int $companyId = null,

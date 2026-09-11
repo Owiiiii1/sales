@@ -13,14 +13,17 @@ use App\Models\CompanyOffering;
 use App\Models\CompanyProfile;
 use App\Models\CompanySalesScript;
 use App\Models\CompanyScorecard;
+use App\Models\CompanyScorecardCap;
 use App\Models\CompanyScorecardCriterion;
 use App\Models\SalesAnalysis;
 use App\Models\Transcript;
 use App\Models\TranscriptSegment;
 use App\Models\User;
+use App\Services\Analysis\AnalysisContextBuilder;
 use App\Services\Analysis\DTO\AnalysisContext;
 use App\Services\Analysis\DTO\SalesAnalysisResult;
 use App\Services\Analysis\SalesAnalysisProvider;
+use App\Services\Analysis\SalesAnalysisResultValidator;
 use App\Services\Analysis\SalesAnalysisSchema;
 use App\Services\Analysis\SalesAnalysisWriter;
 use App\Services\Calls\CallAudioStorage;
@@ -123,9 +126,14 @@ class SalesAnalysisTest extends TestCase
             ], 200),
         ]);
 
-        $this->runAnalyze($call);
+        try {
+            $this->runAnalyze($call);
+            $this->fail('Malformed JSON should be retry-safe.');
+        } catch (TransientAnalysisException $e) {
+            $this->assertStringContainsString('invalid JSON', $e->getMessage());
+        }
 
-        $this->assertSame('failed', $call->fresh()->status);
+        $this->assertSame('analyzing', $call->fresh()->status);
         $this->assertSame(0, SalesAnalysis::query()->count());
     }
 
@@ -354,6 +362,8 @@ class SalesAnalysisTest extends TestCase
         $this->assertNull($call->analysis->scorecard_id);
         $this->assertSame(['company' => null], $call->analysis->context_snapshot);
         $this->assertSame(72, $call->analysis->overall_score);
+        $this->assertSame(0, $call->analysis->result['discovery_talk_balance']['seller_talk_percent']);
+        $this->assertSame(100, $call->analysis->result['discovery_talk_balance']['customer_talk_percent']);
     }
 
     public function test_company_analysis_includes_context_and_application_score(): void
@@ -463,7 +473,74 @@ class SalesAnalysisTest extends TestCase
             ->assertJsonPath('report.overall_score', 72)
             ->assertJsonPath('report.company_scorecard_score', 62)
             ->assertJsonPath('report.company_context_used', true)
+            ->assertJsonPath('report.primary_score_kind', 'company')
+            ->assertJsonPath('report.weighted_company_score', 62)
             ->assertJsonMissingPath('prompt');
+    }
+
+    public function test_cap_snapshot_is_immutable_and_rerun_uses_current_rules(): void
+    {
+        $call = $this->transcribedCompanyCall();
+        $this->bindPayload($this->companyAwarePayload(92, 92));
+        $this->runAnalyze($call);
+
+        $call->refresh();
+        $this->assertSame(92, $call->analysis->company_scorecard_score);
+        $this->assertSame([], $call->analysis->scorecard_snapshot['caps']);
+        $this->assertSame(92, $call->analysis->result['company_specific']['scorecard']['weighted_score']);
+        $this->assertSame([], $call->analysis->result['company_specific']['scorecard']['triggered_caps']);
+
+        $scorecardId = $call->analysis->scorecard_id;
+        CompanyScorecardCap::factory()->create([
+            'scorecard_id' => $scorecardId,
+            'name' => 'Outdated event date',
+            'criterion_key' => 'system_age',
+            'trigger_type' => 'criterion_critical_failure',
+            'max_total_score' => 70,
+        ]);
+
+        $this->assertSame(92, $call->fresh()->analysis->company_scorecard_score);
+        $this->assertSame([], $call->fresh()->analysis->scorecard_snapshot['caps']);
+
+        $payload = $this->companyAwarePayload(92, 92);
+        $payload['company_specific']['scorecard']['criteria'][0]['critical_failure'] = true;
+        $this->bindPayload($payload);
+        $this->runAnalyze($call->fresh(['transcript.segments', 'company.profile']));
+
+        $call->refresh();
+        $this->assertSame(92, $call->analysis->result['company_specific']['scorecard']['weighted_score']);
+        $this->assertSame(70, $call->analysis->company_scorecard_score);
+        $this->assertSame('Outdated event date', $call->analysis->result['company_specific']['scorecard']['triggered_caps'][0]['name']);
+        $this->assertSame('Outdated event date', $call->analysis->scorecard_snapshot['caps'][0]['name']);
+    }
+
+    public function test_forbidden_claim_cap_uses_analysis_result_not_knowledge_text(): void
+    {
+        $call = $this->transcribedCompanyCall();
+        $call->company->profile->update(['forbidden_claims' => 'Do not promise lifetime warranties.']);
+        CompanyScorecardCap::factory()->create([
+            'scorecard_id' => $call->company->scorecards()->first()->id,
+            'name' => 'Forbidden claim',
+            'criterion_key' => null,
+            'trigger_type' => 'forbidden_claim_violation',
+            'max_total_score' => 50,
+        ]);
+
+        $this->bindPayload($this->companyAwarePayload(80, 80));
+        $this->runAnalyze($call);
+        $this->assertSame(80, $call->fresh()->analysis->company_scorecard_score);
+
+        $payload = $this->companyAwarePayload(80, 80);
+        $payload['company_specific']['forbidden_claims']['violations'] = [[
+            'text' => 'Promised a lifetime warranty',
+            'speaker' => 0,
+            'timestamp_seconds' => 1,
+            'quote' => 'lifetime warranty',
+        ]];
+        $this->bindPayload($payload);
+        $this->runAnalyze($call->fresh(['transcript.segments', 'company.profile']));
+
+        $this->assertSame(50, $call->fresh()->analysis->company_scorecard_score);
     }
 
     private function bindPayload(array $payload): void
@@ -479,7 +556,7 @@ class SalesAnalysisTest extends TestCase
 
             public function analyze(Transcript $transcript, AnalysisContext $context): SalesAnalysisResult
             {
-                $validator = app(\App\Services\Analysis\SalesAnalysisResultValidator::class);
+                $validator = app(SalesAnalysisResultValidator::class);
 
                 return $validator->validate($this->payload, 'openai', 'gpt-4o-mini', $context);
             }
@@ -680,7 +757,7 @@ class SalesAnalysisTest extends TestCase
         $job->handle(
             app(SalesAnalysisProvider::class),
             app(SalesAnalysisWriter::class),
-            app(\App\Services\Analysis\AnalysisContextBuilder::class),
+            app(AnalysisContextBuilder::class),
         );
     }
 }
