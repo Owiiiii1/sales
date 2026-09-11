@@ -18,4 +18,7 @@ Route::middleware('throttle:public-analysis-status')->group(function () {
     Route::get('/analysis/{public_token}/status', [PublicAnalyzerController::class, 'status'])
         ->where('public_token', '[0-9a-fA-F-]{36}')
         ->name('analysis.status');
+    Route::post('/analysis/{public_token}/cancel', [PublicAnalyzerController::class, 'cancel'])
+        ->where('public_token', '[0-9a-fA-F-]{36}')
+        ->name('analysis.cancel');
 });

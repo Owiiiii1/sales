@@ -1,5 +1,7 @@
 import AnalysisReport from '@/Components/Public/AnalysisReport';
-import CallTranscript from '@/Components/Public/CallTranscript';
+import CancelProcessingModal from '@/Components/Public/CancelProcessingModal';
+import ProcessingProgress, { uploadingProgress } from '@/Components/Public/ProcessingProgress';
+import TranscriptModal, { TranscriptReadyCard } from '@/Components/Public/TranscriptModal';
 import PublicLayout from '@/Layouts/PublicLayout';
 import { Head, Link, usePage } from '@inertiajs/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -7,6 +9,7 @@ import { useT } from '@/i18n';
 
 const csrfToken = () => document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
 const GENERIC_CONTEXT = 'generic';
+const TERMINAL_STATUSES = ['analysis_pending', 'completed', 'failed', 'cancelled'];
 
 export default function PublicHome({ upload = {}, companies = [], employees = [] }) {
     const t = useT();
@@ -28,6 +31,9 @@ export default function PublicHome({ upload = {}, companies = [], employees = []
     const [result, setResult] = useState(null);
     const [companyId, setCompanyId] = useState('');
     const [employeeId, setEmployeeId] = useState('');
+    const [transcriptOpen, setTranscriptOpen] = useState(false);
+    const [cancelOpen, setCancelOpen] = useState(false);
+    const [cancelling, setCancelling] = useState(false);
 
     companyIdRef.current = companyId;
     employeeIdRef.current = employeeId;
@@ -83,26 +89,61 @@ export default function PublicHome({ upload = {}, companies = [], employees = []
                     return;
                 }
                 const payload = await response.json();
-                setResult((current) => ({ ...(current ?? {}), ...payload }));
-                if (payload.status === 'uploaded' || payload.status === 'processing' || payload.status === 'analyzing' || payload.status === 'transcribed') {
-                    setUiStatus(payload.status);
-                }
-                if (payload.status === 'transcribed' || payload.status === 'analyzing' || payload.status === 'analysis_pending' || payload.status === 'completed' || payload.status === 'failed') {
+                setUiStatus(payload.status);
+
+                if (payload.status !== 'uploaded' && payload.status !== 'processing') {
                     const full = await fetch(route('analysis.show', token), {
                         headers: { Accept: 'application/json' },
                     });
                     if (full.ok) {
                         setResult(await full.json());
+                    } else {
+                        setResult((current) => ({ ...(current ?? {}), ...payload }));
                     }
+                } else {
+                    setResult((current) => ({ ...(current ?? {}), ...payload }));
                 }
-                if (payload.status === 'analysis_pending' || payload.status === 'completed' || payload.status === 'failed') {
-                    setUiStatus(payload.status);
+
+                if (TERMINAL_STATUSES.includes(payload.status)) {
                     stopPolling();
                 }
             } catch {
                 // Keep the last known state; the next tick retries.
             }
         }, pollInterval);
+    };
+
+    const cancelProcessing = async () => {
+        const token = result?.public_token;
+        if (!token) {
+            return;
+        }
+
+        setCancelling(true);
+        try {
+            const response = await fetch(route('analysis.cancel', token), {
+                method: 'POST',
+                headers: {
+                    Accept: 'application/json',
+                    'X-CSRF-TOKEN': csrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (response.ok) {
+                setResult(payload);
+                setUiStatus(payload.status || 'cancelled');
+                stopPolling();
+            } else if (response.status === 409 && payload.status) {
+                setUiStatus(payload.status);
+                if (payload.progress) {
+                    setResult((current) => ({ ...(current ?? {}), ...payload }));
+                }
+            }
+        } finally {
+            setCancelling(false);
+            setCancelOpen(false);
+        }
     };
 
     const submit = async (nextFile) => {
@@ -157,7 +198,7 @@ export default function PublicHome({ upload = {}, companies = [], employees = []
             setFile(audio);
             setUiStatus(payload.status || 'uploaded');
 
-            if (payload.status === 'uploaded' || payload.status === 'processing' || payload.status === 'analyzing') {
+            if (payload.status === 'uploaded' || payload.status === 'processing' || payload.status === 'analyzing' || payload.status === 'transcribed') {
                 startPolling(payload.public_token);
             }
         } catch {
@@ -167,6 +208,7 @@ export default function PublicHome({ upload = {}, companies = [], employees = []
     };
 
     const statusLabel = t.status(uiStatus);
+    const progress = uiStatus === 'uploading' ? uploadingProgress() : result?.progress;
 
     return (
         <PublicLayout>
@@ -277,67 +319,68 @@ export default function PublicHome({ upload = {}, companies = [], employees = []
                             }
                         }}
                     >
-                        {uiStatus === 'uploading' || uiStatus === 'processing' || uiStatus === 'analyzing' ? (
-                            <div className="flex flex-col items-center gap-4 py-6 text-center">
-                                <span className="h-12 w-12 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600" />
-                                <div>
-                                    <p className="text-lg font-semibold text-slate-900">{statusLabel}</p>
-                                    <p className="mt-1 text-sm text-slate-500">{file?.name || result?.original_filename}</p>
-                                </div>
+                        <div className="flex flex-col items-center text-center">
+                            <p className="text-lg font-semibold text-slate-900">
+                                {uploadAvailable ? t('home.drop') : unavailableMessage}
+                            </p>
+                            <p className="mt-2 text-sm text-slate-500">
+                                {uploadAvailable
+                                    ? t('home.formats', { mb: maxMb })
+                                    : t('home.tryLater')}
+                            </p>
+                            {file && (
+                                <p className="mt-3 text-sm font-medium text-slate-700">{file.name}</p>
+                            )}
+                            {uiStatus !== 'idle' && uiStatus !== 'failed' && uiStatus !== 'cancelled' && (
+                                <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-indigo-600">{statusLabel}</p>
+                            )}
+                            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+                                <button
+                                    type="button"
+                                    disabled={!uploadAvailable}
+                                    onClick={() => inputRef.current?.click()}
+                                    className="rounded-full border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    {t('home.chooseFile')}
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={!uploadAvailable || !contextSelected}
+                                    onClick={() => submit()}
+                                    className="rounded-full bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    {t('home.analyze')}
+                                </button>
                             </div>
-                        ) : (
-                            <div className="flex flex-col items-center text-center">
-                                <p className="text-lg font-semibold text-slate-900">
-                                    {uploadAvailable ? t('home.drop') : unavailableMessage}
-                                </p>
-                                <p className="mt-2 text-sm text-slate-500">
-                                    {uploadAvailable
-                                        ? t('home.formats', { mb: maxMb })
-                                        : t('home.tryLater')}
-                                </p>
-                                {file && (
-                                    <p className="mt-3 text-sm font-medium text-slate-700">{file.name}</p>
-                                )}
-                                {uiStatus !== 'idle' && uiStatus !== 'failed' && (
-                                    <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-indigo-600">{statusLabel}</p>
-                                )}
-                                <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-                                    <button
-                                        type="button"
-                                        disabled={!uploadAvailable}
-                                        onClick={() => inputRef.current?.click()}
-                                        className="rounded-full border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                                    >
-                                        {t('home.chooseFile')}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        disabled={!uploadAvailable || !contextSelected}
-                                        onClick={() => submit()}
-                                        className="rounded-full bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
-                                    >
-                                        {t('home.analyze')}
-                                    </button>
-                                </div>
-                                {!contextSelected && uploadAvailable && (
-                                    <p className="mt-3 text-sm text-slate-500">{t('home.selectContextFirst')}</p>
-                                )}
-                                <input
-                                    ref={inputRef}
-                                    type="file"
-                                    accept={accept}
-                                    className="hidden"
-                                    onChange={(event) => assignFile(event.target.files?.[0] ?? null)}
-                                />
-                                {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
-                            </div>
-                        )}
+                            {!contextSelected && uploadAvailable && (
+                                <p className="mt-3 text-sm text-slate-500">{t('home.selectContextFirst')}</p>
+                            )}
+                            <input
+                                ref={inputRef}
+                                type="file"
+                                accept={accept}
+                                className="hidden"
+                                onChange={(event) => assignFile(event.target.files?.[0] ?? null)}
+                            />
+                            {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+                        </div>
                     </div>
                 </section>
 
                 <div className="mt-10 space-y-6">
+                    {progress && uiStatus !== 'idle' && (
+                        <ProcessingProgress
+                            progress={progress}
+                            message={result?.message}
+                            error={result?.error}
+                            onStop={() => setCancelOpen(true)}
+                        />
+                    )}
+                    {result?.transcript && (
+                        <TranscriptReadyCard transcript={result.transcript} onOpen={() => setTranscriptOpen(true)} />
+                    )}
                     <AnalysisReport
-                        status={uiStatus === 'idle' ? null : uiStatus}
+                        status={uiStatus === 'completed' ? uiStatus : null}
                         report={result?.report}
                         message={result?.message}
                         error={result?.error}
@@ -345,11 +388,19 @@ export default function PublicHome({ upload = {}, companies = [], employees = []
                         companyName={result?.company_name}
                         employeeName={result?.employee_name}
                     />
-                    {(uiStatus === 'transcribed' || uiStatus === 'analysis_pending' || uiStatus === 'analyzing' || uiStatus === 'completed' || uiStatus === 'failed') && result?.transcript && (
-                        <CallTranscript transcript={result.transcript} heading={t('calls.transcript')} />
-                    )}
                 </div>
             </div>
+            <TranscriptModal
+                open={transcriptOpen}
+                onOpenChange={setTranscriptOpen}
+                transcript={result?.transcript}
+            />
+            <CancelProcessingModal
+                open={cancelOpen}
+                onOpenChange={setCancelOpen}
+                onConfirm={cancelProcessing}
+                busy={cancelling}
+            />
         </PublicLayout>
     );
 }

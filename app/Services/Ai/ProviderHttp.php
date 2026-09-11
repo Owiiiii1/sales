@@ -17,16 +17,16 @@ class ProviderHttp
             return;
         }
 
-        $code = self::errorCode($response->json());
+        $detail = self::errorCode($response->json());
 
         if ($status === 429 || $status >= 500) {
             throw new TransientAnalysisException(
-                ucfirst($provider).' returned HTTP '.$status.($code ? " ({$code})" : '').'.'
+                ucfirst($provider).' returned HTTP '.$status.($detail ? " ({$detail})" : '').'.'
             );
         }
 
         throw new PermanentAnalysisException(
-            ucfirst($provider).' rejected the request with HTTP '.$status.($code ? " ({$code})" : '').'.'
+            ucfirst($provider).' rejected the request with HTTP '.$status.($detail ? " ({$detail})" : '').'.'
         );
     }
 
@@ -44,16 +44,18 @@ class ProviderHttp
             return null;
         }
 
-        foreach (['code', 'type', 'status'] as $key) {
-            $value = data_get($json, 'error.'.$key) ?? ($json[$key] ?? null);
-            if (is_scalar($value) && (string) $value !== '') {
-                return substr((string) $value, 0, 120);
-            }
+        $message = data_get($json, 'error.message');
+        if (is_scalar($message) && trim((string) $message) !== '') {
+            return substr((string) $message, 0, 240);
         }
 
-        $message = data_get($json, 'error.message');
-        if (is_scalar($message) && (string) $message !== '') {
-            return substr((string) $message, 0, 120);
+        foreach (['status', 'type', 'code'] as $key) {
+            $value = data_get($json, 'error.'.$key) ?? ($json[$key] ?? null);
+            if (! is_scalar($value) || (string) $value === '' || is_numeric($value)) {
+                continue;
+            }
+
+            return substr((string) $value, 0, 120);
         }
 
         return null;

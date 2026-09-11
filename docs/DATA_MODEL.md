@@ -132,10 +132,10 @@ An uploaded or imported conversation.
 * storage_path — relative path on the private `calls` disk
 * mime_type, file_size nullable
 * duration_seconds nullable (ffprobe is not installed; WAV headers may be parsed)
-* status string: `pending` → `uploaded` → `processing` (STT) → `transcribed` → `analysis_pending` or `analyzing` → `completed`. `failed` on error.
+* status string: `pending` → `uploaded` → `processing` (STT) → `transcribed` → `analysis_pending` or `analyzing` → `completed`. `failed` on error. `cancelled` when the operator stops in-flight work (DEC-064).
 * recorded_at nullable
 * uploaded_by → users nullable (`nullOnDelete`); null for analyzer uploads
-* processing_started_at, processing_completed_at, error_message nullable
+* processing_started_at, processing_completed_at, cancelled_at, cancelled_stage, error_message nullable
 * timestamps
 
 Physical files live on disk `calls` (`storage/app/private/calls`), never under `public/`. Admin stream/download remain authenticated. There is **no** public audio URL (DEC-020). Deleting a Call deletes its file after the DB row is removed (DEC-016). Transcripts cascade-delete with the Call.

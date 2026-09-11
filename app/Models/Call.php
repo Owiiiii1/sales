@@ -15,6 +15,8 @@ class Call extends Model
     /** @use HasFactory<CallFactory> */
     use HasFactory;
 
+    public const STATUS_CANCELLED = 'cancelled';
+
     public const STATUSES = [
         'pending',
         'uploaded',
@@ -24,6 +26,14 @@ class Call extends Model
         'analyzing',
         'completed',
         'failed',
+        self::STATUS_CANCELLED,
+    ];
+
+    public const CANCELLABLE_STATUSES = [
+        'uploaded',
+        'processing',
+        'transcribed',
+        'analyzing',
     ];
 
     protected $hidden = [
@@ -46,6 +56,8 @@ class Call extends Model
         'uploaded_by',
         'processing_started_at',
         'processing_completed_at',
+        'cancelled_at',
+        'cancelled_stage',
         'error_message',
     ];
 
@@ -58,6 +70,7 @@ class Call extends Model
             'recorded_at' => 'datetime',
             'processing_started_at' => 'datetime',
             'processing_completed_at' => 'datetime',
+            'cancelled_at' => 'datetime',
             'file_size' => 'integer',
             'duration_seconds' => 'integer',
         ];
@@ -100,6 +113,26 @@ class Call extends Model
     public function analyticsAt(): Carbon
     {
         return ($this->recorded_at ?? $this->created_at)->copy()->timezone((string) config('app.timezone'));
+    }
+
+    public function isCancelled(): bool
+    {
+        return $this->status === self::STATUS_CANCELLED;
+    }
+
+    public function isCancellable(): bool
+    {
+        return in_array($this->status, self::CANCELLABLE_STATUSES, true);
+    }
+
+    public static function cancelStageForStatus(string $status): ?string
+    {
+        return match ($status) {
+            'uploaded', 'processing' => 'transcription',
+            'transcribed' => 'preparing',
+            'analyzing' => 'analysis',
+            default => null,
+        };
     }
 
     public function fileSizeLabel(): ?string

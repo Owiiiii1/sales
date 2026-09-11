@@ -88,6 +88,7 @@ Route::middleware(AdminRouteMiddleware::stack())->group(function () {
     Route::get('/calls/{call}/download', [CallsController::class, 'download'])->name('calls.download');
     Route::post('/calls/{call}/transcribe', [CallsController::class, 'transcribe'])->name('calls.transcribe');
     Route::post('/calls/{call}/analyze', [CallsController::class, 'analyze'])->name('calls.analyze');
+    Route::post('/calls/{call}/cancel', [CallsController::class, 'cancel'])->name('calls.cancel');
 
     Route::get('/customers', [CustomersController::class, 'index'])->name('customers.index');
     Route::post('/customers', [CustomersController::class, 'store'])->name('customers.store');

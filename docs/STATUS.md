@@ -21,7 +21,7 @@ Factual state of the running project. Update this file when reality changes.
 
 ## Product vs running app
 
-Guests open `/`, must explicitly select Generic analysis or a Company (DEC-063), optionally pick an Employee when a Company is selected, upload a recording, and poll through transcription and analysis. Empty context is not a default. If a Company is selected, existing company knowledge and the default scorecard are used (DEC-057). If transcription is not configured, the analyzer UI shows `Audio analysis is temporarily unavailable.` Speakers remain `Speaker 1`, `Speaker 2` on the transcript. Seller/customer mapping is analysis metadata.
+Guests open `/`, must explicitly select Generic analysis or a Company (DEC-063), optionally pick an Employee when a Company is selected, upload a recording, and poll through transcription and analysis. The Main Analyzer shows a staged processing block (not fake percentages), opens the transcript in a modal, and can stop in-flight work (`cancelled`, DEC-064). Empty context is not a default. If a Company is selected, existing company knowledge and the default scorecard are used (DEC-057). If transcription is not configured, the analyzer UI shows `Audio analysis is temporarily unavailable.` Speakers remain `Speaker 1`, `Speaker 2` on the transcript. Seller/customer mapping is analysis metadata.
 
 Admin company pages hold Sales Knowledge, verifiable facts, offerings, objections, scripts, scorecards, and score caps. Analysis context usage is shown on Knowledge. Admin-uploaded calls with a Company use that knowledge automatically (default active scorecard). Company Score is the primary report number when a custom scorecard was used; generic Overall / General Sales Score stays visible. Caps can lower the final company score without changing older analyses.
 
@@ -55,13 +55,15 @@ Admins sign in at `/login`. `/dashboard` is the sales analytics view (Last 30 da
 | `/` | guest | main analyzer workspace |
 | `/login` | guest | admin login |
 | `/analyze` | guest | analyzer audio upload (optional company/employee) |
-| `/analysis/{token}/status` | guest | safe status JSON |
+| `/analysis/{token}/status` | guest | safe status JSON + processing progress |
 | `/analysis/{token}` | guest | transcript + report when ready |
+| `POST /analysis/{token}/cancel` | guest | stop in-flight analyzer processing |
 | `/dashboard` | auth | sales analytics |
 | `/companies/{company}` | auth | company knowledge + analytics tabs |
 | `/employees/{employee}` | auth | employee analytics |
 | `POST /calls/{call}/transcribe` | auth | retry STT job |
 | `POST /calls/{call}/analyze` | auth | run / re-run analysis job (rejected if AI is not configured) |
+| `POST /calls/{call}/cancel` | auth | stop in-flight processing |
 | `/settings?tab=transcription` | auth | ElevenLabs STT settings |
 | `/settings?tab=ai` | auth | LLM providers + analysis behavior |
 

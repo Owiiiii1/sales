@@ -903,10 +903,24 @@ Status values: `Accepted` | `Open` | `Superseded` | `Rejected`.
 
 ---
 
+## DEC-064
+
+**Title:** User cancellation is a first-class Call state  
+**Status:** Accepted  
+**Date:** 2026-09-11
+
+**Decision:** User cancellation is a first-class Call state. External provider requests may not be physically abortable, but cancelled calls never continue the internal pipeline. `POST /analysis/{public_token}/cancel` sets `status = cancelled` with `cancelled_at` and `cancelled_stage`. `TranscribeCall` and `AnalyzeCall` no-op when the Call is cancelled, including after a late provider response. Completed or failed Calls cannot be cancelled. Repeated cancel is idempotent.
+
+**Reason:** Operators need to stop a long transcription or analysis without leaving the UI spinning, and without treating a manual stop as a pipeline failure.
+
+**Consequences:** ElevenLabs and LLM HTTP calls may still finish on the provider side. A transcript received after cancel may be stored. A new analysis result is not written after cancel. Main Analyzer maps backend statuses to a staged progress UI without fake percentages. The transcript opens in a modal instead of filling the page.
+
+---
+
 ## Template for new entries
 
 ```
-## DEC-064
+## DEC-065
 
 **Title:**  
 **Status:** Open | Accepted  

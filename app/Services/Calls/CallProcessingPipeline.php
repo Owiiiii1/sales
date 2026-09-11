@@ -14,7 +14,7 @@ class CallProcessingPipeline
 
     public function dispatch(Call $call): void
     {
-        if (! $this->shouldDispatchAfterUpload()) {
+        if (! $this->shouldDispatchAfterUpload() || $call->isCancelled()) {
             return;
         }
 

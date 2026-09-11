@@ -12,6 +12,7 @@ use App\Models\Employee;
 use App\Services\Ai\ActiveAiProvider;
 use App\Services\Calls\CallAudioStorage;
 use App\Services\Calls\CallAudioStreamer;
+use App\Services\Calls\CallCancellationService;
 use App\Services\Calls\CallUploadService;
 use App\Support\SalesAnalysisPresenter;
 use App\Support\TranscriptPresenter;
@@ -140,6 +141,12 @@ class CallsController extends Controller
 
     public function transcribe(Call $call): RedirectResponse
     {
+        if ($call->isCancelled()) {
+            return back()->withErrors([
+                'call' => 'This call was cancelled. Upload a new file to analyze again.',
+            ]);
+        }
+
         if ($call->status === 'processing') {
             return back()->withErrors([
                 'call' => 'Transcription is already in progress.',
@@ -153,6 +160,12 @@ class CallsController extends Controller
 
     public function analyze(Call $call): RedirectResponse
     {
+        if ($call->isCancelled()) {
+            return back()->withErrors([
+                'call' => 'This call was cancelled. Upload a new file to analyze again.',
+            ]);
+        }
+
         if (in_array($call->status, ['processing', 'analyzing'], true)) {
             return back()->withErrors([
                 'call' => 'This call is already being processed.',
@@ -174,6 +187,19 @@ class CallsController extends Controller
         }
 
         AnalyzeCall::dispatch($call->id);
+
+        return back();
+    }
+
+    public function cancel(Call $call, CallCancellationService $cancellations): RedirectResponse
+    {
+        try {
+            $cancellations->cancel($call);
+        } catch (\Symfony\Component\HttpKernel\Exception\ConflictHttpException $e) {
+            return back()->withErrors([
+                'call' => $e->getMessage(),
+            ]);
+        }
 
         return back();
     }
@@ -257,10 +283,13 @@ class CallsController extends Controller
             'uploaded_by_name' => $call->uploadedBy?->name,
             'processing_started_at' => optional($call->processing_started_at)->toIso8601String(),
             'processing_completed_at' => optional($call->processing_completed_at)->toIso8601String(),
+            'cancelled_at' => optional($call->cancelled_at)->toIso8601String(),
+            'cancelled_stage' => $call->cancelled_stage,
             'error_message' => $call->error_message,
             'has_audio' => $hasAudio,
             'audio_url' => $hasAudio ? route('calls.audio', $call) : null,
             'download_url' => $hasAudio ? route('calls.download', $call) : null,
+            'can_cancel' => $call->isCancellable(),
             'can_retry_transcription' => in_array($call->status, ['uploaded', 'failed', 'transcribed', 'analysis_pending', 'completed'], true),
             'can_run_analysis' => $call->transcript !== null && in_array($call->status, ['transcribed', 'analysis_pending', 'failed'], true),
             'can_rerun_analysis' => $call->transcript !== null && $call->status === 'completed',

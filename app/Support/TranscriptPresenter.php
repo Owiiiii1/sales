@@ -18,7 +18,7 @@ class TranscriptPresenter
             return null;
         }
 
-        $visible = in_array($call->status, ['transcribed', 'analysis_pending', 'analyzing', 'completed', 'failed'], true);
+        $visible = in_array($call->status, ['transcribed', 'analysis_pending', 'analyzing', 'completed', 'failed', 'cancelled'], true);
 
         if (! $visible) {
             return null;

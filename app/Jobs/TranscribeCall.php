@@ -11,6 +11,7 @@ use App\Services\Transcription\TranscriptWriter;
 use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -41,7 +42,7 @@ class TranscribeCall implements ShouldBeUniqueUntilProcessing, ShouldQueue
     ): void {
         $call = Call::query()->find($this->callId);
 
-        if ($call === null) {
+        if ($call === null || $call->isCancelled()) {
             return;
         }
 
@@ -51,34 +52,66 @@ class TranscribeCall implements ShouldBeUniqueUntilProcessing, ShouldQueue
             return;
         }
 
-        $call->forceFill([
-            'status' => 'processing',
-            'processing_started_at' => now(),
-            'error_message' => null,
-        ])->save();
+        Call::query()
+            ->whereKey($call->id)
+            ->where('status', '!=', Call::STATUS_CANCELLED)
+            ->update([
+                'status' => 'processing',
+                'processing_started_at' => now(),
+                'error_message' => null,
+            ]);
+
+        $call->refresh();
+
+        if ($call->isCancelled()) {
+            return;
+        }
 
         try {
             $result = $provider->transcribe($call);
-            $transcript = $writer->replace($call, $result);
 
-            $duration = $transcript->duration_seconds ?? $call->duration_seconds;
+            $shouldDispatch = DB::transaction(function () use ($writer, $result): bool {
+                $call = Call::query()->whereKey($this->callId)->lockForUpdate()->first();
 
-            $call->forceFill([
-                'status' => 'transcribed',
-                'duration_seconds' => $duration,
-                'processing_completed_at' => now(),
-                'error_message' => null,
-            ])->save();
+                if ($call === null) {
+                    return false;
+                }
 
-            AnalyzeCall::dispatch($call->id);
+                $transcript = $writer->replace($call, $result);
+                $duration = $transcript->duration_seconds ?? $call->duration_seconds;
+
+                if ($call->isCancelled()) {
+                    return false;
+                }
+
+                $call->forceFill([
+                    'status' => 'transcribed',
+                    'duration_seconds' => $duration,
+                    'processing_completed_at' => now(),
+                    'error_message' => null,
+                ])->save();
+
+                return true;
+            });
+
+            if ($shouldDispatch) {
+                $fresh = Call::query()->find($this->callId);
+                if ($fresh !== null && ! $fresh->isCancelled()) {
+                    AnalyzeCall::dispatch($fresh->id);
+                }
+            }
         } catch (PermanentTranscriptionException $e) {
-            $this->markFailed($call, $e);
+            $this->markFailed($call->fresh() ?? $call, $e);
         } catch (TransientTranscriptionException $e) {
-            Log::warning('Transient transcription failure; job will retry if attempts remain.', [
-                'call_id' => $call->id,
-                'attempt' => $this->attempts(),
-                'error' => $e->getMessage(),
-            ]);
+            try {
+                Log::warning('Transient transcription failure; job will retry if attempts remain.', [
+                    'call_id' => $this->callId,
+                    'attempt' => $this->attempts(),
+                    'error' => $e->getMessage(),
+                ]);
+            } catch (Throwable) {
+                // Logging must not convert a retryable failure into a stuck call.
+            }
 
             throw $e;
         }
@@ -88,7 +121,7 @@ class TranscribeCall implements ShouldBeUniqueUntilProcessing, ShouldQueue
     {
         $call = Call::query()->find($this->callId);
 
-        if ($call === null || in_array($call->status, ['transcribed', 'analysis_pending', 'analyzing', 'completed'], true)) {
+        if ($call === null || in_array($call->status, ['transcribed', 'analysis_pending', 'analyzing', 'completed', Call::STATUS_CANCELLED], true)) {
             return;
         }
 
@@ -101,15 +134,30 @@ class TranscribeCall implements ShouldBeUniqueUntilProcessing, ShouldQueue
 
     private function markFailed(Call $call, PermanentTranscriptionException $exception): void
     {
-        Log::error('Call transcription failed.', [
-            'call_id' => $call->id,
-            'error' => $exception->getMessage(),
-        ]);
+        if ($call->isCancelled()) {
+            return;
+        }
 
-        $call->forceFill([
-            'status' => 'failed',
-            'processing_completed_at' => now(),
-            'error_message' => $exception->publicMessage(),
-        ])->save();
+        try {
+            Log::error('Call transcription failed.', [
+                'call_id' => $call->id,
+                'error' => $exception->getMessage(),
+            ]);
+        } catch (Throwable) {
+            // Logging must not leave the call stuck in processing.
+        }
+
+        $updated = Call::query()
+            ->whereKey($call->id)
+            ->where('status', '!=', Call::STATUS_CANCELLED)
+            ->update([
+                'status' => 'failed',
+                'processing_completed_at' => now(),
+                'error_message' => $exception->publicMessage(),
+            ]);
+
+        if ($updated === 0) {
+            return;
+        }
     }
 }

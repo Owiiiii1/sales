@@ -6,8 +6,10 @@ use App\Http\Requests\PublicAnalyzeRequest;
 use App\Models\Call;
 use App\Models\Company;
 use App\Models\Employee;
+use App\Services\Calls\CallCancellationService;
 use App\Services\Calls\CallUploadService;
 use App\Services\Transcription\ActiveTranscriptionProvider;
+use App\Support\CallProcessingProgress;
 use App\Support\CompanyKnowledgeCompleteness;
 use App\Support\SalesAnalysisPresenter;
 use App\Support\TranscriptPresenter;
@@ -15,6 +17,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Throwable;
 
 class PublicAnalyzerController extends Controller
@@ -75,10 +78,31 @@ class PublicAnalyzerController extends Controller
 
         return response()->json([
             'status' => $call->status,
-            'progress' => null,
+            'progress' => CallProcessingProgress::for($call),
             'error' => $this->publicError($call),
             'report_available' => $this->reportAvailable($call),
+            'transcript_available' => $call->transcript !== null,
+            'message' => $this->publicMessage($call),
         ]);
+    }
+
+    public function cancel(string $publicToken, CallCancellationService $cancellations): JsonResponse
+    {
+        try {
+            $call = $cancellations->cancelByPublicToken($publicToken);
+        } catch (ConflictHttpException $e) {
+            $call = $this->callByToken($publicToken);
+
+            return response()->json([
+                'message' => $e->getMessage(),
+                'status' => $call->status,
+                'progress' => CallProcessingProgress::for($call),
+            ], 409);
+        }
+
+        $call->load(['transcript.segments', 'analysis', 'company:id,name', 'employee:id,first_name,last_name']);
+
+        return response()->json($this->safePayload($call));
     }
 
     private function callByToken(string $publicToken): Call
@@ -100,9 +124,10 @@ class PublicAnalyzerController extends Controller
             'public_token' => $call->public_token,
             'status' => $call->status,
             'original_filename' => $call->original_filename,
-            'progress' => null,
+            'progress' => CallProcessingProgress::for($call),
             'error' => $this->publicError($call),
             'report_available' => $this->reportAvailable($call),
+            'transcript_available' => $transcript !== null,
             'report' => SalesAnalysisPresenter::public($call),
             'language' => $transcript['language'] ?? null,
             'duration_seconds' => $transcript['duration_seconds'] ?? $call->duration_seconds,
@@ -173,6 +198,7 @@ class PublicAnalyzerController extends Controller
             'analysis_pending' => __('Transcription completed, but AI analysis is temporarily unavailable.'),
             'analyzing' => __('Analyzing your sales call…'),
             'completed' => __('Analysis complete.'),
+            'cancelled' => __('Processing stopped.'),
             'failed' => $this->publicError($call),
             default => null,
         };

@@ -12,6 +12,7 @@ use App\Services\Analysis\SalesAnalysisWriter;
 use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -42,7 +43,7 @@ class AnalyzeCall implements ShouldBeUniqueUntilProcessing, ShouldQueue
     ): void {
         $call = Call::query()->with(['transcript.segments', 'company'])->find($this->callId);
 
-        if ($call === null) {
+        if ($call === null || $call->isCancelled()) {
             return;
         }
 
@@ -58,39 +59,63 @@ class AnalyzeCall implements ShouldBeUniqueUntilProcessing, ShouldQueue
         }
 
         if (! $provider->isConfigured()) {
-            $call->forceFill([
-                'status' => 'analysis_pending',
-                'error_message' => null,
-            ])->save();
+            Call::query()
+                ->whereKey($call->id)
+                ->where('status', '!=', Call::STATUS_CANCELLED)
+                ->update([
+                    'status' => 'analysis_pending',
+                    'error_message' => null,
+                ]);
 
             return;
         }
 
         $startedAt = now();
-        $call->forceFill([
-            'status' => 'analyzing',
-            'error_message' => null,
-        ])->save();
+        Call::query()
+            ->whereKey($call->id)
+            ->where('status', '!=', Call::STATUS_CANCELLED)
+            ->update([
+                'status' => 'analyzing',
+                'error_message' => null,
+            ]);
+
+        $call->refresh()->load(['transcript.segments', 'company']);
+
+        if ($call->isCancelled()) {
+            return;
+        }
 
         try {
             $result = $provider->analyze($transcript, $contexts->build($call));
             $result = app(ConversationMetricsCalculator::class)->attach($transcript, $result);
 
-            $writer->replace($call, $result, $startedAt);
+            DB::transaction(function () use ($writer, $result, $startedAt): void {
+                $call = Call::query()->whereKey($this->callId)->lockForUpdate()->first();
 
-            $call->forceFill([
-                'status' => 'completed',
-                'processing_completed_at' => now(),
-                'error_message' => null,
-            ])->save();
+                if ($call === null || $call->isCancelled()) {
+                    return;
+                }
+
+                $writer->replace($call, $result, $startedAt);
+
+                $call->forceFill([
+                    'status' => 'completed',
+                    'processing_completed_at' => now(),
+                    'error_message' => null,
+                ])->save();
+            });
         } catch (PermanentAnalysisException $e) {
-            $this->markFailed($call, $e);
+            $this->markFailed($call->fresh() ?? $call, $e);
         } catch (TransientAnalysisException $e) {
-            Log::warning('Transient sales analysis failure; job will retry if attempts remain.', [
-                'call_id' => $call->id,
-                'attempt' => $this->attempts(),
-                'error' => $e->getMessage(),
-            ]);
+            try {
+                Log::warning('Transient sales analysis failure; job will retry if attempts remain.', [
+                    'call_id' => $this->callId,
+                    'attempt' => $this->attempts(),
+                    'error' => $e->getMessage(),
+                ]);
+            } catch (Throwable) {
+                // Logging must not convert a retryable failure into a stuck call.
+            }
 
             throw $e;
         }
@@ -100,7 +125,7 @@ class AnalyzeCall implements ShouldBeUniqueUntilProcessing, ShouldQueue
     {
         $call = Call::query()->find($this->callId);
 
-        if ($call === null || $call->status === 'completed') {
+        if ($call === null || in_array($call->status, ['completed', Call::STATUS_CANCELLED], true)) {
             return;
         }
 
@@ -113,15 +138,26 @@ class AnalyzeCall implements ShouldBeUniqueUntilProcessing, ShouldQueue
 
     private function markFailed(Call $call, PermanentAnalysisException $exception): void
     {
-        Log::error('Call sales analysis failed.', [
-            'call_id' => $call->id,
-            'error' => $exception->getMessage(),
-        ]);
+        if ($call->isCancelled()) {
+            return;
+        }
 
-        $call->forceFill([
-            'status' => 'failed',
-            'processing_completed_at' => now(),
-            'error_message' => $exception->publicMessage(),
-        ])->save();
+        try {
+            Log::error('Call sales analysis failed.', [
+                'call_id' => $call->id,
+                'error' => $exception->getMessage(),
+            ]);
+        } catch (Throwable) {
+            // Logging must not leave the call stuck in analyzing.
+        }
+
+        Call::query()
+            ->whereKey($call->id)
+            ->where('status', '!=', Call::STATUS_CANCELLED)
+            ->update([
+                'status' => 'failed',
+                'processing_completed_at' => now(),
+                'error_message' => $exception->publicMessage(),
+            ]);
     }
 }

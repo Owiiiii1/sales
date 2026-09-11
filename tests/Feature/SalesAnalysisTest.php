@@ -32,6 +32,7 @@ use App\Services\Transcription\TranscriptWriter;
 use Database\Factories\SalesAnalysisFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -156,6 +157,34 @@ class SalesAnalysisTest extends TestCase
         $this->runAnalyze($call);
 
         $this->assertSame('failed', $call->fresh()->status);
+    }
+
+    public function test_permanent_analysis_failure_is_saved_even_if_logging_fails(): void
+    {
+        $call = $this->transcribedCall();
+        $this->app->instance(SalesAnalysisProvider::class, new class implements SalesAnalysisProvider
+        {
+            public function isConfigured(): bool
+            {
+                return true;
+            }
+
+            public function analyze(Transcript $transcript, AnalysisContext $context): SalesAnalysisResult
+            {
+                throw new PermanentAnalysisException('Gemini rejected the request with HTTP 400 (400).');
+            }
+        });
+
+        Log::shouldReceive('error')
+            ->once()
+            ->andThrow(new \UnexpectedValueException('Failed to open stream: Permission denied'));
+
+        $this->runAnalyze($call);
+
+        $call->refresh();
+        $this->assertSame('failed', $call->status);
+        $this->assertSame('Analysis failed. Please try again.', $call->error_message);
+        $this->assertSame(0, SalesAnalysis::query()->count());
     }
 
     public function test_invalid_speaker_role_is_rejected(): void

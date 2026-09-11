@@ -172,6 +172,16 @@ class PublicAnalyzerTest extends TestCase
         $this->assertStringNotContainsString("<option value=\"\">{t('home.genericOption')}</option>", $source);
     }
 
+    public function test_home_does_not_render_full_transcript_inline(): void
+    {
+        $source = file_get_contents(resource_path('js/Pages/Public/Home.jsx'));
+
+        $this->assertStringNotContainsString('<CallTranscript', $source);
+        $this->assertStringContainsString('TranscriptReadyCard', $source);
+        $this->assertStringContainsString('TranscriptModal', $source);
+        $this->assertStringContainsString('ProcessingProgress', $source);
+    }
+
     public function test_explicit_generic_upload_keeps_company_and_employee_null(): void
     {
         $response = $this->post('/analyze', [
@@ -425,6 +435,9 @@ class PublicAnalyzerTest extends TestCase
             ->assertOk()
             ->assertJsonPath('status', 'uploaded')
             ->assertJsonPath('report_available', false)
+            ->assertJsonPath('progress.cancellable', true)
+            ->assertJsonPath('progress.steps.0.state', 'completed')
+            ->assertJsonPath('progress.steps.1.state', 'active')
             ->assertJsonMissingPath('id')
             ->assertJsonMissingPath('storage_path')
             ->assertJsonMissingPath('uploaded_by');

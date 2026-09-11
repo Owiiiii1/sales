@@ -16,6 +16,7 @@ function statusClass(status) {
     if (status === 'uploaded') return 'bg-indigo-100 text-indigo-800';
     if (status === 'processing' || status === 'analyzing') return 'bg-amber-100 text-amber-800';
     if (status === 'failed') return 'bg-red-100 text-red-800';
+    if (status === 'cancelled') return 'bg-slate-200 text-slate-700';
     return 'bg-slate-100 text-slate-700';
 }
 

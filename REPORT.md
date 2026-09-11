@@ -1,108 +1,110 @@
-# Sales Analyzer — Phase 7.2 Correction: Explicit Analysis Context
+# Sales Analyzer — Processing UX, Transcript Modal & Cancellation
 
 ## Baseline
 
-Phase 7.2 already put Company and optional Employee on `/`. Empty `<select>` value was Generic, so Generic was pre-selected and **Analyze Call** was enabled immediately. This correction makes context an explicit choice. No new modules. No migration.
+Phase 7.2 put Company selection on `/`. After upload the Main Analyzer showed a single spinner and, once STT finished, dumped the full transcript onto the page. There was no way to stop a long job. Call #4 demonstrated the gap: the UI stayed on “analyzing” with no staged progress and no Stop.
 
-## What changed
+This change is UX + a first-class `cancelled` state. The transcription/LLM pipeline is unchanged.
 
-### 1. Company / context select
+Also included: log writes no longer block `markFailed` (worker `www-data` vs `deploy`-owned `laravel.log`), and Gemini HTTP 400 now prefers `error.message` over a numeric `error.code`.
 
-The Main Analyzer select starts unselected:
+## Transcript UX
 
-* placeholder: `Select analysis context`
-* explicit Generic: `No company — Generic analysis` (sentinel `generic`, never sent as `company_id`)
-* explicit Company: a named active company
+Full `CallTranscript` is no longer rendered on `/`. When a transcript exists, a compact block shows **Call transcript / Transcript ready / Open transcript**. The full text, timestamps, speakers, duration, and language open in `TranscriptModal` (max ~900–1100px, ~90vh, inner scroll, ESC and overlay click close). `CallTranscript` is reused with `framed={false}` inside the modal.
 
-`company_id = null` remains valid on `POST /analyze` only after the operator chooses Generic. Upload is not submitted until a context is selected.
+Admin Call detail used the same full-page transcript; it now uses **Open transcript** + the same modal.
 
-### 2. Employee
+## Processing Progress
 
-Still optional.
+After upload, Main Analyzer shows **Call processing** with real stages:
 
-* Generic: Employee disabled, value null
-* Company: Employee optional, list filtered to that company
-* Changing context still resets Employee (`changeCompany` clears `employeeId`)
+1. File uploaded
+2. Transcribing call
+3. Preparing analysis
+4. Analyzing call
+5. Complete
 
-### 3. Analyze button
+No fake percentages. Desktop is a compact horizontal stepper; mobile is vertical. Active uses a light spinner; completed a check; failed an X; cancelled a stop square; `analysis_pending` shows Analysis unavailable without an infinite spinner.
 
-Disabled until context is selected. Hint:
+`CallProcessingProgress` maps backend status → step states and is returned on public upload/status/show payloads.
 
-`Select a company or Generic analysis first.`
+## Status Mapping
 
-Label is `Analyze Call`.
+| Backend | UI |
+|---|---|
+| `uploaded` / `processing` | transcription active |
+| `transcribed` | preparing analysis active |
+| `analyzing` | analysis active |
+| `completed` | all complete (compact “Analysis complete ✓”) |
+| `analysis_pending` | analysis unavailable + existing safe message |
+| `failed` without transcript | transcription failed |
+| `failed` with transcript | analysis failed |
+| `cancelled` | cancelled on `cancelled_stage` |
 
-### 4. Context summary
+## Cancellation
 
-Shown only after a context is chosen, before upload.
+`POST /analysis/{public_token}/cancel` (UUID token only). Admin: `POST /calls/{call}/cancel`.
 
-Generic:
+Cancellable: `uploaded`, `processing`, `transcribed`, `analyzing`. Completed/failed → 409. Already cancelled → 200 idempotent.
 
-```
-Generic analysis
-General sales methodology
-No company-specific rules will be used
-```
+UI: **Stop processing** → confirm modal (not `window.confirm`). After success: **Processing stopped**, polling stops, upload form remains. Transcript stays openable if it already exists.
 
-Company:
+## Job Guards
 
-```
-{Company} · Company analysis
-Knowledge: {percent}%
-Scorecard: {name}
-Employee: {name}   // only if selected
-```
+`TranscribeCall` and `AnalyzeCall` return immediately if the Call is cancelled. After the provider returns they reload under `lockForUpdate`. Cancelled calls do not dispatch `AnalyzeCall`, do not write a new analysis, and do not move to `completed`. `markFailed` will not overwrite `cancelled`.
 
-Home payload still exposes only `id`, `name`, `knowledge_completeness`, `scorecard_name` for companies and `id`, `company_id`, `name` for employees. No scripts, forbidden claims, notes, or other knowledge secrets.
+## Provider Cancellation Limitations
 
-### 5. Report badge
+ElevenLabs and LLM HTTP calls are not aborted mid-flight. The Call becomes `cancelled` immediately in our DB. A late STT response may still save the transcript. A late LLM response must not publish a final result.
 
-* Generic: `Generic analysis`
-* Company: `Company analysis · {Company Name}`
-* If Employee: nearby `Employee · {Employee Name}`
+## Race Conditions
 
-Admin call show passes `analysisMode`, `companyName`, and `employeeName` into the shared report.
+Covered in tests: cancel before the job starts; cancel during STT (late response does not start analysis); cancel after transcribed; cancel during analyzing (late LLM does not complete); cannot cancel completed; repeated cancel is safe.
 
-### 6. Source
+## Tests
 
-`calls.source = public` is unchanged. No migration.
+* Progress mapping for every backend status
+* Home no longer inlines full transcript; modal + progress + cancel are wired
+* Cancel uploaded / processing / transcribed / analyzing
+* 409 on completed; idempotent repeat; raw Call id rejected
+* Job guards and late-provider races
+* Public payloads omit ids, storage paths, and traces
 
-Technical debt: `public` is historical and now means upload through the Main Analyzer Workspace. On a later suitable migration, consider `manual_analyzer`. Do not migrate only for this rename.
+`php artisan test`: **233 passed**, 1613 assertions.
 
-## Backend
+## Database Changes
 
-Unchanged contract:
+Migration `2026_09_11_123000_add_call_cancellation_columns.php`:
 
-* omitted / null `company_id` → generic (`company_id` and `employee_id` null)
-* company + optional employee still validated (active company, active employee of that company, employee requires company)
-* inactive company/employee rejected
+* `calls.cancelled_at` nullable timestamp
+* `calls.cancelled_stage` nullable string (`transcription` | `preparing` | `analysis`)
 
-Explicitness is UI-only. The `generic` sentinel is not posted.
+## Production Sentinel
 
-## Files
+Backup: `/home/deploy/backups/sales/sales-pre-processing-ux-20260911-125143.sql` (outside the repo). Migration `2026_09_11_123000_add_call_cancellation_columns` applied with `php artisan migrate --force`.
 
-* `resources/js/Pages/Public/Home.jsx`
-* `resources/js/i18n/catalog.js`
-* `resources/js/Components/Public/AnalysisReport.jsx`
-* `resources/js/Pages/Calls/Show.jsx`
-* `tests/Feature/PublicAnalyzerTest.php`
-* `docs/PRODUCT.md`, `docs/STATUS.md`, `docs/DECISIONS.md` (DEC-063), `docs/ROADMAP.md`, `docs/DATA_MODEL.md`, `docs/PROJECT.md`, `docs/ARCHITECTURE.md`
+## Documentation
 
-## Tests added
+DEC-064 accepted. STATUS, PRODUCT, ARCHITECTURE, DATA_MODEL updated.
 
-* initial home state has no selected context
-* Home UI requires explicit context before Analyze (source contract: placeholder, disabled Analyze, Generic sentinel, Employee reset)
-* explicit Generic upload keeps `company_id` / `employee_id` null
-* explicit Company upload without Employee is allowed
-* home company/employee payload shape is only safe metadata (nested Inertia assert without extra keys)
-* existing generic, company+employee, and validation tests remain
+## Changed Files
 
-## Docs
+Backend: Call model/status, cancellation service, progress presenter, public/admin cancel routes, TranscribeCall/AnalyzeCall guards, TranscriptPresenter, logging ignore_exceptions, ProviderHttp error messages.
 
-Recorded: **Main Analyzer requires explicit analysis context selection before upload. Generic remains a first-class explicit mode.**
+Frontend: Home processing UI, ProcessingProgress, TranscriptModal, CancelProcessingModal, CallTranscript modal variant, Admin Call transcript modal, i18n.
 
-DEC-063 accepted. DEC-057 consequences updated so empty select is no longer Generic.
+Tests: CallProcessingProgressTest, CallCancellationTest, PublicAnalyzerTest, SalesAnalysisTest, ProviderHttpTest.
 
-## Database
+Docs: STATUS, PRODUCT, ARCHITECTURE, DATA_MODEL, DECISIONS (DEC-064), REPORT.
 
-None. No production backup or migrate for this correction.
+## Git
+
+Commit and push to `main` after tests, build, production backup, migrate, sentinel, and secret scan. Secret scan: no literal secrets in the diff.
+
+## Problems / Warnings
+
+Gemini `responseSchema` + v3 `additionalProperties` still yields HTTP 400 on live company analysis (separate from this UX work). Worker PHP changes need a worker recycle (`--max-time=3600` or systemd restart). Log ACL for `www-data` was applied on `storage/logs`.
+
+## Final Status
+
+PROCESSING UX & CANCELLATION PASSED

@@ -1,5 +1,6 @@
 import AdminLayout from '@/Layouts/AdminLayout';
 import AnalysisReport from '@/Components/Public/AnalysisReport';
+import TranscriptModal from '@/Components/Public/TranscriptModal';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 import { useT } from '@/i18n';
@@ -18,6 +19,7 @@ function statusClass(status) {
     if (status === 'uploaded') return 'bg-indigo-100 text-indigo-800';
     if (status === 'processing' || status === 'analyzing') return 'bg-amber-100 text-amber-800';
     if (status === 'failed') return 'bg-red-100 text-red-800';
+    if (status === 'cancelled') return 'bg-slate-200 text-slate-700';
     return 'bg-slate-100 text-slate-700';
 }
 
@@ -30,6 +32,7 @@ export default function CallsShow({ call, companies = [], employees = [] }) {
         recorded_at: call.recorded_at ? call.recorded_at.slice(0, 16) : '',
     });
     const [showSnapshot, setShowSnapshot] = useState(false);
+    const [transcriptOpen, setTranscriptOpen] = useState(false);
 
     const employeesForCompany = useMemo(
         () => employees.filter((employee) => String(employee.company_id) === String(form.data.company_id)),
@@ -207,27 +210,15 @@ export default function CallsShow({ call, companies = [], employees = [] }) {
                         <p className="mt-3 text-sm text-red-700">{call.error_message || t('calls.transcriptionFailed')}</p>
                     )}
                     {call.transcript && (
-                        <div className="mt-4 space-y-4">
-                            <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 text-sm">
-                                <Item label={t('calls.provider')} value={call.transcript.provider_label} />
-                                <Item label={t('calls.model')} value={call.transcript.model_label} />
-                                <Item label={t('calls.detectedLanguage')} value={call.transcript.language ? call.transcript.language.toUpperCase() : null} />
-                                <Item label={t('common.duration')} value={formatDuration(call.transcript.duration_seconds, t)} />
-                            </dl>
-                            {call.transcript.segments?.length > 0 ? (
-                                <div className="space-y-3">
-                                    {call.transcript.segments.map((segment, index) => (
-                                        <div key={`${segment.speaker}-${segment.start_seconds}-${index}`}>
-                                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                                {segment.start_label} {segment.speaker_label}
-                                            </p>
-                                            <p className="mt-1 text-sm leading-6 text-slate-800">{segment.text}</p>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <p className="whitespace-pre-wrap text-sm leading-6 text-slate-800">{call.transcript.text}</p>
-                            )}
+                        <div className="mt-4">
+                            <p className="text-sm text-slate-600">{t('progress.transcriptReady')}</p>
+                            <button
+                                type="button"
+                                onClick={() => setTranscriptOpen(true)}
+                                className="mt-3 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+                            >
+                                {t('progress.openTranscript')}
+                            </button>
                         </div>
                     )}
                 </section>
@@ -296,6 +287,11 @@ export default function CallsShow({ call, companies = [], employees = [] }) {
                     )}
                 </section>
             </div>
+            <TranscriptModal
+                open={transcriptOpen}
+                onOpenChange={setTranscriptOpen}
+                transcript={call.transcript}
+            />
         </AdminLayout>
     );
 }
