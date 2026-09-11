@@ -18,11 +18,12 @@ Factual state of the running project. Update this file when reality changes.
 * **Phase 7.2 — Main analyzer company selection:** COMPLETED (application code + mocked tests). Explicit context selection required before upload (DEC-063).
 * **Phase 7.3 — Methodology alignment & context reliability:** COMPLETED (application code + mocked tests).
 * **Production fix — Gemini structured output & failure reliability:** COMPLETED. Live Gemini analysis of Call #4 completed on `gemini-3.7-flash` (schema v3, overall_score 48). `responseJsonSchema` is used instead of OpenAPI `responseSchema` (DEC-065). Call status transitions do not depend on the logger (DEC-066). Stuck processing/analyzing calls can be recovered with `php artisan sales:recover-stuck-calls`.
+* **Report structure & UX revision:** COMPLETED. Gemini wire schema now models high-value nested blocks (DEC-071). Main Analyzer default output is the short report (DEC-067); full report is `/analysis/{public_token}/full` (DEC-068). Empty sections are omitted (DEC-069). Main Analyzer report language is the UI locale stored at upload (DEC-070).
 * **Next planned work:** Phase 8 user product (accounts / personal cabinet), unless the roadmap is reordered.
 
 ## Product vs running app
 
-Guests open `/`, must explicitly select Generic analysis or a Company (DEC-063), optionally pick an Employee when a Company is selected, upload a recording, and poll through transcription and analysis. The Main Analyzer shows a staged processing block (not fake percentages), opens the transcript in a modal, and can stop in-flight work (`cancelled`, DEC-064). Empty context is not a default. If a Company is selected, existing company knowledge and the default scorecard are used (DEC-057). If transcription is not configured, the analyzer UI shows `Audio analysis is temporarily unavailable.` Speakers remain `Speaker 1`, `Speaker 2` on the transcript. Seller/customer mapping is analysis metadata.
+Guests open `/`, must explicitly select Generic analysis or a Company (DEC-063), optionally pick an Employee when a Company is selected, upload a recording, and poll through transcription and analysis. The Main Analyzer shows a staged processing block (not fake percentages), opens the transcript in a modal, and can stop in-flight work (`cancelled`, DEC-064). After `completed`, Main Analyzer shows a short report; the full report opens in a new tab (DEC-067 / DEC-068). Report language is the UI locale captured at upload, not the later browser/session locale (DEC-070). Empty context is not a default. If a Company is selected, existing company knowledge and the default scorecard are used (DEC-057). If transcription is not configured, the analyzer UI shows `Audio analysis is temporarily unavailable.` Speakers remain `Speaker 1`, `Speaker 2` on the transcript. Seller/customer mapping is analysis metadata.
 
 Admin company pages hold Sales Knowledge, verifiable facts, offerings, objections, scripts, scorecards, and score caps. Analysis context usage is shown on Knowledge. Admin-uploaded calls with a Company use that knowledge automatically (default active scorecard). Company Score is the primary report number when a custom scorecard was used; generic Overall / General Sales Score stays visible. Caps can lower the final company score without changing older analyses.
 
@@ -57,7 +58,8 @@ Admins sign in at `/login`. `/dashboard` is the sales analytics view (Last 30 da
 | `/login` | guest | admin login |
 | `/analyze` | guest | analyzer audio upload (optional company/employee) |
 | `/analysis/{token}/status` | guest | safe status JSON + processing progress |
-| `/analysis/{token}` | guest | transcript + report when ready |
+| `/analysis/{token}` | guest | transcript + short-report JSON when ready |
+| `/analysis/{token}/full` | guest | read-only full report page (same stored result) |
 | `POST /analysis/{token}/cancel` | guest | stop in-flight analyzer processing |
 | `/dashboard` | auth | sales analytics |
 | `/companies/{company}` | auth | company knowledge + analytics tabs |
@@ -71,8 +73,8 @@ Admins sign in at `/login`. `/dashboard` is the sales analytics view (Last 30 da
 
 ## Known issues (non-critical)
 
-* Live ElevenLabs verification deferred by Project Manager. Live Gemini structured analysis verified on Call #4 (`gemini-3.7-flash`, HTTP 200, schema v3, status `completed`).
-* `sales-worker.service` uses `--max-time=3600`. PHP job/client changes need a worker recycle (`sudo systemctl restart sales-worker.service`); the deploy user cannot sudo without a password. The unit auto-recycled at 13:23 CEST (PID 3056249); a further restart is needed to pick up the Gemini adapter committed after that recycle.
+* Live ElevenLabs verification deferred by Project Manager. Live Gemini structured analysis verified on Call #13 (`gemini-3.7-flash`, schema v3, status `completed`, overall 48, company 49, filled critical mistakes / better phrases / coaching / scorecard).
+* `sales-worker.service` uses `--max-time=3600`. PHP job/client changes need a worker recycle (`sudo systemctl restart sales-worker.service`); the deploy user cannot sudo without a password. Current worker PID 3071367 started 14:41 CEST; auto-recycle ~15:41 CEST picks up this Gemini adapter. Call #13 re-analysis used `dispatchSync`, so it already ran the new code.
 * Without an active AI provider, analysis stays `analysis_pending`.
 * Analyzer upload requires a ready transcription provider (DB key + connection check, or env fallback).
 * ffprobe/ffmpeg not installed; duration often comes from STT.

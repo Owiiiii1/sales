@@ -1,5 +1,5 @@
 import AdminLayout from '@/Layouts/AdminLayout';
-import AnalysisReport from '@/Components/Public/AnalysisReport';
+import FullAnalysisReport from '@/Components/Public/FullAnalysisReport';
 import TranscriptModal from '@/Components/Public/TranscriptModal';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
@@ -264,12 +264,13 @@ export default function CallsShow({ call, companies = [], employees = [] }) {
                                     </ul>
                                 </div>
                             )}
-                            <AnalysisReport
-                                status="completed"
+                            <FullAnalysisReport
                                 report={call.analysis}
                                 analysisMode={call.company_id ? 'company' : 'generic'}
                                 companyName={call.company_name}
                                 employeeName={call.employee_name}
+                                transcriptAvailable={Boolean(call.transcript)}
+                                onOpenTranscript={() => setTranscriptOpen(true)}
                             />
                             {call.analysis.context_snapshot && (
                                 <div className="rounded-xl border border-slate-200 p-4">

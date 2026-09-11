@@ -44,6 +44,7 @@ class Call extends Model
         'company_id',
         'employee_id',
         'source',
+        'ui_locale',
         'public_token',
         'external_id',
         'original_filename',

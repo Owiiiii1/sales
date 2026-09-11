@@ -316,6 +316,54 @@ class AnalysisContextBuilderTest extends TestCase
         $this->assertStringContainsString('The price is 500 dollars.', $messages['user']);
     }
 
+    public function test_stored_ui_locale_overrides_company_and_transcript_language(): void
+    {
+        $company = $this->companyWithKnowledge();
+        $company->profile->update(['report_language' => 'ru']);
+        $call = Call::factory()->create([
+            'company_id' => $company->id,
+            'source' => 'public',
+            'ui_locale' => 'en',
+        ]);
+        $transcript = Transcript::factory()->create([
+            'call_id' => $call->id,
+            'language' => 'uk',
+            'raw_text' => 'Ціна пʼятсот доларів.',
+        ]);
+
+        app()->setLocale('ru');
+
+        $context = app(AnalysisContextBuilder::class)->build($call->fresh(['transcript', 'company']));
+        $messages = app(SalesAnalysisPromptBuilder::class)->messages($transcript->fresh('segments'), $context);
+
+        $this->assertSame('en', $context->reportLanguage);
+        $this->assertSame('uk', $context->language);
+        $this->assertStringContainsString('Write the report in English.', $messages['system']);
+        $this->assertStringContainsString('Ціна пʼятсот доларів.', $messages['user']);
+        $this->assertStringContainsString('Do not translate quotes.', $messages['user']);
+    }
+
+    public function test_generic_ui_locale_writes_russian_report_for_english_call(): void
+    {
+        $call = Call::factory()->create([
+            'company_id' => null,
+            'source' => 'public',
+            'ui_locale' => 'ru',
+        ]);
+        $transcript = Transcript::factory()->create([
+            'call_id' => $call->id,
+            'language' => 'en',
+            'raw_text' => 'The price is 500 dollars.',
+        ]);
+
+        $context = app(AnalysisContextBuilder::class)->build($call->fresh(['transcript', 'company']));
+        $messages = app(SalesAnalysisPromptBuilder::class)->messages($transcript, $context);
+
+        $this->assertSame('ru', $context->reportLanguage);
+        $this->assertStringContainsString('Write the report in Russian.', $messages['system']);
+        $this->assertStringContainsString('The price is 500 dollars.', $messages['user']);
+    }
+
     public function test_generic_report_language_follows_same_as_call(): void
     {
         $call = Call::factory()->create(['company_id' => null]);

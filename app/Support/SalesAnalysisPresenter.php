@@ -111,12 +111,12 @@ class SalesAnalysisPresenter
             'trust_rapport' => self::namedFindings($result['trust_rapport'] ?? null, ['trust_building_moments', 'trust_reducing_moments']),
             'closing' => self::namedFindings($result['closing'] ?? null, ['missed_closing_opportunities']),
             'timeline' => self::timeline($result['timeline'] ?? []),
-            'turning_points' => is_array($result['turning_points'] ?? null) ? $result['turning_points'] : [],
-            'critical_mistakes' => is_array($result['critical_mistakes'] ?? null) ? $result['critical_mistakes'] : [],
+            'turning_points' => self::turningPoints($result['turning_points'] ?? []),
+            'critical_mistakes' => self::criticalMistakes($result['critical_mistakes'] ?? []),
             'what_to_repeat' => self::practices($result['what_to_repeat'] ?? []),
             'what_to_stop' => self::practices($result['what_to_stop'] ?? []),
             'what_to_start' => self::practices($result['what_to_start'] ?? []),
-            'coaching_priorities' => is_array($result['coaching_priorities'] ?? null) ? $result['coaching_priorities'] : [],
+            'coaching_priorities' => self::coachingPriorities($result['coaching_priorities'] ?? []),
             'next_call_playbook' => is_array($result['next_call_playbook'] ?? null) ? $result['next_call_playbook'] : null,
             'alternative_path' => is_array($result['alternative_path'] ?? null) ? $result['alternative_path'] : null,
             'outcome_analysis' => is_array($result['outcome_analysis'] ?? null) ? $result['outcome_analysis'] : null,
@@ -146,6 +146,9 @@ class SalesAnalysisPresenter
                 ? $analysis->scorecard_snapshot['score_bands']
                 : null,
         );
+
+        $payload['company_specific'] = self::companySpecific($payload['company_specific'], $analysis->scorecard_snapshot);
+        $payload['short'] = ShortReportComposer::from($payload);
 
         unset($admin);
 
@@ -185,6 +188,10 @@ class SalesAnalysisPresenter
                 ? (float) $item['timestamp_seconds']
                 : null;
 
+            if (trim((string) ($item['text'] ?? '')) === '') {
+                continue;
+            }
+
             $normalized[] = [
                 'text' => (string) ($item['text'] ?? ''),
                 'speaker' => $speaker,
@@ -210,6 +217,9 @@ class SalesAnalysisPresenter
         $normalized = [];
         foreach ($items as $item) {
             if (is_string($item)) {
+                if (trim($item) === '') {
+                    continue;
+                }
                 $normalized[] = [
                     'timestamp_seconds' => null,
                     'timestamp_label' => null,
@@ -228,6 +238,12 @@ class SalesAnalysisPresenter
                 continue;
             }
 
+            $original = (string) ($item['original'] ?? '');
+            $better = (string) ($item['better'] ?? $item['suggested'] ?? '');
+            if (trim($original) === '' && trim($better) === '') {
+                continue;
+            }
+
             $normalized[] = [
                 'timestamp_seconds' => isset($item['timestamp_seconds']) && $item['timestamp_seconds'] !== null
                     ? (float) $item['timestamp_seconds']
@@ -235,10 +251,10 @@ class SalesAnalysisPresenter
                 'timestamp_label' => isset($item['timestamp_seconds']) && $item['timestamp_seconds'] !== null
                     ? TranscriptPresenter::timestamp((float) $item['timestamp_seconds'])
                     : null,
-                'original' => (string) ($item['original'] ?? ''),
+                'original' => $original,
                 'problem' => (string) ($item['problem'] ?? ''),
-                'better' => (string) ($item['better'] ?? $item['suggested'] ?? ''),
-                'suggested' => (string) ($item['better'] ?? $item['suggested'] ?? ''),
+                'better' => $better,
+                'suggested' => $better,
                 'why_better' => (string) ($item['why_better'] ?? $item['reason'] ?? ''),
                 'reason' => (string) ($item['why_better'] ?? $item['reason'] ?? ''),
             ];
@@ -379,7 +395,28 @@ class SalesAnalysisPresenter
      */
     private static function missedSignals(mixed $items): array
     {
-        return is_array($items) ? array_values($items) : [];
+        if (! is_array($items)) {
+            return [];
+        }
+
+        $normalized = [];
+        foreach ($items as $item) {
+            if (! is_array($item) || trim((string) ($item['signal'] ?? '')) === '') {
+                continue;
+            }
+
+            $timestamp = isset($item['timestamp_seconds']) && $item['timestamp_seconds'] !== null
+                ? (float) $item['timestamp_seconds']
+                : null;
+
+            $normalized[] = [
+                ...$item,
+                'timestamp_seconds' => $timestamp,
+                'timestamp_label' => $timestamp !== null ? TranscriptPresenter::timestamp($timestamp) : null,
+            ];
+        }
+
+        return $normalized;
     }
 
     /**
@@ -443,11 +480,16 @@ class SalesAnalysisPresenter
                 ? (float) $item['timestamp_seconds']
                 : null;
 
+            $title = (string) ($item['title'] ?? '');
+            if (trim($title) === '') {
+                continue;
+            }
+
             $normalized[] = [
                 'timestamp_seconds' => $timestamp,
                 'timestamp_label' => $timestamp !== null ? TranscriptPresenter::timestamp($timestamp) : null,
                 'type' => (string) ($item['type'] ?? 'positive'),
-                'title' => (string) ($item['title'] ?? ''),
+                'title' => $title,
                 'description' => (string) ($item['description'] ?? ''),
                 'speaker' => $speaker,
                 'speaker_label' => $speaker !== null ? 'Speaker '.($speaker + 1) : null,
@@ -470,6 +512,9 @@ class SalesAnalysisPresenter
         $normalized = [];
         foreach ($items as $item) {
             if (is_string($item)) {
+                if (trim($item) === '') {
+                    continue;
+                }
                 $normalized[] = ['text' => $item, 'why' => ''];
 
                 continue;
@@ -479,13 +524,119 @@ class SalesAnalysisPresenter
                 continue;
             }
 
+            $text = (string) ($item['text'] ?? $item['practice'] ?? '');
+            if (trim($text) === '') {
+                continue;
+            }
+
             $normalized[] = [
-                'text' => (string) ($item['text'] ?? $item['practice'] ?? ''),
+                'text' => $text,
                 'why' => (string) ($item['why'] ?? ''),
             ];
         }
 
         return $normalized;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private static function criticalMistakes(mixed $items): array
+    {
+        if (! is_array($items)) {
+            return [];
+        }
+
+        $normalized = [];
+        foreach ($items as $item) {
+            if (! is_array($item) || trim((string) ($item['mistake'] ?? '')) === '') {
+                continue;
+            }
+
+            $timestamp = isset($item['timestamp_seconds']) && $item['timestamp_seconds'] !== null
+                ? (float) $item['timestamp_seconds']
+                : null;
+
+            $normalized[] = [
+                ...$item,
+                'timestamp_seconds' => $timestamp,
+                'timestamp_label' => $timestamp !== null ? TranscriptPresenter::timestamp($timestamp) : null,
+            ];
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private static function coachingPriorities(mixed $items): array
+    {
+        if (! is_array($items)) {
+            return [];
+        }
+
+        $normalized = [];
+        foreach ($items as $item) {
+            if (! is_array($item) || trim((string) ($item['skill'] ?? '')) === '') {
+                continue;
+            }
+            $normalized[] = $item;
+        }
+
+        return array_values($normalized);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private static function turningPoints(mixed $items): array
+    {
+        if (! is_array($items)) {
+            return [];
+        }
+
+        $normalized = [];
+        foreach ($items as $item) {
+            if (! is_array($item) || trim((string) ($item['what_changed'] ?? '')) === '') {
+                continue;
+            }
+            $normalized[] = $item;
+        }
+
+        return array_values($normalized);
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $specific
+     * @param  array<string, mixed>|null  $snapshot
+     * @return array<string, mixed>|null
+     */
+    private static function companySpecific(?array $specific, ?array $snapshot): ?array
+    {
+        if ($specific === null) {
+            return null;
+        }
+
+        $names = [];
+        foreach ($snapshot['criteria'] ?? [] as $criterion) {
+            if (is_array($criterion) && filled($criterion['key'] ?? null)) {
+                $names[(string) $criterion['key']] = (string) ($criterion['name'] ?? $criterion['key']);
+            }
+        }
+
+        $criteria = $specific['scorecard']['criteria'] ?? [];
+        if (is_array($criteria)) {
+            foreach ($criteria as $index => $row) {
+                if (! is_array($row)) {
+                    continue;
+                }
+                $key = (string) ($row['key'] ?? '');
+                $specific['scorecard']['criteria'][$index]['name'] = $row['name'] ?? $names[$key] ?? $key;
+            }
+        }
+
+        return $specific;
     }
 
     public static function providerLabel(?string $provider): string

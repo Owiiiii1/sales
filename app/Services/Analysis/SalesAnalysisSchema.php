@@ -720,7 +720,23 @@ final class SalesAnalysisSchema
                 'scorecard' => [
                     'type' => 'object',
                     'properties' => [
-                        'criteria' => ['type' => 'array'],
+                        'criteria' => [
+                            'type' => 'array',
+                            'items' => [
+                                'type' => 'object',
+                                'additionalProperties' => false,
+                                'properties' => [
+                                    'key' => ['type' => 'string'],
+                                    'score' => ['type' => ['integer', 'null'], 'minimum' => 0],
+                                    'max_score' => ['type' => 'integer', 'minimum' => 1],
+                                    'applicable' => ['type' => 'boolean'],
+                                    'summary' => ['type' => 'string'],
+                                    'evidence' => ['type' => 'array', 'items' => $finding],
+                                    'critical_failure' => ['type' => 'boolean'],
+                                ],
+                                'required' => ['key', 'applicable'],
+                            ],
+                        ],
                     ],
                     'required' => ['criteria'],
                 ],

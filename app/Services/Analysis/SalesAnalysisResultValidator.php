@@ -3,6 +3,7 @@
 namespace App\Services\Analysis;
 
 use App\Exceptions\Analysis\PermanentAnalysisException;
+use App\Exceptions\Analysis\TransientAnalysisException;
 use App\Services\Analysis\DTO\AnalysisContext;
 use App\Services\Analysis\DTO\SalesAnalysisResult;
 
@@ -221,6 +222,7 @@ class SalesAnalysisResultValidator
 
             $normalized[] = [
                 'key' => $key,
+                'name' => (string) ($expected[$key]['name'] ?? $item['name'] ?? $key),
                 'score' => $applicable ? $this->boundedScore($item['score'] ?? null, $max, "company_specific.scorecard.criteria.{$index}.score") : null,
                 'max_score' => $max,
                 'applicable' => $applicable,
@@ -230,10 +232,15 @@ class SalesAnalysisResultValidator
             ];
         }
 
+        if ($expected !== [] && count($seen) * 2 < count($expected)) {
+            throw new TransientAnalysisException('Company scorecard output is incomplete: majority of expected criteria are missing.');
+        }
+
         foreach ($expected as $key => $criterion) {
             if (! isset($seen[$key])) {
                 $normalized[] = [
                     'key' => $key,
+                    'name' => (string) ($criterion['name'] ?? $key),
                     'score' => null,
                     'max_score' => (int) ($criterion['max_score'] ?? 100),
                     'applicable' => false,
@@ -258,7 +265,16 @@ class SalesAnalysisResultValidator
 
         $values = [];
         foreach (array_values($items) as $index => $item) {
-            $values[] = $this->string($item, $path.'.'.$index);
+            if (is_array($item) && array_key_exists('text', $item)) {
+                $item = $item['text'];
+            }
+
+            $value = $this->string($item, $path.'.'.$index);
+            if ($this->blank($value)) {
+                continue;
+            }
+
+            $values[] = $value;
         }
 
         return $values;
@@ -354,7 +370,11 @@ class SalesAnalysisResultValidator
 
         $normalized = [];
         foreach (array_values($items) as $index => $item) {
-            $normalized[] = $this->finding($item, $path.'.'.$index);
+            $finding = $this->finding($item, $path.'.'.$index);
+            if ($this->blank($finding['text'])) {
+                continue;
+            }
+            $normalized[] = $finding;
         }
 
         return $this->capped($normalized, $path, 'findings');
@@ -403,12 +423,17 @@ class SalesAnalysisResultValidator
         $normalized = [];
         foreach (array_values($items) as $index => $item) {
             if (is_string($item)) {
+                $better = $this->string($item, $path.'.'.$index);
+                if ($this->blank($better)) {
+                    continue;
+                }
+
                 $normalized[] = [
                     'timestamp_seconds' => null,
                     'original' => '',
                     'problem' => '',
-                    'better' => $this->string($item, $path.'.'.$index),
-                    'suggested' => $this->string($item, $path.'.'.$index),
+                    'better' => $better,
+                    'suggested' => $better,
                     'why_better' => '',
                     'reason' => '',
                 ];
@@ -421,11 +446,16 @@ class SalesAnalysisResultValidator
             }
 
             $better = $this->string($item['better'] ?? $item['suggested'] ?? '', $path.'.'.$index.'.better');
+            $original = $this->string($item['original'] ?? '', $path.'.'.$index.'.original');
             $why = $this->string($item['why_better'] ?? $item['reason'] ?? '', $path.'.'.$index.'.why_better');
+
+            if ($this->blank($better) && $this->blank($original)) {
+                continue;
+            }
 
             $normalized[] = [
                 'timestamp_seconds' => $this->timestamp($item['timestamp_seconds'] ?? null, $path.'.'.$index.'.timestamp_seconds'),
-                'original' => $this->string($item['original'] ?? '', $path.'.'.$index.'.original'),
+                'original' => $original,
                 'problem' => $this->string($item['problem'] ?? '', $path.'.'.$index.'.problem'),
                 'better' => $better,
                 'suggested' => $better,
@@ -806,9 +836,14 @@ class SalesAnalysisResultValidator
                 throw new PermanentAnalysisException("missed_signals.{$index} must be an object.");
             }
 
+            $signal = $this->string($item['signal'] ?? '', "missed_signals.{$index}.signal");
+            if ($this->blank($signal)) {
+                continue;
+            }
+
             $normalized[] = [
                 'timestamp_seconds' => $this->timestamp($item['timestamp_seconds'] ?? null, "missed_signals.{$index}.timestamp_seconds"),
-                'signal' => $this->string($item['signal'] ?? '', "missed_signals.{$index}.signal"),
+                'signal' => $signal,
                 'seller_response_quality' => $this->enum($item['seller_response_quality'] ?? 'missed', SalesAnalysisSchema::SELLER_RESPONSE_QUALITY, "missed_signals.{$index}.seller_response_quality"),
                 'impact' => $this->enum($item['impact'] ?? 'medium', SalesAnalysisSchema::IMPACT, "missed_signals.{$index}.impact"),
                 'recommended_action' => $this->string($item['recommended_action'] ?? '', "missed_signals.{$index}.recommended_action"),
@@ -905,6 +940,16 @@ class SalesAnalysisResultValidator
                 throw new PermanentAnalysisException("timeline.{$index} must be an object.");
             }
 
+            $title = $this->string($item['title'] ?? $item['text'] ?? '', "timeline.{$index}.title");
+            if ($this->blank($title)) {
+                continue;
+            }
+
+            $type = $item['type'] ?? $item['event_type'] ?? '';
+            if (! is_string($type) || ! in_array($type, SalesAnalysisSchema::TIMELINE_TYPES, true)) {
+                continue;
+            }
+
             $speaker = $item['speaker'] ?? null;
             if ($speaker !== null && ! is_numeric($speaker)) {
                 throw new PermanentAnalysisException("timeline.{$index}.speaker must be an integer or null.");
@@ -912,8 +957,8 @@ class SalesAnalysisResultValidator
 
             $normalized[] = [
                 'timestamp_seconds' => $this->timestamp($item['timestamp_seconds'] ?? null, "timeline.{$index}.timestamp_seconds"),
-                'type' => $this->enum($item['type'] ?? '', SalesAnalysisSchema::TIMELINE_TYPES, "timeline.{$index}.type"),
-                'title' => $this->string($item['title'] ?? '', "timeline.{$index}.title"),
+                'type' => $type,
+                'title' => $title,
                 'description' => $this->string($item['description'] ?? '', "timeline.{$index}.description"),
                 'speaker' => $speaker === null ? null : (int) $speaker,
                 'quote' => isset($item['quote']) && $item['quote'] !== null ? $this->string($item['quote'], "timeline.{$index}.quote") : null,
@@ -938,9 +983,14 @@ class SalesAnalysisResultValidator
                 throw new PermanentAnalysisException("turning_points.{$index} must be an object.");
             }
 
+            $whatChanged = $this->string($item['what_changed'] ?? '', "turning_points.{$index}.what_changed");
+            if ($this->blank($whatChanged)) {
+                continue;
+            }
+
             $normalized[] = [
                 'timestamp_seconds' => $this->timestamp($item['timestamp_seconds'] ?? null, "turning_points.{$index}.timestamp_seconds"),
-                'what_changed' => $this->string($item['what_changed'] ?? '', "turning_points.{$index}.what_changed"),
+                'what_changed' => $whatChanged,
                 'before' => $this->string($item['before'] ?? '', "turning_points.{$index}.before"),
                 'after' => $this->string($item['after'] ?? '', "turning_points.{$index}.after"),
                 'impact' => $this->enum($item['impact'] ?? 'medium', SalesAnalysisSchema::IMPACT, "turning_points.{$index}.impact"),
@@ -965,9 +1015,14 @@ class SalesAnalysisResultValidator
                 throw new PermanentAnalysisException("critical_mistakes.{$index} must be an object.");
             }
 
+            $mistake = $this->string($item['mistake'] ?? '', "critical_mistakes.{$index}.mistake");
+            if ($this->blank($mistake)) {
+                continue;
+            }
+
             $normalized[] = [
                 'timestamp_seconds' => $this->timestamp($item['timestamp_seconds'] ?? null, "critical_mistakes.{$index}.timestamp_seconds"),
-                'mistake' => $this->string($item['mistake'] ?? '', "critical_mistakes.{$index}.mistake"),
+                'mistake' => $mistake,
                 'impact' => $this->enum($item['impact'] ?? 'high', SalesAnalysisSchema::IMPACT, "critical_mistakes.{$index}.impact"),
                 'why' => $this->string($item['why'] ?? '', "critical_mistakes.{$index}.why"),
                 'better_action' => $this->string($item['better_action'] ?? '', "critical_mistakes.{$index}.better_action"),
@@ -990,8 +1045,13 @@ class SalesAnalysisResultValidator
         $normalized = [];
         foreach (array_values($items) as $index => $item) {
             if (is_string($item)) {
+                $text = $this->string($item, $path.'.'.$index);
+                if ($this->blank($text)) {
+                    continue;
+                }
+
                 $normalized[] = [
-                    'text' => $this->string($item, $path.'.'.$index),
+                    'text' => $text,
                     'why' => '',
                 ];
 
@@ -1002,8 +1062,13 @@ class SalesAnalysisResultValidator
                 throw new PermanentAnalysisException("{$path}.{$index} must be an object.");
             }
 
+            $text = $this->string($item['text'] ?? $item['practice'] ?? '', $path.'.'.$index.'.text');
+            if ($this->blank($text)) {
+                continue;
+            }
+
             $normalized[] = [
-                'text' => $this->string($item['text'] ?? $item['practice'] ?? '', $path.'.'.$index.'.text'),
+                'text' => $text,
                 'why' => $this->string($item['why'] ?? '', $path.'.'.$index.'.why'),
             ];
         }
@@ -1026,6 +1091,11 @@ class SalesAnalysisResultValidator
                 throw new PermanentAnalysisException("coaching_priorities.{$index} must be an object.");
             }
 
+            $skill = $this->string($item['skill'] ?? '', "coaching_priorities.{$index}.skill");
+            if ($this->blank($skill)) {
+                continue;
+            }
+
             $priority = $item['priority'] ?? ($index + 1);
             if (! is_int($priority) && ! (is_float($priority) && floor($priority) === $priority)) {
                 throw new PermanentAnalysisException("coaching_priorities.{$index}.priority must be an integer.");
@@ -1042,7 +1112,7 @@ class SalesAnalysisResultValidator
 
             $normalized[] = [
                 'priority' => $priority,
-                'skill' => $this->string($item['skill'] ?? '', "coaching_priorities.{$index}.skill"),
+                'skill' => $skill,
                 'why' => $this->string($item['why'] ?? '', "coaching_priorities.{$index}.why"),
                 'evidence' => $this->stringList($evidence, "coaching_priorities.{$index}.evidence"),
                 'practice' => $this->string($item['practice'] ?? '', "coaching_priorities.{$index}.practice"),
@@ -1070,9 +1140,15 @@ class SalesAnalysisResultValidator
                 throw new PermanentAnalysisException("alternative_path.steps.{$index} must be an object.");
             }
 
+            $stage = $this->string($item['stage'] ?? '', "alternative_path.steps.{$index}.stage");
+            $what = $this->string($item['what_to_do'] ?? '', "alternative_path.steps.{$index}.what_to_do");
+            if ($this->blank($stage) && $this->blank($what)) {
+                continue;
+            }
+
             $normalized[] = [
-                'stage' => $this->string($item['stage'] ?? '', "alternative_path.steps.{$index}.stage"),
-                'what_to_do' => $this->string($item['what_to_do'] ?? '', "alternative_path.steps.{$index}.what_to_do"),
+                'stage' => $stage,
+                'what_to_do' => $what,
                 'example_phrase' => $this->string($item['example_phrase'] ?? '', "alternative_path.steps.{$index}.example_phrase"),
             ];
         }
@@ -1111,5 +1187,10 @@ class SalesAnalysisResultValidator
         }
 
         return $this->capped($normalized, 'sales_stage_map', 'sales_stage_map');
+    }
+
+    private function blank(string $value): bool
+    {
+        return trim($value) === '';
     }
 }

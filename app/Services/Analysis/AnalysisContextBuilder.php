@@ -19,13 +19,13 @@ class AnalysisContextBuilder
         $language = $call->transcript?->language;
 
         if ($call->company_id === null) {
-            return $this->generic($language);
+            return $this->generic($language, $call);
         }
 
         $company = $call->company()->with($this->relations())->first();
 
         if ($company === null) {
-            return $this->generic($language);
+            return $this->generic($language, $call);
         }
 
         $this->loadScorecardChildren($company);
@@ -44,7 +44,7 @@ class AnalysisContextBuilder
 
         return new AnalysisContext(
             language: $language,
-            reportLanguage: $this->resolveReportLanguage($language, $company->profile?->report_language),
+            reportLanguage: $this->resolveReportLanguage($call, $language, $company->profile?->report_language),
             companyName: $company->name,
             companyContextUsed: true,
             companyId: $company->id,
@@ -57,14 +57,14 @@ class AnalysisContextBuilder
         );
     }
 
-    public function generic(?string $language = null): AnalysisContext
+    public function generic(?string $language = null, ?Call $call = null): AnalysisContext
     {
         $snapshot = ['company' => null];
         $hash = hash('sha256', json_encode($snapshot, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
 
         return new AnalysisContext(
             language: $language,
-            reportLanguage: $this->resolveReportLanguage($language, null, generic: true),
+            reportLanguage: $this->resolveReportLanguage($call, $language, null, generic: true),
             companyName: null,
             companyContextUsed: false,
             companyContextHash: $hash,
@@ -291,8 +291,13 @@ class AnalysisContextBuilder
         return mb_strlen($text, 'UTF-8');
     }
 
-    private function resolveReportLanguage(?string $transcriptLanguage, ?string $companyMode, bool $generic = false): string
+    private function resolveReportLanguage(?Call $call, ?string $transcriptLanguage, ?string $companyMode, bool $generic = false): string
     {
+        $uiLocale = LanguageCode::normalize($call?->ui_locale);
+        if (LanguageCode::isSupported($uiLocale)) {
+            return $uiLocale;
+        }
+
         if (! $generic && filled($companyMode) && $companyMode !== 'same_as_call') {
             return LanguageCode::normalize($companyMode) ?: 'en';
         }

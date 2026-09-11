@@ -1,117 +1,167 @@
-# Sales Analyzer — Gemini Structured Output Production Fix
+# Sales Analyzer — Report Structure & UX Revision
 
-## Incident
+## Baseline
 
-Call #4 (`analyzing`, transcript ~15k chars, company_id 3) never finished. Queue was empty. Gemini `gemini-3.7-flash` returned HTTP 400. Public/internal error collapsed to `HTTP 400 (400)`. A `storage/logs` permission error could also block `markFailed`, leaving the Call stuck in `analyzing`.
+Latest completed live analysis before this change: Call **#13** (`public`, company_id 3, schema v3, provider Gemini `gemini-3.7-flash`, overall_score 48, company_scorecard_score `null`, transcript language `ru`). Call #4 was an earlier completed Gemini run of the same pipeline with the shallow `{text}` wire schema.
 
-## Root Cause
+No secrets, API keys, or internal credentials are recorded here.
 
-1. `GeminiClient` sent schema v3 through legacy OpenAPI `generationConfig.responseSchema`. v3 is JSON Schema (`additionalProperties`, nullable unions). Gemini rejected it (`INVALID_ARGUMENT`, `additionalProperties` / later compiler errors).
-2. After switching to `responseJsonSchema`, generateContent still cannot compile the **full nested** v3 graph (duplicate top-level `required`, nullable-union volume, nested complexity). Live compiler errors were `duplicate elements in required` then generic `Request contains an invalid argument`.
-3. `markFailed` logged before persisting `failed`. Logger exceptions could skip the status write.
+## Live Result Audit
 
-## Gemini Schema Fix
+Sanitized JSON from Call #13 showed nested keys present but almost no semantic content:
 
-Kept `POST https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent`. Never send `responseSchema`.
+| Block | Count | What was actually stored |
+|---|---|---|
+| `critical_mistakes` | 3 | keys present; `mistake`/`why`/`better_action`/`example_phrase` empty; `impact=high` |
+| `missed_signals` | 1 | `signal` empty; `impact` and `seller_response_quality` filled with defaults |
+| `missed_opportunities` | 2 | `{text}` items with real sentences (shallow schema fit) |
+| `better_phrases` | 1 | `original`/`problem`/`better`/`why_better` empty |
+| `coaching_priorities` | 3 | `priority` 1–3; `skill`/`why`/`practice` empty |
+| `timeline` | 6 | titles filled from `{text}` fallback; `description` empty; type forced |
+| `turning_points` | 2 | `what_changed` empty; default `impact` |
+| `what_to_repeat` / `stop` / `start` | 2 / 3 / 3 | `text` filled; `why` empty |
+| `company_specific.scorecard.criteria` | 9 | all snapshot keys present, **all `applicable=false`**, company score `null` |
 
-Gemini adapter (`GeminiClient`):
+`report_language` was not stored on the result. The worker had no UI locale to use.
 
-* `responseMimeType = application/json`
-* `responseJsonSchema` = shallow projection of v3 required keys/types (array items as `{text}` objects so the compiler accepts the graph)
-* full provider-neutral `SalesAnalysisSchema::jsonSchema()` in the system prompt
-* unique `required` lists on the domain schema (`customer_intent_confidence` was duplicated)
-* `SalesAnalysisResultValidator` still enforces v3
-* timeline `type` filled from `text` when Gemini omits the enum
-* scorecard criteria without `key` are skipped; snapshot keys are still filled as not applicable
+## Gemini Output Findings
 
-OpenAI / Anthropic wrappers unchanged. Domain schema v3 was not reduced.
+Gemini did return objects for the high-value arrays, but the wire schema only required `{text}`. Fields that were not in that item schema were dropped. Normalization then invented a usable-looking v3 shape:
 
-## Error Parsing
+* empty `mistake` + default `impact=high` → empty critical cards (“Влияние: Высокое”)
+* missing scorecard `key`/`score` → validator skipped items, then filled every snapshot criterion as N/A
+* timeline titles taken from `text`; empty titles became “Timeline moment”
 
-`ProviderHttp` Gemini path uses `error.message` and `error.status`, never numeric `error.code` as the human text.
+Useful `{text}` blocks (`what_to_repeat`, `missed_opportunities`) survived because they matched the shallow item shape.
 
-Example: `Gemini HTTP 400 INVALID_ARGUMENT: Invalid JSON schema`
+## Gemini Wire Schema Fix
 
-Public analyzer still shows `Analysis failed. Please try again.`
+Provider-specific `GeminiClient::forGeminiWire()` now models slim nested items for:
 
-## Failure-State Reliability
+* `critical_mistakes`: timestamp_seconds, mistake, impact, why, better_action, example_phrase
+* `better_phrases`: timestamp_seconds, original, problem, better, why_better
+* `coaching_priorities`: priority, skill, why, evidence (string array), practice, success_criteria
+* `company_specific.scorecard.criteria`: key, score, max_score, applicable, summary
 
-`AnalyzeCall` / `TranscribeCall` persist `failed` (and never overwrite `completed` / `cancelled`) **before** logging. Logger exceptions are swallowed. Stack `ignore_exceptions => true` remains.
+Live compiler probes: adding full nested `missed_signals` and `timeline` **together with** those three arrays exceeds generateContent’s budget (HTTP 400 `INVALID_ARGUMENT`). Those two arrays stay `{text}`; after parse, `text` is copied to `signal` / `title`, and timeline `type` defaults to `turning_point` only when a title exists.
 
-## Log Permissions
+Other arrays stay the simplified `{text}` item. Full v3 is still attached in the prompt and enforced by the validator.
 
-`/var/www/sales/storage/logs` owner `deploy:www-data`, ACL `user:www-data:rwx` (default ACL for new files). `laravel.log` ACL `user:www-data:rw`. Not mode 777.
+## Validator Changes
 
-## Worker Restart
+Strategy: **skip malformed individual items** when the rest of the payload is valid. Do not create empty cards.
 
-Unit: `/etc/systemd/system/sales-worker.service`  
-`User=www-data`  
-`ExecStart=/usr/bin/php8.5 artisan queue:work database --sleep=3 --tries=3 --timeout=300 --max-time=3600`
+Skipped when the required semantic field is blank: `critical_mistakes.mistake`, `missed_signals.signal`, `better_phrases` (original and better), `coaching_priorities.skill`, `timeline.title` + valid type, `turning_points.what_changed`, empty practice `text`, empty findings `text`.
 
-Deploy cannot `sudo` without a password (`kill` on the worker PID is not permitted).
+Scorecard: map by `key`; attach snapshot `name`; do not treat unknown keys as N/A. If a **majority of expected keys are missing**, throw `TransientAnalysisException` so the job retries instead of publishing an all-N/A company score. Remaining unmatched keys after a majority hit may still be N/A when Gemini explicitly omitted only a minority.
 
-Authorized restart:
+## Report Language
 
-```bash
-sudo systemctl restart sales-worker.service
-systemctl is-active sales-worker.service
-systemctl show sales-worker.service -p MainPID,ExecMainStartTimestamp
-```
+Main Analyzer: selected UI locale at upload (`en` / `ru` / `uk`) is stored on `calls.ui_locale` and used by `AnalysisContextBuilder`. Priority: **stored UI locale > company `report_language` > transcript language**. The worker does not read session/browser locale. Quotes stay in the transcript language. Company `report_language` remains for admin/manual calls without `ui_locale`.
 
-Auto-recycle observed: PID 3056249, `ExecMainStartTimestamp=Fri 2026-09-11 13:23:36 CEST`. That recycle is **older than** the final Gemini adapter. Restart the unit so queued jobs load the new client.
+## Short Report
 
-Call #4 was re-run in-process (`sales:recover-stuck-calls --call=4 --retry --sync`) and did not depend on that worker PID.
+Default Main Analyzer completed view (`ShortAnalysisReport`): scores (company primary + generic secondary, or overall), executive summary, max 3 strengths, max 3 problems, max 3 next-call actions, compact scorecard weakest/strongest, and an info card with **Open full report**.
 
-## Stuck Call Recovery
+## Full Report
 
-`php artisan sales:recover-stuck-calls`
+`GET /analysis/{public_token}/full` is a read-only Inertia page of the same `sales_analyses` row. No new AI job. Public token only. Admin Call detail still defaults to the full report.
 
-* Default: mark `processing`/`analyzing` failed when no matching `jobs` row and older than `sales-analyzer.analysis.stuck_after_minutes` (30).
-* `--call=` targets one id (no age wait).
-* `--retry` dispatches `TranscribeCall` / `AnalyzeCall`.
-* `--sync` runs the job in this process (requires `--retry`).
-* Safe message: `Processing interrupted or worker job was lost`.
-* No cron auto-retry.
+## Report Information Architecture
 
-## Live Gemini Verification
+Full report groups: A outcome → B what happened → C what went well → D what went poorly → E how to improve → F deep skills → G what to improve first / playbook → H company standard (company calls only) → I transcript via existing modal, not inline.
 
-| Item | Result |
-|---|---|
-| Model | `gemini-3.7-flash` |
-| Endpoint | `v1beta` `generateContent` |
-| HTTP | 200 |
-| JSON decoded | yes |
-| Validator | schema v3 accepted |
-| Call #4 | `completed`, `overall_score` 48, `provider` gemini, `error_message` null |
-| Transcription | not repeated |
-| Queue after | 0 jobs |
-| Secrets | not logged |
+## Timeline UX
 
-Earlier live 400s (duplicate `required`, then compiler `INVALID_ARGUMENT`) were fixed before this completed run. Public error never exposed Gemini internals.
+`Хронология звонка` is one collapsed row with a moment count and visible Expand/Collapse. Inner timeline renders only after expand.
+
+## Deep Analysis UX
+
+Skill blocks use an explicit Expand/Collapse control on the header row, not a card that looks static.
+
+## Critical Mistakes
+
+Block kept. Cards show mistake, impact, why, better action, example phrase, timestamp when present. Empty cards are not rendered. Empty list omits the section.
+
+## Missed Opportunities
+
+Prefer `missed_signals`, fallback `missed_opportunities`. Shows the customer signal, why it mattered, recommended action, and a better reply when present. Hidden when both are empty.
+
+## Better Phrases
+
+Was / Problem / Better / Why / timestamp. Hidden when empty.
+
+## Coaching Priorities
+
+UI label is **What to improve first** / **Что улучшить в первую очередь**. Skill, why, evidence, practice, success criteria. Max 5. Hidden when empty.
+
+## Company Scorecard
+
+Criteria mapped by key with human `name` labels (`Диагностика потребности — 12 / 18`). Applicable rows as a compact score table; N/A grouped at the bottom. Majority-missing output fails the analysis instead of a false all-N/A score.
+
+## Empty Block Policy
+
+No section heading or empty container is rendered after normalization if the block has no valid items.
+
+## Visual Design
+
+Section groups, inner cards, spacing, restrained borders. Critical cards use a light rose tone; strengths a light green tone; coaching cards are numbered. Not a rainbow UI.
+
+## Live Re-analysis
+
+Re-run `AnalyzeCall` only (no transcription) on Call **#13** after migrate. First attempt compiled (HTTP 200) then truncated JSON (`TransientAnalysisException`); second attempt **completed**.
+
+Sanitized outcome:
+
+* `ui_locale=ru`, transcript language `ru`, narrative Russian
+* overall_score 48, **company_score 49** (was `null`)
+* `critical_mistakes` 3/3 with mistake, why, example phrase
+* `better_phrases` 2/2 with original + better
+* `coaching_priorities` 3/3 with skill/why/practice (Russian skill titles)
+* `missed_signals` 2/2 with signal text
+* `timeline` 8 titled moments
+* scorecard 9/9 applicable, none N/A
+* Quotes on this call were mostly unset on timeline items; transcript and report are both Russian, so quote-language split was not observable on this recording
+
+This call did have critical mistakes, better phrases, coaching, and missed signals; they were empty before because of the wire schema, not because the conversation lacked them.
 
 ## Tests
 
-`php artisan test`: **250 passed**, 1700 assertions.
+`php artisan test`: **261 passed**, 1795 assertions.
 
-Covered: `responseJsonSchema` present and `responseSchema` absent; v3 keywords in the prompt payload; unique `required`; Gemini 400 message includes `INVALID_ARGUMENT` and `Invalid JSON schema` not `(400)`; public JSON stays `Analysis failed. Please try again.`; logging exception still sets `failed`; `failed()` does not resurrect `completed`; retry after Gemini 400 can complete; stuck-call recovery and `--retry`.
+Covered: Gemini wire fields for mistakes / phrases / coaching / scorecard; `text` mapped to timeline title and missed signal; malformed critical item skipped; empty mistake not presented; majority-missing scorecard fails; mapped criteria accepted; UI ru→Russian report / UI en→English report with original quotes; stored locale used instead of later session locale; completed Main Analyzer JSON includes `short` (max 3); full report route uses the same result and creates no AI job; public token payload has no internal id/secrets.
 
-Frontend unchanged; `npm run build` not required.
+UI expand/collapse and section order are implemented in `FullAnalysisReport` / `TimelineSection`; PHP asserts the payload and route contract (no browser runner in this repo).
 
 ## Production Verification
 
-* Call #4: `completed` / schema 3 / score 48 / Gemini `gemini-3.7-flash`
+* Backup: `/home/deploy/backups/sales/sales-20260911-151507-notablespaces.sql.gz`
+* Migration `2026_09_11_160000_add_ui_locale_to_calls_table` applied (`migrate --force`)
+* `npm run build` succeeded (`FullReport`, `FullAnalysisReport`, `Home` chunks)
+* Shipped Gemini `responseJsonSchema` live compile: HTTP 200
+* Call #13 re-analyzed without transcription: `completed`, overall 48, company 49, filled mistakes/phrases/coaching/signals/scorecard
+* Public `GET /analysis/{token}` 200, no `id`/`storage_path`/`api_key`
+* `GET /analysis/{token}/full` 200
+* `/` 200, `/up` 200
 * `jobs` table empty
-* Worker active; needs an additional systemd restart for queued jobs (see Worker Restart)
-* No new stuck analyzing jobs in queue
 
 ## Changed Files
 
-`app/Services/Ai/Clients/GeminiClient.php`, `app/Services/Ai/ProviderHttp.php`, `app/Jobs/AnalyzeCall.php`, `app/Jobs/TranscribeCall.php`, `app/Services/Analysis/SalesAnalysisSchema.php`, `app/Services/Analysis/SalesAnalysisResultValidator.php`, `app/Services/Analysis/ConfiguredSalesAnalysisProvider.php`, `app/Services/Calls/StuckCallRecovery.php`, `app/Console/Commands/RecoverStuckCallsCommand.php`, `config/sales-analyzer.php`, tests, `docs/STATUS.md`, `docs/AI_ANALYSIS.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md` (DEC-065, DEC-066), `REPORT.md`.
+Backend: Gemini adapter, validator, schema, prompt, context builder, upload/request, Call `ui_locale` migration, presenter, short-report composer, public controller/routes.
+
+Frontend: `ShortAnalysisReport`, `FullAnalysisReport`, shared cards, Home short default, admin full default, i18n.
+
+Tests and docs: PRODUCT, STATUS, AI_ANALYSIS, ARCHITECTURE, DECISIONS (DEC-067–071), DATA_MODEL, REPORT.md.
 
 ## Git
 
-Commit and push to `main` after tests, secret scan, and live Call #4 verification.
+* `php artisan test`: 261 passed, 1795 assertions
+* `npm run build` succeeded
+* Secret scan of the working tree/diff: no API keys or credentials
+* Backup + `ui_locale` migration already applied
+* Live re-analysis of Call #13 completed without transcription
+* Commit and push `origin/main`
 
 ## Final Status
 
-**GEMINI STRUCTURED OUTPUT PRODUCTION FIX PASSED**
+**REPORT STRUCTURE & UX REVISION PASSED**

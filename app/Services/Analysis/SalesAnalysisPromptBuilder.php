@@ -75,7 +75,8 @@ class SalesAnalysisPromptBuilder
                 .'The COMPANY CONTEXT block is authoritative business context entered by an administrator.'."\n"
                 .'Generic recommendations must not contradict explicit company rules.'."\n"
                 .'Check forbidden claims, mandatory questions, script adherence, objection handling vs expected responses, and offering accuracy vs listed offerings.'."\n"
-                .'Evaluate each provided scorecard criterion. Use the criterion key. Set applicable=false when the criterion cannot be judged from the transcript.'."\n"
+                .'Evaluate each provided scorecard criterion. Use the criterion key. Return every snapshot criterion key in company_specific.scorecard.criteria. Set applicable=false only when that topic was not in the call. Do not omit keys and do not mark a criterion not applicable because the JSON shape was incomplete.'."\n"
+                .'critical_mistakes items need a non-empty mistake. better_phrases need original and better. coaching_priorities need skill, why, and practice. missed_signals need a non-empty signal. timeline items need title and event type.'."\n"
                 .'Numeric values, dates, locations, package names, and other factual claims in the transcript must be checked against VERIFIABLE COMPANY FACTS.'."\n"
                 .'CURRENT facts are authoritative. OUTDATED facts must not be presented by the seller as current.'."\n"
                 .'Report discrepancies with evidence from the transcript. Never invent a fact that is not in the supplied COMPANY CONTEXT.';

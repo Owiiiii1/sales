@@ -72,6 +72,13 @@ class PublicAnalyzerController extends Controller
         return response()->json($this->safePayload($this->callByToken($publicToken)));
     }
 
+    public function full(string $publicToken): Response
+    {
+        return Inertia::render('Public/FullReport', [
+            'result' => $this->safePayload($this->callByToken($publicToken)),
+        ]);
+    }
+
     public function status(string $publicToken): JsonResponse
     {
         $call = $this->callByToken($publicToken);
@@ -128,6 +135,7 @@ class PublicAnalyzerController extends Controller
             'error' => $this->publicError($call),
             'report_available' => $this->reportAvailable($call),
             'transcript_available' => $transcript !== null,
+            'full_report_url' => route('analysis.full', $call->public_token),
             'report' => SalesAnalysisPresenter::public($call),
             'language' => $transcript['language'] ?? null,
             'duration_seconds' => $transcript['duration_seconds'] ?? $call->duration_seconds,

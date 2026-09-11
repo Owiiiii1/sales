@@ -2,7 +2,7 @@
 
 This document describes the product we intend to build. It is not a description of the current UI.
 
-The live site has a **main analyzer workspace** at `/` for uploading a sales call (generic or company-specific), plus an admin at `/login`. Transcription is queued through ElevenLabs Scribe v2. Admins configure the STT key and LLM providers in Settings without editing `.env`. Main Analyzer requires explicit analysis context selection before upload. Generic remains a first-class explicit mode. Employee is optional and only after a Company is chosen. During processing the operator sees real pipeline stages, opens the transcript in a modal, and can stop the call (`cancelled`). Analyzer uploads with a Company use that company’s knowledge, default scorecard, facts, and report language. See [STATUS.md](STATUS.md).
+The live site has a **main analyzer workspace** at `/` for uploading a sales call (generic or company-specific), plus an admin at `/login`. Transcription is queued through ElevenLabs Scribe v2. Admins configure the STT key and LLM providers in Settings without editing `.env`. Main Analyzer requires explicit analysis context selection before upload. Generic remains a first-class explicit mode. Employee is optional and only after a Company is chosen. During processing the operator sees real pipeline stages, opens the transcript in a modal, and can stop the call (`cancelled`). After analysis completes, Main Analyzer shows a **short report** by default; the full report is a separate read-only page of the same stored result. Report language follows the UI locale selected at upload. Analyzer uploads with a Company use that company’s knowledge, default scorecard, and facts. See [STATUS.md](STATUS.md).
 
 ## Problem
 

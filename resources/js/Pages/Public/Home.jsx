@@ -1,4 +1,4 @@
-import AnalysisReport from '@/Components/Public/AnalysisReport';
+import ShortAnalysisReport from '@/Components/Public/ShortAnalysisReport';
 import CancelProcessingModal from '@/Components/Public/CancelProcessingModal';
 import ProcessingProgress, { uploadingProgress } from '@/Components/Public/ProcessingProgress';
 import TranscriptModal, { TranscriptReadyCard } from '@/Components/Public/TranscriptModal';
@@ -159,6 +159,7 @@ export default function PublicHome({ upload = {}, companies = [], employees = []
 
         const data = new FormData();
         data.append('audio', audio);
+        data.append('locale', t.locale);
         if (companyIdRef.current && companyIdRef.current !== GENERIC_CONTEXT) {
             data.append('company_id', companyIdRef.current);
             if (employeeIdRef.current) {
@@ -379,15 +380,15 @@ export default function PublicHome({ upload = {}, companies = [], employees = []
                     {result?.transcript && (
                         <TranscriptReadyCard transcript={result.transcript} onOpen={() => setTranscriptOpen(true)} />
                     )}
-                    <AnalysisReport
-                        status={uiStatus === 'completed' ? uiStatus : null}
-                        report={result?.report}
-                        message={result?.message}
-                        error={result?.error}
-                        analysisMode={result?.analysis_mode}
-                        companyName={result?.company_name}
-                        employeeName={result?.employee_name}
-                    />
+                    {uiStatus === 'completed' && result?.report ? (
+                        <ShortAnalysisReport
+                            report={result.report}
+                            analysisMode={result.analysis_mode}
+                            companyName={result.company_name}
+                            employeeName={result.employee_name}
+                            fullReportUrl={result.full_report_url || (result.public_token ? route('analysis.full', result.public_token) : null)}
+                        />
+                    ) : null}
                 </div>
             </div>
             <TranscriptModal

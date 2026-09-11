@@ -15,6 +15,9 @@ Route::middleware('throttle:public-analysis-status')->group(function () {
     Route::get('/analysis/{public_token}', [PublicAnalyzerController::class, 'show'])
         ->where('public_token', '[0-9a-fA-F-]{36}')
         ->name('analysis.show');
+    Route::get('/analysis/{public_token}/full', [PublicAnalyzerController::class, 'full'])
+        ->where('public_token', '[0-9a-fA-F-]{36}')
+        ->name('analysis.full');
     Route::get('/analysis/{public_token}/status', [PublicAnalyzerController::class, 'status'])
         ->where('public_token', '[0-9a-fA-F-]{36}')
         ->name('analysis.status');

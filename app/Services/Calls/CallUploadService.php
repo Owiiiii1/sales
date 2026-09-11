@@ -20,7 +20,7 @@ class CallUploadService
      * Store the audio first, then persist the Call. If the database write
      * fails, the stored file is deleted so it cannot remain orphaned.
      *
-     * @param  array{company_id?:int|null, employee_id?:int|null, recorded_at?:string|null, source?:string}  $payload
+     * @param  array{company_id?:int|null, employee_id?:int|null, recorded_at?:string|null, source?:string, ui_locale?:string|null}  $payload
      */
     public function upload(?User $user, array $payload, UploadedFile $file): Call
     {
@@ -35,6 +35,7 @@ class CallUploadService
                 'company_id' => $companyId,
                 'employee_id' => $payload['employee_id'] ?? null,
                 'source' => $payload['source'] ?? 'manual',
+                'ui_locale' => $payload['ui_locale'] ?? null,
                 'original_filename' => $file->getClientOriginalName(),
                 'storage_path' => $path,
                 'mime_type' => $mimeType,

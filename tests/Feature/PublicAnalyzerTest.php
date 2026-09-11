@@ -455,6 +455,99 @@ class PublicAnalyzerTest extends TestCase
     {
         $this->getJson('/analysis/'.Str::uuid().'/status')->assertNotFound();
         $this->getJson('/analysis/1/status')->assertNotFound();
+        $this->get('/analysis/'.Str::uuid().'/full')->assertNotFound();
+    }
+
+    public function test_upload_stores_selected_ui_locale_not_later_session_locale(): void
+    {
+        $this->withSession(['locale' => 'en']);
+
+        $this->post('/analyze', [
+            'audio' => $this->fakeAudio('locale.mp3'),
+            'locale' => 'ru',
+        ], ['Accept' => 'application/json'])->assertCreated();
+
+        $call = Call::query()->first();
+        $this->assertSame('ru', $call->ui_locale);
+
+        $this->withSession(['locale' => 'uk']);
+        app()->setLocale('uk');
+
+        $context = app(AnalysisContextBuilder::class)->build($call->fresh(['transcript', 'company']));
+        $this->assertSame('ru', $context->reportLanguage);
+    }
+
+    public function test_completed_main_analyzer_exposes_short_report_and_full_page_without_new_job(): void
+    {
+        $this->post('/analyze', [
+            'audio' => $this->fakeAudio('done.mp3'),
+            'locale' => 'en',
+        ], ['Accept' => 'application/json'])->assertCreated();
+
+        $call = Call::query()->first();
+        $call->forceFill(['status' => 'completed'])->save();
+
+        $repeats = [];
+        for ($i = 1; $i <= 5; $i++) {
+            $repeats[] = ['text' => 'Strength '.$i, 'why' => 'Why '.$i];
+        }
+
+        SalesAnalysis::factory()->create([
+            'call_id' => $call->id,
+            'overall_score' => 72,
+            'result' => SalesAnalysisFactory::validPayload([
+                'what_to_repeat' => $repeats,
+                'critical_mistakes' => [
+                    [
+                        'timestamp_seconds' => null,
+                        'mistake' => '',
+                        'impact' => 'high',
+                        'why' => '',
+                        'better_action' => '',
+                        'example_phrase' => '',
+                    ],
+                    [
+                        'timestamp_seconds' => 8,
+                        'mistake' => 'No next step.',
+                        'impact' => 'high',
+                        'why' => 'Interest was left hanging.',
+                        'better_action' => 'Book a time.',
+                        'example_phrase' => 'Thursday at 10?',
+                    ],
+                ],
+            ]),
+        ]);
+
+        Queue::fake();
+
+        $this->get('/')->assertOk()->assertInertia(fn (Assert $page) => $page->component('Public/Home', false));
+
+        $json = $this->getJson('/analysis/'.$call->public_token);
+        $json->assertOk()
+            ->assertJsonPath('report.overall_score', 72)
+            ->assertJsonPath('full_report_url', route('analysis.full', $call->public_token))
+            ->assertJsonMissingPath('id')
+            ->assertJsonMissingPath('storage_path')
+            ->assertJsonMissingPath('uploaded_by')
+            ->assertJsonMissingPath('report.api_key')
+            ->assertJsonMissingPath('report.context_snapshot');
+
+        $this->assertCount(3, $json->json('report.short.strengths'));
+        $this->assertCount(1, $json->json('report.critical_mistakes'));
+        $this->assertSame('No next step.', $json->json('report.critical_mistakes.0.mistake'));
+
+        $this->get('/analysis/'.$call->public_token.'/full')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Public/FullReport', false)
+                ->where('result.public_token', $call->public_token)
+                ->where('result.report.overall_score', 72)
+                ->where('result.report.critical_mistakes.0.mistake', 'No next step.')
+                ->missing('result.id')
+                ->missing('result.storage_path')
+                ->missing('result.api_key'));
+
+        Queue::assertNothingPushed();
     }
 
     public function test_admin_audio_endpoints_still_require_auth(): void

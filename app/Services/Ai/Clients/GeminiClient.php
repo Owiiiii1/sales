@@ -104,9 +104,10 @@ class GeminiClient implements AiProviderClient
     /**
      * Gemini generateContent uses JSON Schema (`responseJsonSchema`), never OpenAPI `responseSchema`.
      *
-     * The full v3 graph cannot be compiled by generateContent (nullable unions and nested
-     * complexity). The wire schema is a shallow projection of v3 required keys and types.
-     * The complete JSON Schema is also attached in the prompt and enforced by the validator.
+     * The full v3 graph cannot be compiled. Live probes on gemini-3.7-flash accept
+     * slim nested items for critical_mistakes, better_phrases, coaching_priorities,
+     * and scorecard criteria. missed_signals and timeline stay a shallow `{text}`
+     * projection; text is mapped to signal/title after parse.
      *
      * @param  array<string, mixed>  $jsonSchema
      * @return array<string, mixed>
@@ -122,6 +123,18 @@ class GeminiClient implements AiProviderClient
     }
 
     /**
+     * @return array<int, string>
+     */
+    public static function detailedArrayKeys(): array
+    {
+        return [
+            'critical_mistakes',
+            'better_phrases',
+            'coaching_priorities',
+        ];
+    }
+
+    /**
      * @param  array<string, mixed>  $jsonSchema
      * @return array<string, mixed>
      */
@@ -132,7 +145,14 @@ class GeminiClient implements AiProviderClient
             if (! is_array($schema)) {
                 continue;
             }
-            $properties[$name] = self::shallowProperty($schema);
+
+            $properties[$name] = match ($name) {
+                'critical_mistakes' => self::arrayOf(self::criticalMistakeItem()),
+                'better_phrases' => self::arrayOf(self::betterPhraseItem()),
+                'coaching_priorities' => self::arrayOf(self::coachingPriorityItem()),
+                'company_specific' => self::companySpecificWire(),
+                default => self::shallowProperty($schema),
+            };
         }
 
         $required = [];
@@ -151,17 +171,117 @@ class GeminiClient implements AiProviderClient
     }
 
     /**
+     * @param  array<string, mixed>  $item
+     * @return array<string, mixed>
+     */
+    private static function arrayOf(array $item): array
+    {
+        return [
+            'type' => 'array',
+            'items' => $item,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function criticalMistakeItem(): array
+    {
+        return [
+            'type' => 'object',
+            'additionalProperties' => false,
+            'properties' => [
+                'timestamp_seconds' => ['type' => 'number'],
+                'mistake' => ['type' => 'string'],
+                'impact' => ['type' => 'string', 'enum' => ['high', 'medium', 'low']],
+                'why' => ['type' => 'string'],
+                'better_action' => ['type' => 'string'],
+                'example_phrase' => ['type' => 'string'],
+            ],
+            'required' => ['mistake'],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function betterPhraseItem(): array
+    {
+        return [
+            'type' => 'object',
+            'additionalProperties' => false,
+            'properties' => [
+                'timestamp_seconds' => ['type' => 'number'],
+                'original' => ['type' => 'string'],
+                'problem' => ['type' => 'string'],
+                'better' => ['type' => 'string'],
+                'why_better' => ['type' => 'string'],
+            ],
+            'required' => ['original', 'better'],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function coachingPriorityItem(): array
+    {
+        return [
+            'type' => 'object',
+            'additionalProperties' => false,
+            'properties' => [
+                'priority' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 5],
+                'skill' => ['type' => 'string'],
+                'why' => ['type' => 'string'],
+                'evidence' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'practice' => ['type' => 'string'],
+                'success_criteria' => ['type' => 'string'],
+            ],
+            'required' => ['priority', 'skill'],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function companySpecificWire(): array
+    {
+        return [
+            'type' => 'object',
+            'additionalProperties' => true,
+            'properties' => [
+                'scorecard' => [
+                    'type' => 'object',
+                    'additionalProperties' => true,
+                    'properties' => [
+                        'criteria' => [
+                            'type' => 'array',
+                            'items' => [
+                                'type' => 'object',
+                                'additionalProperties' => false,
+                                'properties' => [
+                                    'key' => ['type' => 'string'],
+                                    'score' => ['type' => 'integer'],
+                                    'max_score' => ['type' => 'integer'],
+                                    'applicable' => ['type' => 'boolean'],
+                                    'summary' => ['type' => 'string'],
+                                ],
+                                'required' => ['key'],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+    }
+
+    /**
      * @param  array<string, mixed>  $schema
      * @return array<string, mixed>
      */
     private static function shallowProperty(array $schema): array
     {
-        $type = $schema['type'] ?? 'object';
-        if (is_array($type)) {
-            $nonNull = array_values(array_filter($type, fn (mixed $item): bool => $item !== 'null'));
-            $type = $nonNull[0] ?? 'object';
-        }
-
+        $type = self::scalarType($schema['type'] ?? 'object');
         $wire = ['type' => $type];
 
         if ($type === 'string' && isset($schema['enum']) && is_array($schema['enum'])) {
@@ -192,6 +312,16 @@ class GeminiClient implements AiProviderClient
         return $wire;
     }
 
+    private static function scalarType(mixed $type): string
+    {
+        if (is_array($type)) {
+            $nonNull = array_values(array_filter($type, fn (mixed $item): bool => $item !== 'null'));
+            $type = $nonNull[0] ?? 'object';
+        }
+
+        return is_string($type) ? $type : 'object';
+    }
+
     /**
      * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
@@ -199,26 +329,47 @@ class GeminiClient implements AiProviderClient
     private static function normalizePayload(array $payload): array
     {
         $payload = self::restoreEventTypes($payload);
+        $payload = self::promoteTextField($payload, 'timeline', 'title');
+        $payload = self::promoteTextField($payload, 'missed_signals', 'signal');
 
         if (isset($payload['timeline']) && is_array($payload['timeline'])) {
             foreach ($payload['timeline'] as $index => $item) {
-                if (! is_array($item)) {
+                if (! is_array($item) || ! filled($item['title'] ?? null)) {
                     continue;
                 }
 
-                $text = is_string($item['text'] ?? null) ? $item['text'] : '';
-                $type = $item['type'] ?? $item['event_type'] ?? '';
+                $type = $item['type'] ?? '';
                 if (! in_array($type, SalesAnalysisSchema::TIMELINE_TYPES, true)) {
-                    $type = 'turning_point';
+                    $item['type'] = 'turning_point';
+                    $payload['timeline'][$index] = $item;
                 }
-
-                $item['type'] = $type;
-                if (! filled($item['title'] ?? null)) {
-                    $item['title'] = $text !== '' ? mb_substr($text, 0, 80) : 'Timeline moment';
-                }
-
-                $payload['timeline'][$index] = $item;
             }
+        }
+
+        return $payload;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private static function promoteTextField(array $payload, string $key, string $target): array
+    {
+        if (! isset($payload[$key]) || ! is_array($payload[$key])) {
+            return $payload;
+        }
+
+        foreach ($payload[$key] as $index => $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+
+            $text = is_string($item['text'] ?? null) ? $item['text'] : '';
+            if (! filled($item[$target] ?? null) && $text !== '') {
+                $item[$target] = $text;
+            }
+
+            $payload[$key][$index] = $item;
         }
 
         return $payload;

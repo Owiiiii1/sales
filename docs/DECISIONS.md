@@ -927,7 +927,7 @@ Status values: `Accepted` | `Open` | `Superseded` | `Rejected`.
 
 **Reason:** Schema v3 is JSON Schema (`additionalProperties`, nullable unions such as `["integer","null"]`). Sending it as legacy `responseSchema` produced Gemini HTTP 400 `INVALID_ARGUMENT`. OpenAI and Anthropic keep their own wrappers; Gemini adapts at the client boundary.
 
-**Consequences:** Gemini errors are parsed from `error.message` and `error.status`, never from numeric `error.code` as the human-readable text. Public analyzer copy stays `Analysis failed. Please try again.` Provider internals stay in logs/admin debug only.
+**Consequences:** Gemini errors are parsed from `error.message` and `error.status`, never from numeric `error.code` as the human-readable text. Public analyzer copy stays `Analysis failed. Please try again.` Provider internals stay in logs/admin debug only. High-value nested blocks are now modeled on the Gemini wire (DEC-071); remaining arrays stay a shallow `{text}` projection.
 
 ---
 
@@ -945,10 +945,80 @@ Status values: `Accepted` | `Open` | `Superseded` | `Rejected`.
 
 ---
 
+## DEC-067
+
+**Title:** Short report is default Main Analyzer output  
+**Status:** Accepted  
+**Date:** 2026-09-11
+
+**Decision:** Short report is default Main Analyzer output.
+
+**Reason:** The completed live report was too long to use as the first screen. Operators need scores, the executive summary, and a few next actions before the deep blocks.
+
+**Consequences:** After `completed`, `/` shows `ShortAnalysisReport`. The full deep report is not rendered on the Main Analyzer home page.
+
+---
+
+## DEC-068
+
+**Title:** Full report is a separate read-only view of the same analysis result  
+**Status:** Accepted  
+**Date:** 2026-09-11
+
+**Decision:** Full report is a separate read-only view of the same analysis result.
+
+**Reason:** Opening the deep report in a new tab keeps the short view fast without storing a second analysis or starting a new AI job.
+
+**Consequences:** `GET /analysis/{public_token}/full` is an Inertia page that reads the existing `sales_analyses` row through `SalesAnalysisPresenter`. Admin Call detail defaults to the full report. No second analysis is created.
+
+---
+
+## DEC-069
+
+**Title:** Empty report sections are omitted from UI  
+**Status:** Accepted  
+**Date:** 2026-09-11
+
+**Decision:** Empty report sections are omitted from UI.
+
+**Reason:** Empty headings and empty cards looked like missing analysis rather than “nothing to show for this call.”
+
+**Consequences:** After normalization, sections with no valid items are not rendered. Malformed items are skipped instead of becoming empty cards.
+
+---
+
+## DEC-070
+
+**Title:** Main Analyzer report language follows selected UI locale  
+**Status:** Accepted  
+**Date:** 2026-09-11
+
+**Decision:** Main Analyzer report language follows selected UI locale.
+
+**Reason:** Operators review in the interface language even when the call is in another language. Reading locale later from the worker session/browser is racy and wrong.
+
+**Consequences:** `POST /analyze` stores `calls.ui_locale` (`en` / `ru` / `uk`). `AnalysisContextBuilder` uses that stored locale ahead of company `report_language` and transcript language. Quotes stay in the transcript language. Company `report_language` remains for admin/manual analysis when `ui_locale` is null.
+
+---
+
+## DEC-071
+
+**Title:** Gemini wire schema explicitly models high-value nested analysis blocks  
+**Status:** Accepted  
+**Date:** 2026-09-11
+
+**Decision:** Gemini wire schema explicitly models high-value nested analysis blocks.
+
+**Reason:** The previous shallow `{text}` array item schema caused Gemini to omit `mistake`, `original`/`better`, `skill`, scorecard `key`/`score`, and similar fields. The validator then filled empty cards and N/A criteria.
+
+**Consequences:** `GeminiClient::forGeminiWire()` describes slim nested items for `critical_mistakes`, `better_phrases`, `coaching_priorities`, and `company_specific.scorecard.criteria`. Full nested `missed_signals` and `timeline` together with those blocks exceed Gemini’s generateContent compiler budget, so they stay a `{text}` projection with `text` mapped to `signal`/`title`. Other arrays stay simplified. The full v3 graph is still not sent as `responseJsonSchema`. If a majority of expected scorecard keys are missing, company analysis fails rather than silently scoring N/A.
+
+---
+
 ## Template for new entries
 
 ```
-## DEC-067
+## DEC-072
 
 **Title:**  
 **Status:** Open | Accepted  

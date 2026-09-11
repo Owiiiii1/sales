@@ -66,6 +66,42 @@ class GeminiClientTest extends TestCase
             $this->assertSame(['text'], $wire['properties']['strengths']['items']['required']);
             $this->assertArrayHasKey('text', $wire['properties']['strengths']['items']['properties']);
 
+            $mistakes = $wire['properties']['critical_mistakes']['items']['properties'];
+            $this->assertArrayHasKey('mistake', $mistakes);
+            $this->assertArrayHasKey('impact', $mistakes);
+            $this->assertArrayHasKey('why', $mistakes);
+            $this->assertArrayHasKey('better_action', $mistakes);
+            $this->assertArrayHasKey('example_phrase', $mistakes);
+            $this->assertArrayHasKey('timestamp_seconds', $mistakes);
+
+            $phrases = $wire['properties']['better_phrases']['items']['properties'];
+            $this->assertArrayHasKey('original', $phrases);
+            $this->assertArrayHasKey('problem', $phrases);
+            $this->assertArrayHasKey('better', $phrases);
+            $this->assertArrayHasKey('why_better', $phrases);
+
+            $coaching = $wire['properties']['coaching_priorities']['items']['properties'];
+            $this->assertArrayHasKey('priority', $coaching);
+            $this->assertArrayHasKey('skill', $coaching);
+            $this->assertArrayHasKey('why', $coaching);
+            $this->assertArrayHasKey('evidence', $coaching);
+            $this->assertArrayHasKey('practice', $coaching);
+            $this->assertArrayHasKey('success_criteria', $coaching);
+
+            $signals = $wire['properties']['missed_signals']['items']['properties'];
+            $this->assertArrayHasKey('text', $signals);
+
+            $timeline = $wire['properties']['timeline']['items']['properties'];
+            $this->assertArrayHasKey('text', $timeline);
+            $this->assertArrayNotHasKey('event_type', $timeline);
+
+            $criteria = $wire['properties']['company_specific']['properties']['scorecard']['properties']['criteria']['items']['properties'];
+            $this->assertArrayHasKey('key', $criteria);
+            $this->assertArrayHasKey('score', $criteria);
+            $this->assertArrayHasKey('max_score', $criteria);
+            $this->assertArrayHasKey('applicable', $criteria);
+            $this->assertArrayHasKey('summary', $criteria);
+
             $encoded = $instruction."\n".(string) json_encode($schema);
             $this->assertStringContainsString('"additionalProperties"', $encoded);
             $this->assertStringContainsString('["integer","null"]', $encoded);
@@ -79,6 +115,34 @@ class GeminiClientTest extends TestCase
 
             return true;
         });
+    }
+
+    public function test_timeline_text_is_promoted_to_title_and_event_type_restored(): void
+    {
+        Http::fake([
+            'generativelanguage.googleapis.com/*' => Http::response([
+                'candidates' => [
+                    [
+                        'content' => [
+                            'parts' => [['text' => '{"timeline":[{"event_type":"buying_signal","text":"Interest"}],"missed_signals":[{"text":"Customer asked for a date"}]}']],
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $payload = (new GeminiClient)->completeJson(
+            'test-key',
+            'gemini-3.7-flash',
+            'system',
+            'user',
+            SalesAnalysisSchema::jsonSchema(),
+            1024,
+        );
+
+        $this->assertSame('buying_signal', $payload['timeline'][0]['type']);
+        $this->assertSame('Interest', $payload['timeline'][0]['title']);
+        $this->assertSame('Customer asked for a date', $payload['missed_signals'][0]['signal']);
     }
 
     public function test_generation_config_never_uses_legacy_response_schema(): void

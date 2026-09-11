@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use App\Exceptions\Analysis\PermanentAnalysisException;
+use App\Exceptions\Analysis\TransientAnalysisException;
 use App\Services\Analysis\DTO\AnalysisContext;
 use App\Services\Analysis\SalesAnalysisResultValidator;
 use App\Services\Analysis\SalesAnalysisSchema;
@@ -90,6 +91,107 @@ class SalesAnalysisResultValidatorTest extends TestCase
             'gpt-4o-mini',
             new AnalysisContext(companyContextUsed: true),
         );
+    }
+
+    public function test_empty_critical_mistake_is_skipped(): void
+    {
+        $result = app(SalesAnalysisResultValidator::class)->validate(
+            SalesAnalysisFactory::validPayload([
+                'critical_mistakes' => [
+                    [
+                        'timestamp_seconds' => null,
+                        'mistake' => '',
+                        'impact' => 'high',
+                        'why' => '',
+                        'better_action' => '',
+                        'example_phrase' => '',
+                    ],
+                    [
+                        'timestamp_seconds' => 12,
+                        'mistake' => 'Left without a next step.',
+                        'impact' => 'high',
+                        'why' => 'Interest was explicit.',
+                        'better_action' => 'Offer two times.',
+                        'example_phrase' => 'Thursday at 10?',
+                    ],
+                ],
+            ]),
+            'openai',
+            'gpt-4o-mini',
+        );
+
+        $this->assertCount(1, $result->payload['critical_mistakes']);
+        $this->assertSame('Left without a next step.', $result->payload['critical_mistakes'][0]['mistake']);
+    }
+
+    public function test_empty_better_phrase_and_coaching_items_are_skipped(): void
+    {
+        $result = app(SalesAnalysisResultValidator::class)->validate(
+            SalesAnalysisFactory::validPayload([
+                'better_phrases' => [
+                    ['original' => '', 'problem' => '', 'better' => '', 'why_better' => ''],
+                    [
+                        'timestamp_seconds' => 4,
+                        'original' => 'I will be in touch.',
+                        'problem' => 'No date.',
+                        'better' => 'Can we book Thursday at 10?',
+                        'why_better' => 'Creates a commitment.',
+                    ],
+                ],
+                'coaching_priorities' => [
+                    ['priority' => 1, 'skill' => '', 'why' => '', 'evidence' => [], 'practice' => '', 'success_criteria' => ''],
+                    [
+                        'priority' => 2,
+                        'skill' => 'Closing',
+                        'why' => 'No next step.',
+                        'evidence' => ['I will be in touch.'],
+                        'practice' => 'Offer two times.',
+                        'success_criteria' => 'A dated meeting.',
+                    ],
+                ],
+            ]),
+            'openai',
+            'gpt-4o-mini',
+        );
+
+        $this->assertCount(1, $result->payload['better_phrases']);
+        $this->assertSame('Can we book Thursday at 10?', $result->payload['better_phrases'][0]['better']);
+        $this->assertCount(1, $result->payload['coaching_priorities']);
+        $this->assertSame('Closing', $result->payload['coaching_priorities'][0]['skill']);
+    }
+
+    public function test_missing_majority_scorecard_criteria_fails_company_analysis(): void
+    {
+        $this->expectException(TransientAnalysisException::class);
+        $this->expectExceptionMessage('majority of expected criteria are missing');
+
+        app(SalesAnalysisResultValidator::class)->validate(
+            $this->companyPayload([]),
+            'openai',
+            'gpt-4o-mini',
+            $this->scorecardContext(),
+        );
+    }
+
+    public function test_mapped_scorecard_criteria_are_accepted_with_names(): void
+    {
+        $context = $this->scorecardContext();
+        $context->scorecardSnapshot['criteria'][0]['name'] = 'System age';
+        $context->scorecardSnapshot['criteria'][1]['name'] = 'Estimate';
+
+        $result = app(SalesAnalysisResultValidator::class)->validate(
+            $this->companyPayload([
+                $this->criterion('system_age', 80),
+                $this->criterion('estimate', 60),
+            ]),
+            'openai',
+            'gpt-4o-mini',
+            $context,
+        );
+
+        $this->assertSame('System age', $result->payload['company_specific']['scorecard']['criteria'][0]['name']);
+        $this->assertSame(80, $result->payload['company_specific']['scorecard']['criteria'][0]['score']);
+        $this->assertSame('Estimate', $result->payload['company_specific']['scorecard']['criteria'][1]['name']);
     }
 
     public function test_unknown_and_duplicate_scorecard_keys_are_rejected(): void
