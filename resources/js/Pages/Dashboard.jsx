@@ -1,6 +1,7 @@
 import AdminLayout from '@/Layouts/AdminLayout';
 import { AnalyticsFilters, AnalyticsSections } from '@/Components/Analytics/Board';
 import { Head, router } from '@inertiajs/react';
+import { useT } from '@/i18n';
 
 export default function Dashboard({
     filters = { period: 'last_30' },
@@ -8,9 +9,11 @@ export default function Dashboard({
     employees = [],
     analytics = {},
 }) {
+    const t = useT();
+
     return (
-        <AdminLayout title="Dashboard">
-            <Head title="Dashboard" />
+        <AdminLayout title={t('nav.dashboard')}>
+            <Head title={t('nav.dashboard')} />
             <div className="space-y-6">
                 <AnalyticsFilters
                     filters={filters}

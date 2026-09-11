@@ -1,31 +1,15 @@
 import AdminLayout from '@/Layouts/AdminLayout';
-import { Head, usePage } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
+import { useT } from '@/i18n';
 
 export default function StatisticsLogs() {
-    const { locale = 'en' } = usePage().props;
-
-    const text = {
-        en: {
-            title: 'Logs',
-            body: 'This is a placeholder logs page for the Statistics section.',
-        },
-        ru: {
-            title: 'Логи',
-            body: 'Это заглушка страницы логов в разделе статистики.',
-        },
-        uk: {
-            title: 'Логи',
-            body: 'Це заглушка сторінки логів у розділі статистики.',
-        },
-    };
-
-    const t = text[locale] ?? text.en;
+    const t = useT();
 
     return (
-        <AdminLayout title={t.title}>
-            <Head title="Logs" />
+        <AdminLayout title={t('logs.title')}>
+            <Head title={t('logs.title')} />
             <div className="app-widget p-4">
-                <p className="text-sm text-slate-700">{t.body}</p>
+                <p className="text-sm text-slate-700">{t('logs.body')}</p>
             </div>
         </AdminLayout>
     );

@@ -49,7 +49,7 @@ class StoreCallRequest extends FormRequest
     public function messages(): array
     {
         return array_merge(CallAudioRules::messages(), [
-            'company_id.required' => 'Please select a company.',
+            'company_id.required' => __('Please select a company.'),
         ]);
     }
 

@@ -2,16 +2,16 @@
 
 namespace App\Http\Controllers;
 
-use App\Jobs\AnalyzeCall;
-use App\Jobs\TranscribeCall;
 use App\Http\Requests\StoreCallRequest;
 use App\Http\Requests\UpdateCallRequest;
+use App\Jobs\AnalyzeCall;
+use App\Jobs\TranscribeCall;
 use App\Models\Call;
 use App\Models\Company;
 use App\Models\Employee;
 use App\Services\Ai\ActiveAiProvider;
-use App\Services\Calls\CallAudioStreamer;
 use App\Services\Calls\CallAudioStorage;
+use App\Services\Calls\CallAudioStreamer;
 use App\Services\Calls\CallUploadService;
 use App\Support\SalesAnalysisPresenter;
 use App\Support\TranscriptPresenter;
@@ -267,7 +267,7 @@ class CallsController extends Controller
             'analysis_ready' => $analysisReady,
             'analysis_unavailable_message' => $analysisReady
                 ? null
-                : 'AI analysis is not configured. Activate a provider and model in Settings → AI.',
+                : __('AI analysis is not configured. Activate a provider and model in Settings → AI.'),
             'transcript' => TranscriptPresenter::admin($call),
             'analysis' => SalesAnalysisPresenter::admin($call),
             'analysis_context' => [

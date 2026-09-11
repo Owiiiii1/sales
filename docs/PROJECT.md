@@ -59,9 +59,9 @@ Basic first-version flow:
 
 ## What this repository is today
 
-This repository currently hosts a **deployed Laravel 13 application** with **OwlSolutions Custom Admin Kit v0.5.0**, a **public analyzer homepage** at `/`, and an admin at `/login` (Companies, Employees, Calls, private audio).
+This repository currently hosts a **deployed Laravel 13 application** with **OwlSolutions Custom Admin Kit v0.5.0**, a **main analyzer workspace** at `/`, and an admin at `/login` (Companies, Employees, Calls, private audio).
 
-Transcription and AI scoring are **not** built yet. Public upload stores audio privately and waits for the analysis engine.
+Transcription and structured analysis are implemented. The operator may run generic analysis or select a Company (and optional Employee) before upload (DEC-057).
 
 See:
 
@@ -77,7 +77,7 @@ Primary users (planned, not all in MVP):
 * sales leads / owners (quality and team trends);
 * later: trainers, QA, operations. **TBD.**
 
-MVP is intentionally simpler: a public-style upload and analysis flow without a required personal cabinet. See [PRODUCT.md](PRODUCT.md).
+MVP is intentionally simpler: an operator analyzer without a required personal cabinet. Generic mode remains available. See [PRODUCT.md](PRODUCT.md).
 
 ## Out of scope for now
 

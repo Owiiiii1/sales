@@ -2,7 +2,7 @@
 
 This document describes the product we intend to build. It is not a description of the current UI.
 
-The live site has a **public homepage** at `/` for uploading a sales call, plus an admin at `/login`. Transcription is queued through ElevenLabs Scribe v2. Admins configure the STT key and LLM providers in Settings without editing `.env`. Generic AI sales analysis runs for public calls when the pipeline is ready. Admin-uploaded calls with a Company also use that company’s knowledge and default scorecard. See [STATUS.md](STATUS.md).
+The live site has a **main analyzer workspace** at `/` for uploading a sales call (generic or company-specific), plus an admin at `/login`. Transcription is queued through ElevenLabs Scribe v2. Admins configure the STT key and LLM providers in Settings without editing `.env`. The operator selects a Company (optional) and Employee (optional) before upload. Generic AI sales analysis runs when no company is selected. Analyzer uploads with a Company use that company’s knowledge and default scorecard. See [STATUS.md](STATUS.md).
 
 ## Problem
 
@@ -25,7 +25,7 @@ then a single uploaded call can produce a coaching-quality report.
 
 | Role | Intent | When |
 |---|---|---|
-| Anonymous / light user | Upload a call and get a report | Phase 1 (MVP) |
+| Anonymous / light user | Upload a call and get a report | Phase 1 (MVP) — **superseded as product framing**: `/` is an operator analyzer (DEC-057), still unauthenticated technically |
 | Logged-in user | History, saved company context | Phase 2 |
 | Employee (no login required) | Person whose calls are scored | Phase 2 domain |
 | Company admin / owner | Team quality, scorecards, knowledge | Later phases |
@@ -70,7 +70,7 @@ Which of those is **TBD**.
 
 A person can upload one call, optionally give company/product context, and receive a structured sales analysis they can act on.
 
-Exact public URL, branding, and whether analysis is behind a gate (email, waitlist, payment) are **Open questions**. The live public homepage is `https://sales.owlsolutions.net/` (DEC-017). Generic analysis is connected in application code when an AI provider is configured.
+Exact public URL, branding, and whether analysis is behind a gate (email, waitlist, payment) are **Open questions**. The live analyzer is `https://sales.owlsolutions.net/` (DEC-017, DEC-057). Generic analysis remains available when no Company is selected. Company-specific analysis is chosen explicitly before upload.
 
 ## Phase 2
 
@@ -110,7 +110,7 @@ These are possible later capabilities. **Do not treat the list as committed scop
 
 | Surface | Purpose | Status |
 |---|---|---|
-| Upload Call | Submit audio | Implemented (public + admin) |
+| Upload Call | Submit audio | Implemented (analyzer + admin) |
 | Analysis report | Deep coaching report for one call | Implemented (Phase 4–7) |
 | Company context form | Admin Sales Knowledge (not a public prompt field) | Implemented (Phase 5) |
 | Admin / operator UI | Adapted from Custom Admin Kit | Implemented (Phase 1) |

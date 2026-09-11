@@ -1,10 +1,6 @@
-import { Link, router, usePage } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import {
-    ChevronDown,
     Building2,
-    ChartColumn,
-    FileText,
-    Globe,
     Home,
     LogOut,
     Phone,
@@ -14,6 +10,7 @@ import {
     Menu,
 } from 'lucide-react';
 import { useState } from 'react';
+import LanguageSwitcher from '@/Components/LanguageSwitcher';
 import {
     Sheet,
     SheetContent,
@@ -27,135 +24,47 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/Components/ui/dropdown-menu';
+import { useT } from '@/i18n';
 
 const primaryNavItems = [
-    { route: 'dashboard', icon: Home },
-    { route: 'companies.index', icon: Building2, activePattern: 'companies.*' },
-    { route: 'employees.index', icon: Users, activePattern: 'employees.*' },
-    { route: 'calls.index', icon: Phone, activePattern: 'calls.*' },
+    { route: 'dashboard', icon: Home, labelKey: 'nav.dashboard' },
+    { route: 'companies.index', icon: Building2, activePattern: 'companies.*', labelKey: 'nav.companies' },
+    { route: 'employees.index', icon: Users, activePattern: 'employees.*', labelKey: 'nav.employees' },
+    { route: 'calls.index', icon: Phone, activePattern: 'calls.*', labelKey: 'nav.calls' },
 ];
 
-const languageLabels = {
-    uk: 'Українська',
-    en: 'English',
-    ru: 'Русский',
-};
-
-function navLabel(routeName, t) {
-    if (routeName === 'dashboard') return t.dashboard;
-    if (routeName === 'companies.index') return t.companies;
-    if (routeName === 'employees.index') return t.employees;
-    if (routeName === 'calls.index') return t.calls;
-    return routeName;
-}
-
 export default function AdminLayout({ title, children }) {
-    const { auth, locale = 'en', owlAdmin = {} } = usePage().props;
+    const { auth, owlAdmin = {} } = usePage().props;
+    const t = useT();
     const user = auth?.user;
     const brandName = owlAdmin?.brand_name ?? 'Service Admin';
     const logoPath = owlAdmin?.logo_path ?? '/images/company-logo.svg';
 
     const ai = owlAdmin?.ai ?? {};
     const aiConnected = !!ai.connected;
-    const aiBadgeText = ai?.status_label
-        ?? (aiConnected
-            ? `AI: connected — ${ai.provider_label ?? ai.provider ?? 'Unknown'} / ${ai.model ?? 'unknown'}`
-            : 'AI: not connected');
+    const aiBadgeText = aiConnected
+        ? t('header.aiConnected', {
+            provider: ai.provider_label ?? ai.provider ?? t('common.unknown'),
+            model: ai.model ?? t('common.unknown'),
+        })
+        : t('header.aiDisconnected');
 
-    const telegram = owlAdmin?.telegram ?? {};
-    const telegramStatus = telegram.status;
-    let telegramBadgeText = 'Bot: not connected';
-    let telegramBadgeClass = 'bg-red-100 text-red-700';
+    const transcription = owlAdmin?.transcription ?? {};
+    const transcriptionConnected = !!transcription.connected;
+    const modelLabel = transcription.model === 'scribe_v2' ? 'Scribe v2' : (transcription.model || t('common.unknown'));
+    const transcriptionBadgeText = transcriptionConnected
+        ? t('header.sttConnected', { model: modelLabel })
+        : t('header.sttDisconnected');
 
-    if (telegramStatus === 'connected') {
-        telegramBadgeText = telegram.status_label
-            ?? `Bot: connected — @${telegram.bot_username ?? ''}`;
-        telegramBadgeClass = 'bg-emerald-100 text-emerald-700';
-    } else if (telegramStatus === 'incomplete') {
-        telegramBadgeText = telegram.status_label ?? 'Bot: incomplete';
-        telegramBadgeClass = 'bg-amber-100 text-amber-800';
-    } else if (telegram.status_label) {
-        telegramBadgeText = telegram.status_label;
-    }
-
-    const [statisticsOpen, setStatisticsOpen] = useState(route().current('statistics.*'));
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-    const [mobileStatisticsOpen, setMobileStatisticsOpen] = useState(
-        route().current('statistics.*'),
-    );
-    const [localeSwitching, setLocaleSwitching] = useState(false);
-
-    const uiText = {
-        en: {
-            dashboard: 'Dashboard',
-            companies: 'Companies',
-            employees: 'Employees',
-            calls: 'Calls',
-            settings: 'Settings',
-            logout: 'Logout',
-            statistics: 'Statistics',
-            logs: 'Logs',
-            adminPanel: 'Admin Panel',
-            profile: 'Profile',
-            language: 'Language',
-            backToPublic: 'Back to Sales Analyzer',
-        },
-        ru: {
-            dashboard: 'Dashboard',
-            companies: 'Companies',
-            employees: 'Employees',
-            calls: 'Calls',
-            settings: 'Настройки',
-            logout: 'Выход',
-            statistics: 'Статистика',
-            logs: 'Логи',
-            adminPanel: 'Панель администратора',
-            profile: 'Профиль',
-            language: 'Язык',
-            backToPublic: 'Back to Sales Analyzer',
-        },
-        uk: {
-            dashboard: 'Dashboard',
-            companies: 'Companies',
-            employees: 'Employees',
-            calls: 'Calls',
-            settings: 'Налаштування',
-            logout: 'Вийти',
-            statistics: 'Статистика',
-            logs: 'Логи',
-            adminPanel: 'Панель адміністратора',
-            profile: 'Профіль',
-            language: 'Мова',
-            backToPublic: 'Back to Sales Analyzer',
-        },
-    };
-
-    const t = uiText[locale] ?? uiText.en;
-    const currentLanguageLabel = languageLabels[locale] ?? languageLabels.en;
 
     const settingsActive =
         route().current('settings.*')
         || route().current('ai-settings.*')
         || route().current('app-settings.*');
 
-    const switchLocale = (nextLocale) => {
-        if (!nextLocale || nextLocale === locale || localeSwitching) {
-            return;
-        }
-
-        setLocaleSwitching(true);
-        router.post(
-            route('settings.language.update'),
-            { locale: nextLocale },
-            {
-                preserveScroll: true,
-                onFinish: () => setLocaleSwitching(false),
-            },
-        );
-    };
-
     const renderPrimaryNav = (mobile = false) =>
-        primaryNavItems.map(({ route: routeName, icon: Icon, activePattern }) => {
+        primaryNavItems.map(({ route: routeName, icon: Icon, activePattern, labelKey }) => {
             const active = activePattern
                 ? route().current(activePattern)
                 : route().current(routeName);
@@ -172,54 +81,10 @@ export default function AdminLayout({ title, children }) {
                     }`}
                 >
                     <Icon className="h-4 w-4" />
-                    <span>{navLabel(routeName, t)}</span>
+                    <span>{t(labelKey)}</span>
                 </Link>
             );
         });
-
-    const renderStatistics = (mobile = false) => {
-        const open = mobile ? mobileStatisticsOpen : statisticsOpen;
-        const setOpen = mobile ? setMobileStatisticsOpen : setStatisticsOpen;
-
-        return (
-            <div>
-                <button
-                    type="button"
-                    onClick={() => setOpen((prev) => !prev)}
-                    className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition ${
-                        route().current('statistics.*')
-                            ? 'border-l-2 border-white bg-white/10 text-white'
-                            : 'text-slate-400 hover:bg-white/5 hover:text-white'
-                    }`}
-                >
-                    <span className="flex items-center gap-3">
-                        <ChartColumn className="h-4 w-4" />
-                        <span>{t.statistics}</span>
-                    </span>
-                    <ChevronDown
-                        className={`h-4 w-4 transition ${open ? 'rotate-180' : ''}`}
-                    />
-                </button>
-
-                {open && (
-                    <div className="mt-1 space-y-1 pl-4">
-                        <Link
-                            href={route('statistics.logs')}
-                            onClick={() => mobile && setMobileMenuOpen(false)}
-                            className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition ${
-                                route().current('statistics.logs')
-                                    ? 'bg-white/10 text-white'
-                                    : 'text-slate-400 hover:bg-white/5 hover:text-white'
-                            }`}
-                        >
-                            <FileText className="h-4 w-4" />
-                            <span>{t.logs}</span>
-                        </Link>
-                    </div>
-                )}
-            </div>
-        );
-    };
 
     const renderSettingsLink = (mobile = false) => (
         <Link
@@ -232,20 +97,20 @@ export default function AdminLayout({ title, children }) {
             }`}
         >
             <Settings className="h-4 w-4" />
-            <span>{t.settings}</span>
+            <span>{t('nav.settings')}</span>
         </Link>
     );
 
     const poweredBy = (
-        <div className="mt-auto border-t border-white/10 pt-4">
+        <div className="border-t border-white/10 pt-4">
             <Link
                 href={route('home')}
                 className="mb-3 block px-3 text-sm font-medium text-slate-300 transition hover:text-white"
             >
-                {t.backToPublic}
+                {t('nav.backToPublic')}
             </Link>
             <p className="px-3 text-xs text-slate-500">
-                Powered by{' '}
+                {t('common.poweredBy')}{' '}
                 <a
                     href="https://owlsolutions.net"
                     target="_blank"
@@ -278,10 +143,9 @@ export default function AdminLayout({ title, children }) {
                     <nav className="flex h-full flex-1 flex-col px-4 pb-6">
                         <div className="space-y-1.5">
                             {renderPrimaryNav(false)}
+                        </div>
 
-                            <div className="my-3 border-t border-white/10" />
-
-                            {renderStatistics(false)}
+                        <div className="mt-auto space-y-1.5">
                             {renderSettingsLink(false)}
                         </div>
 
@@ -303,10 +167,9 @@ export default function AdminLayout({ title, children }) {
                         <nav className="flex h-full flex-1 flex-col px-4 pb-6 pt-4">
                             <div className="space-y-1.5">
                                 {renderPrimaryNav(true)}
+                            </div>
 
-                                <div className="my-3 border-t border-white/10" />
-
-                                {renderStatistics(true)}
+                            <div className="mt-auto space-y-1.5">
                                 {renderSettingsLink(true)}
                             </div>
 
@@ -325,18 +188,18 @@ export default function AdminLayout({ title, children }) {
                                     size="icon"
                                     className="h-9 w-9 lg:hidden"
                                     onClick={() => setMobileMenuOpen(true)}
-                                    aria-label="Open menu"
+                                    aria-label={t('common.openMenu')}
                                 >
                                     <Menu className="h-4 w-4" />
                                 </Button>
                                 <div className="text-sm font-semibold uppercase tracking-wide text-slate-700">
-                                    {t.adminPanel}
+                                    {t('nav.adminPanel')}
                                 </div>
                                 <Link
                                     href={route('home')}
                                     className="text-sm font-medium text-indigo-700 hover:text-indigo-600"
                                 >
-                                    {t.backToPublic}
+                                    {t('nav.backToPublic')}
                                 </Link>
                             </div>
 
@@ -353,40 +216,24 @@ export default function AdminLayout({ title, children }) {
                                 </span>
 
                                 <span
-                                    className={`hidden max-w-[280px] truncate rounded-full px-3 py-1 text-xs font-semibold md:inline-flex ${telegramBadgeClass}`}
-                                    title={telegramBadgeText}
+                                    className={`hidden max-w-[280px] truncate rounded-full px-3 py-1 text-xs font-semibold md:inline-flex ${
+                                        transcriptionConnected
+                                            ? 'bg-emerald-100 text-emerald-700'
+                                            : 'bg-red-100 text-red-700'
+                                    }`}
+                                    title={transcriptionBadgeText}
                                 >
-                                    {telegramBadgeText}
+                                    {transcriptionBadgeText}
                                 </span>
 
-                                <div className="relative">
-                                    <label htmlFor="admin-header-language" className="sr-only">
-                                        {t.language}
-                                    </label>
-                                    <div className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 pr-8 text-sm font-medium text-slate-700 shadow-sm">
-                                        <Globe className="h-4 w-4 text-slate-500" />
-                                        <span className="hidden sm:inline">{currentLanguageLabel}</span>
-                                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                                    </div>
-                                    <select
-                                        id="admin-header-language"
-                                        value={locale}
-                                        disabled={localeSwitching}
-                                        onChange={(e) => switchLocale(e.target.value)}
-                                        className="absolute inset-0 h-9 w-full cursor-pointer opacity-0 disabled:cursor-wait"
-                                    >
-                                        <option value="uk">Українська</option>
-                                        <option value="en">English</option>
-                                        <option value="ru">Русский</option>
-                                    </select>
-                                </div>
+                                <LanguageSwitcher id="admin-header-language" compact />
 
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                         <button
                                             type="button"
                                             className="inline-flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-50 text-slate-700 outline-none transition hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-indigo-200"
-                                            aria-label={t.profile}
+                                            aria-label={t('nav.profile')}
                                         >
                                             {user?.avatar_path ? (
                                                 <img
@@ -406,7 +253,7 @@ export default function AdminLayout({ title, children }) {
                                                 className="cursor-pointer"
                                             >
                                                 <UserCircle2 className="h-4 w-4" />
-                                                <span>{t.profile}</span>
+                                                <span>{t('nav.profile')}</span>
                                             </Link>
                                         </DropdownMenuItem>
                                         <DropdownMenuItem asChild>
@@ -417,7 +264,7 @@ export default function AdminLayout({ title, children }) {
                                                 className="w-full cursor-pointer"
                                             >
                                                 <LogOut className="h-4 w-4" />
-                                                <span>{t.logout}</span>
+                                                <span>{t('nav.logout')}</span>
                                             </Link>
                                         </DropdownMenuItem>
                                     </DropdownMenuContent>

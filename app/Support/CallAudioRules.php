@@ -32,11 +32,11 @@ class CallAudioRules
         $maxMb = (int) config('sales-analyzer.max_audio_size_mb');
 
         return [
-            'audio.required' => 'Please choose an audio file.',
-            'audio.file' => 'Please choose an audio file.',
-            'audio.max' => "The audio file is too large. Maximum size is {$maxMb} MB.",
-            'audio.mimes' => 'This audio format is not supported.',
-            'audio.mimetypes' => 'This audio format is not supported.',
+            'audio.required' => __('Please choose an audio file.'),
+            'audio.file' => __('Please choose an audio file.'),
+            'audio.max' => __('The audio file is too large. Maximum size is :max MB.', ['max' => $maxMb]),
+            'audio.mimes' => __('This audio format is not supported.'),
+            'audio.mimetypes' => __('This audio format is not supported.'),
         ];
     }
 
@@ -50,7 +50,7 @@ class CallAudioRules
         $allowed = config('sales-analyzer.allowed_audio_extensions', []);
 
         if ($extension === '' || ! in_array($extension, $allowed, true)) {
-            $validator->errors()->add('audio', 'This audio format is not supported.');
+            $validator->errors()->add('audio', __('This audio format is not supported.'));
         }
     }
 }

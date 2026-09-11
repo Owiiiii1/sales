@@ -1,35 +1,25 @@
 import AdminLayout from '@/Layouts/AdminLayout';
 import { AnalyticsFilters, AnalyticsSections } from '@/Components/Analytics/Board';
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { useState } from 'react';
+import { useT } from '@/i18n';
 
-const TABS = [
-    { id: 'overview', label: 'Overview' },
-    { id: 'analytics', label: 'Analytics' },
-    { id: 'knowledge', label: 'Knowledge' },
-    { id: 'offerings', label: 'Offerings' },
-    { id: 'objections', label: 'Objections' },
-    { id: 'scripts', label: 'Scripts' },
-    { id: 'scorecard', label: 'Scorecard' },
-    { id: 'employees', label: 'Employees' },
-    { id: 'calls', label: 'Calls' },
-];
+const TABS = ['overview', 'analytics', 'knowledge', 'offerings', 'objections', 'scripts', 'scorecard', 'employees', 'calls'];
 
 const PROFILE_FIELDS = [
-    { key: 'short_description', label: 'What does the company sell?' },
-    { key: 'target_audience', label: 'Who is the target customer?' },
-    { key: 'ideal_customer_profile', label: 'Ideal customer' },
-    { key: 'customer_pains', label: 'Main customer pains' },
-    { key: 'value_proposition', label: 'Value proposition' },
-    { key: 'usp', label: 'USP' },
-    { key: 'competitors', label: 'Competitors' },
-    { key: 'pricing_context', label: 'Pricing context' },
-    { key: 'sales_goals', label: 'Sales goals' },
-    { key: 'desired_next_steps', label: 'Desired next steps' },
-    { key: 'mandatory_questions', label: 'Mandatory questions' },
-    { key: 'forbidden_claims', label: 'Forbidden claims' },
-    { key: 'sales_context', label: 'Additional sales context' },
-    { key: 'notes', label: 'Notes' },
+    'short_description',
+    'target_audience',
+    'ideal_customer_profile',
+    'customer_pains',
+    'value_proposition',
+    'usp',
+    'competitors',
+    'pricing_context',
+    'sales_goals',
+    'desired_next_steps',
+    'mandatory_questions',
+    'forbidden_claims',
+    'sales_context',
+    'notes',
 ];
 
 export default function CompanyShow({
@@ -46,6 +36,8 @@ export default function CompanyShow({
     filters = { period: 'last_30' },
     analytics = null,
 }) {
+    const t = useT();
+
     const go = (nextTab) => {
         const params = { tab: nextTab };
         if (nextTab === 'analytics') {
@@ -65,23 +57,23 @@ export default function CompanyShow({
                 <section className="app-widget p-4">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div>
-                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Company</p>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t('common.company')}</p>
                             <h2 className="mt-1 text-xl font-semibold text-slate-900">{company.name}</h2>
-                            <p className="mt-2 text-sm text-slate-600">Knowledge completeness: {completeness.percent}%</p>
+                            <p className="mt-2 text-sm text-slate-600">{t('companies.completeness', { percent: completeness.percent })}</p>
                         </div>
                         <Link href={route('companies.index')} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700">
-                            Back to companies
+                            {t('companies.back')}
                         </Link>
                     </div>
                     <div className="mt-4 flex flex-wrap gap-2">
-                        {TABS.map((item) => (
+                        {TABS.map((id) => (
                             <button
-                                key={item.id}
+                                key={id}
                                 type="button"
-                                onClick={() => go(item.id)}
-                                className={`rounded-full px-3 py-1.5 text-sm font-medium ${tab === item.id ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-700'}`}
+                                onClick={() => go(id)}
+                                className={`rounded-full px-3 py-1.5 text-sm font-medium ${tab === id ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-700'}`}
                             >
-                                {item.label}
+                                {t(`companies.${id}`)}
                             </button>
                         ))}
                     </div>
@@ -111,35 +103,28 @@ export default function CompanyShow({
 }
 
 function Overview({ company, completeness }) {
-    const labels = {
-        target_audience: 'Target customer',
-        usp: 'USP',
-        customer_pains: 'Customer pains',
-        offerings: 'Offerings',
-        script: 'Sales script',
-        scorecard: 'Scorecard',
-    };
+    const t = useT();
 
     return (
         <section className="app-widget p-4">
-            <h3 className="text-base font-semibold text-slate-900">Overview</h3>
+            <h3 className="text-base font-semibold text-slate-900">{t('companies.overview')}</h3>
             <dl className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 text-sm">
-                <Item label="Name" value={company.name} />
-                <Item label="Legal name" value={company.legal_name} />
-                <Item label="Website" value={company.website} />
-                <Item label="Industry" value={company.industry} />
-                <Item label="Phone" value={company.phone} />
-                <Item label="Email" value={company.email} />
-                <Item label="Location" value={[company.city, company.country].filter(Boolean).join(', ')} />
-                <Item label="Status" value={company.is_active ? 'active' : 'inactive'} />
+                <Item label={t('common.name')} value={company.name} />
+                <Item label={t('companies.legalName')} value={company.legal_name} />
+                <Item label={t('common.website')} value={company.website} />
+                <Item label={t('common.industry')} value={company.industry} />
+                <Item label={t('common.phone')} value={company.phone} />
+                <Item label={t('common.email')} value={company.email} />
+                <Item label={t('companies.location')} value={[company.city, company.country].filter(Boolean).join(', ')} />
+                <Item label={t('common.status')} value={company.is_active ? t('common.active') : t('common.inactive')} />
             </dl>
             {company.description && <p className="mt-4 text-sm leading-6 text-slate-700">{company.description}</p>}
             <div className="mt-6">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Knowledge checklist</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t('companies.checklist')}</p>
                 <ul className="mt-2 grid grid-cols-1 gap-1 sm:grid-cols-2 text-sm">
                     {Object.entries(completeness.items || {}).map(([key, filled]) => (
                         <li key={key} className={filled ? 'text-emerald-700' : 'text-slate-500'}>
-                            {filled ? '✓' : '○'} {labels[key] || key}
+                            {filled ? '✓' : '○'} {t(`companies.checklistItems.${key}`)}
                         </li>
                     ))}
                 </ul>
@@ -149,6 +134,7 @@ function Overview({ company, completeness }) {
 }
 
 function Knowledge({ company, profile }) {
+    const t = useT();
     const form = useForm({
         short_description: profile.short_description ?? '',
         sales_context: profile.sales_context ?? '',
@@ -168,8 +154,8 @@ function Knowledge({ company, profile }) {
 
     return (
         <section className="app-widget p-4">
-            <h3 className="text-base font-semibold text-slate-900">Sales knowledge</h3>
-            <p className="mt-1 text-sm text-slate-500">Describe the business in ordinary language. This becomes analysis context automatically.</p>
+            <h3 className="text-base font-semibold text-slate-900">{t('companies.knowledgeTitle')}</h3>
+            <p className="mt-1 text-sm text-slate-500">{t('companies.knowledgeHint')}</p>
             <form
                 className="mt-4 space-y-3"
                 onSubmit={(e) => {
@@ -177,19 +163,19 @@ function Knowledge({ company, profile }) {
                     form.patch(route('companies.profile.update', company.id), { preserveScroll: true });
                 }}
             >
-                {PROFILE_FIELDS.map((field) => (
-                    <div key={field.key}>
-                        <label className="mb-1 block text-sm font-medium text-slate-600">{field.label}</label>
+                {PROFILE_FIELDS.map((key) => (
+                    <div key={key}>
+                        <label className="mb-1 block text-sm font-medium text-slate-600">{t(`companies.profile.${key}`)}</label>
                         <textarea
                             rows={3}
-                            value={form.data[field.key] ?? ''}
-                            onChange={(e) => form.setData(field.key, e.target.value)}
+                            value={form.data[key] ?? ''}
+                            onChange={(e) => form.setData(key, e.target.value)}
                             className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                         />
                     </div>
                 ))}
                 <div className="flex justify-end">
-                    <button type="submit" disabled={form.processing} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">Save knowledge</button>
+                    <button type="submit" disabled={form.processing} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">{t('companies.saveKnowledge')}</button>
                 </div>
             </form>
         </section>
@@ -197,6 +183,7 @@ function Knowledge({ company, profile }) {
 }
 
 function Offerings({ company, offerings }) {
+    const t = useT();
     const create = useForm({
         type: 'service',
         name: '',
@@ -211,7 +198,7 @@ function Offerings({ company, offerings }) {
 
     return (
         <section className="app-widget p-4 space-y-6">
-            <h3 className="text-base font-semibold text-slate-900">Offerings</h3>
+            <h3 className="text-base font-semibold text-slate-900">{t('companies.offerings')}</h3>
             <form
                 className="grid grid-cols-1 gap-3 md:grid-cols-2"
                 onSubmit={(e) => {
@@ -222,26 +209,34 @@ function Offerings({ company, offerings }) {
                     });
                 }}
             >
-                <Select label="Type" value={create.data.type} onChange={(v) => create.setData('type', v)} options={['product', 'service', 'other']} />
-                <Field label="Name" value={create.data.name} onChange={(v) => create.setData('name', v)} error={create.errors.name} />
+                <Select
+                    label={t('common.type')}
+                    value={create.data.type}
+                    onChange={(v) => create.setData('type', v)}
+                    options={['product', 'service', 'other'].map((type) => ({
+                        value: type,
+                        label: t(`companies.offeringTypes.${type}`),
+                    }))}
+                />
+                <Field label={t('common.name')} value={create.data.name} onChange={(v) => create.setData('name', v)} error={create.errors.name} />
                 <div className="md:col-span-2">
-                    <Textarea label="Description" value={create.data.description} onChange={(v) => create.setData('description', v)} />
+                    <Textarea label={t('common.description')} value={create.data.description} onChange={(v) => create.setData('description', v)} />
                 </div>
-                <Field label="Target customer" value={create.data.target_customer} onChange={(v) => create.setData('target_customer', v)} />
-                <Field label="Pricing" value={create.data.pricing} onChange={(v) => create.setData('pricing', v)} />
+                <Field label={t('companies.targetCustomer')} value={create.data.target_customer} onChange={(v) => create.setData('target_customer', v)} />
+                <Field label={t('companies.pricing')} value={create.data.pricing} onChange={(v) => create.setData('pricing', v)} />
                 <div className="md:col-span-2 flex justify-end">
-                    <button type="submit" className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">Add offering</button>
+                    <button type="submit" className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">{t('companies.addOffering')}</button>
                 </div>
             </form>
             <div className="space-y-3">
                 {offerings.map((item) => (
                     <CrudCard
                         key={item.id}
-                        title={`${item.name} (${item.type})`}
+                        title={`${item.name} (${t(`companies.offeringTypes.${item.type}`)})`}
                         active={item.is_active}
                         onDelete={() => router.delete(route('companies.offerings.destroy', [company.id, item.id]), { preserveScroll: true })}
                     >
-                        <p className="text-sm text-slate-700">{item.description || 'No description'}</p>
+                        <p className="text-sm text-slate-700">{item.description || t('companies.noDescription')}</p>
                     </CrudCard>
                 ))}
             </div>
@@ -250,11 +245,12 @@ function Offerings({ company, offerings }) {
 }
 
 function Objections({ company, objections }) {
+    const t = useT();
     const create = useForm({ objection: '', recommended_response: '', notes: '', priority: '', is_active: true });
 
     return (
         <section className="app-widget p-4 space-y-6">
-            <h3 className="text-base font-semibold text-slate-900">Objections</h3>
+            <h3 className="text-base font-semibold text-slate-900">{t('companies.objections')}</h3>
             <form
                 className="grid grid-cols-1 gap-3"
                 onSubmit={(e) => {
@@ -262,11 +258,11 @@ function Objections({ company, objections }) {
                     create.post(route('companies.objections.store', company.id), { preserveScroll: true, onSuccess: () => create.reset() });
                 }}
             >
-                <Field label="Objection" value={create.data.objection} onChange={(v) => create.setData('objection', v)} error={create.errors.objection} />
-                <Textarea label="Recommended response" value={create.data.recommended_response} onChange={(v) => create.setData('recommended_response', v)} />
-                <Field label="Priority" value={create.data.priority} onChange={(v) => create.setData('priority', v)} />
+                <Field label={t('companies.objection')} value={create.data.objection} onChange={(v) => create.setData('objection', v)} error={create.errors.objection} />
+                <Textarea label={t('companies.recommendedResponse')} value={create.data.recommended_response} onChange={(v) => create.setData('recommended_response', v)} />
+                <Field label={t('companies.priority')} value={create.data.priority} onChange={(v) => create.setData('priority', v)} />
                 <div className="flex justify-end">
-                    <button type="submit" className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">Add objection</button>
+                    <button type="submit" className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">{t('companies.addObjection')}</button>
                 </div>
             </form>
             {objections.map((item) => (
@@ -276,7 +272,7 @@ function Objections({ company, objections }) {
                     active={item.is_active}
                     onDelete={() => router.delete(route('companies.objections.destroy', [company.id, item.id]), { preserveScroll: true })}
                 >
-                    <p className="text-sm text-slate-700">{item.recommended_response || 'No recommended response'}</p>
+                    <p className="text-sm text-slate-700">{item.recommended_response || t('companies.noResponse')}</p>
                 </CrudCard>
             ))}
         </section>
@@ -284,11 +280,12 @@ function Objections({ company, objections }) {
 }
 
 function Scripts({ company, scripts }) {
+    const t = useT();
     const create = useForm({ name: '', description: '', script_text: '', is_active: true });
 
     return (
         <section className="app-widget p-4 space-y-6">
-            <h3 className="text-base font-semibold text-slate-900">Sales scripts</h3>
+            <h3 className="text-base font-semibold text-slate-900">{t('companies.salesScripts')}</h3>
             <form
                 className="grid grid-cols-1 gap-3"
                 onSubmit={(e) => {
@@ -296,10 +293,10 @@ function Scripts({ company, scripts }) {
                     create.post(route('companies.scripts.store', company.id), { preserveScroll: true, onSuccess: () => create.reset() });
                 }}
             >
-                <Field label="Name" value={create.data.name} onChange={(v) => create.setData('name', v)} error={create.errors.name} />
-                <Textarea label="Script" value={create.data.script_text} onChange={(v) => create.setData('script_text', v)} error={create.errors.script_text} />
+                <Field label={t('common.name')} value={create.data.name} onChange={(v) => create.setData('name', v)} error={create.errors.name} />
+                <Textarea label={t('companies.script')} value={create.data.script_text} onChange={(v) => create.setData('script_text', v)} error={create.errors.script_text} />
                 <div className="flex justify-end">
-                    <button type="submit" className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">Add script</button>
+                    <button type="submit" className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">{t('companies.addScript')}</button>
                 </div>
             </form>
             {scripts.map((item) => (
@@ -317,6 +314,7 @@ function Scripts({ company, scripts }) {
 }
 
 function Scorecards({ company, scorecards }) {
+    const t = useT();
     const create = useForm({ name: '', description: '', is_default: false, is_active: true });
     const criterion = useForm({
         scorecard_id: scorecards[0]?.id ?? '',
@@ -332,7 +330,7 @@ function Scorecards({ company, scorecards }) {
 
     return (
         <section className="app-widget p-4 space-y-6">
-            <h3 className="text-base font-semibold text-slate-900">Scorecards</h3>
+            <h3 className="text-base font-semibold text-slate-900">{t('companies.scorecards')}</h3>
             <form
                 className="grid grid-cols-1 gap-3 md:grid-cols-2"
                 onSubmit={(e) => {
@@ -340,10 +338,10 @@ function Scorecards({ company, scorecards }) {
                     create.post(route('companies.scorecards.store', company.id), { preserveScroll: true, onSuccess: () => create.reset('name', 'description') });
                 }}
             >
-                <Field label="Name" value={create.data.name} onChange={(v) => create.setData('name', v)} error={create.errors.name} />
-                <Field label="Description" value={create.data.description} onChange={(v) => create.setData('description', v)} />
+                <Field label={t('common.name')} value={create.data.name} onChange={(v) => create.setData('name', v)} error={create.errors.name} />
+                <Field label={t('common.description')} value={create.data.description} onChange={(v) => create.setData('description', v)} />
                 <div className="md:col-span-2 flex justify-end">
-                    <button type="submit" className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">Add scorecard</button>
+                    <button type="submit" className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">{t('companies.addScorecard')}</button>
                 </div>
             </form>
 
@@ -353,10 +351,10 @@ function Scorecards({ company, scorecards }) {
                         <div>
                             <p className="font-semibold text-slate-900">{scorecard.name}</p>
                             <p className="text-sm text-slate-500">
-                                Total weight: {scorecard.total_weight}
-                                {scorecard.weight_warning ? ' (warning: not 100)' : ''}
-                                {scorecard.is_default ? ' · default' : ''}
-                                {scorecard.is_active ? '' : ' · inactive'}
+                                {t('companies.totalWeight', { weight: scorecard.total_weight })}
+                                {scorecard.weight_warning ? ` ${t('companies.weightWarning')}` : ''}
+                                {scorecard.is_default ? ` · ${t('common.default')}` : ''}
+                                {scorecard.is_active ? '' : ` · ${t('common.inactive')}`}
                             </p>
                         </div>
                         <div className="flex gap-3">
@@ -371,22 +369,22 @@ function Scorecards({ company, scorecards }) {
                                         is_active: scorecard.is_active,
                                     }, { preserveScroll: true })}
                                 >
-                                    Make default
+                                    {t('companies.makeDefault')}
                                 </button>
                             )}
-                            <button type="button" className="text-sm text-red-700" onClick={() => router.delete(route('companies.scorecards.destroy', [company.id, scorecard.id]), { preserveScroll: true })}>Delete</button>
+                            <button type="button" className="text-sm text-red-700" onClick={() => router.delete(route('companies.scorecards.destroy', [company.id, scorecard.id]), { preserveScroll: true })}>{t('common.delete')}</button>
                         </div>
                     </div>
                     <ul className="mt-3 space-y-2 text-sm">
                         {scorecard.criteria.map((item) => (
                             <li key={item.id} className="flex justify-between gap-3">
-                                <span>{item.name} ({item.key}) · weight {item.weight}</span>
+                                <span>{t('companies.criterionWeight', { name: item.name, key: item.key, weight: item.weight })}</span>
                                 <button
                                     type="button"
                                     className="text-red-700"
                                     onClick={() => router.delete(route('companies.scorecards.criteria.destroy', [company.id, scorecard.id, item.id]), { preserveScroll: true })}
                                 >
-                                    Remove
+                                    {t('common.remove')}
                                 </button>
                             </li>
                         ))}
@@ -409,21 +407,21 @@ function Scorecards({ company, scorecards }) {
                         });
                     }}
                 >
-                    <h4 className="md:col-span-2 text-sm font-semibold text-slate-900">Add criterion</h4>
+                    <h4 className="md:col-span-2 text-sm font-semibold text-slate-900">{t('companies.addCriterion')}</h4>
                     <Select
-                        label="Scorecard"
+                        label={t('companies.scorecard')}
                         value={String(criterion.data.scorecard_id || scorecards[0]?.id || '')}
                         onChange={(v) => criterion.setData('scorecard_id', v)}
                         options={scorecards.map((item) => ({ value: item.id, label: item.name }))}
                     />
-                    <Field label="Name" value={criterion.data.name} onChange={(v) => criterion.setData('name', v)} error={criterion.errors.name} />
-                    <Field label="Key" value={criterion.data.key} onChange={(v) => criterion.setData('key', v)} error={criterion.errors.key} />
-                    <Field label="Weight" value={criterion.data.weight} onChange={(v) => criterion.setData('weight', v)} />
+                    <Field label={t('common.name')} value={criterion.data.name} onChange={(v) => criterion.setData('name', v)} error={criterion.errors.name} />
+                    <Field label={t('companies.criterionKey')} value={criterion.data.key} onChange={(v) => criterion.setData('key', v)} error={criterion.errors.key} />
+                    <Field label={t('companies.criterionWeightField')} value={criterion.data.weight} onChange={(v) => criterion.setData('weight', v)} />
                     <div className="md:col-span-2">
-                        <Textarea label="How AI should judge this" value={criterion.data.ai_instructions} onChange={(v) => criterion.setData('ai_instructions', v)} />
+                        <Textarea label={t('companies.aiJudge')} value={criterion.data.ai_instructions} onChange={(v) => criterion.setData('ai_instructions', v)} />
                     </div>
                     <div className="md:col-span-2 flex justify-end">
-                        <button type="submit" className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">Add criterion</button>
+                        <button type="submit" className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">{t('companies.addCriterion')}</button>
                     </div>
                 </form>
             )}
@@ -432,11 +430,13 @@ function Scorecards({ company, scorecards }) {
 }
 
 function EmployeesList({ company, employees }) {
+    const t = useT();
+
     return (
         <section className="app-widget p-4">
             <div className="flex justify-between">
-                <h3 className="text-base font-semibold text-slate-900">Employees</h3>
-                <Link href={`${route('employees.index')}?company_id=${company.id}`} className="text-sm text-indigo-700">Open employees</Link>
+                <h3 className="text-base font-semibold text-slate-900">{t('companies.employees')}</h3>
+                <Link href={`${route('employees.index')}?company_id=${company.id}`} className="text-sm text-indigo-700">{t('companies.openEmployees')}</Link>
             </div>
             <ul className="mt-4 space-y-2 text-sm">
                 {employees.map((employee) => (
@@ -445,38 +445,42 @@ function EmployeesList({ company, employees }) {
                         {employee.position ? ` · ${employee.position}` : ''}
                     </li>
                 ))}
-                {employees.length === 0 && <p className="text-slate-500">No employees yet.</p>}
+                {employees.length === 0 && <p className="text-slate-500">{t('companies.noEmployees')}</p>}
             </ul>
         </section>
     );
 }
 
 function CallsList({ calls }) {
+    const t = useT();
+
     return (
         <section className="app-widget p-4">
-            <h3 className="text-base font-semibold text-slate-900">Recent calls</h3>
+            <h3 className="text-base font-semibold text-slate-900">{t('companies.recentCalls')}</h3>
             <ul className="mt-4 space-y-2 text-sm">
                 {calls.map((call) => (
                     <li key={call.id}>
                         <Link href={call.show_url} className="text-indigo-700">#{call.id}</Link>
-                        {' '}{call.original_filename || 'Call'} · {call.status}
+                        {' '}{call.original_filename || t('companies.callFallback')} · {t.status(call.status)}
                     </li>
                 ))}
-                {calls.length === 0 && <p className="mt-3 text-slate-500">No calls yet.</p>}
+                {calls.length === 0 && <p className="mt-3 text-slate-500">{t('companies.noCalls')}</p>}
             </ul>
         </section>
     );
 }
 
 function CrudCard({ title, active, onDelete, children }) {
+    const t = useT();
+
     return (
         <div className="rounded-xl border border-slate-200 p-4">
             <div className="flex items-start justify-between gap-3">
                 <div>
                     <p className="font-semibold text-slate-900">{title}</p>
-                    <p className="text-xs text-slate-500">{active ? 'active' : 'inactive'}</p>
+                    <p className="text-xs text-slate-500">{active ? t('common.active') : t('common.inactive')}</p>
                 </div>
-                <button type="button" className="text-sm text-red-700" onClick={onDelete}>Delete</button>
+                <button type="button" className="text-sm text-red-700" onClick={onDelete}>{t('common.delete')}</button>
             </div>
             <div className="mt-2">{children}</div>
         </div>
@@ -484,10 +488,11 @@ function CrudCard({ title, active, onDelete, children }) {
 }
 
 function Item({ label, value }) {
+    const t = useT();
     return (
         <div>
             <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</dt>
-            <dd className="mt-1 text-slate-800">{value || '—'}</dd>
+            <dd className="mt-1 text-slate-800">{value || t('common.dash')}</dd>
         </div>
     );
 }

@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\CallsController;
 use App\Http\Controllers\CompaniesController;
@@ -8,16 +7,20 @@ use App\Http\Controllers\CompanyKnowledgeController;
 use App\Http\Controllers\CustomersController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EmployeesController;
+use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\OrdersController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ServicesController;
-use App\Http\Controllers\StaffController;
-use App\Http\Controllers\TelegramWebhookController;
 use App\Http\Controllers\Settings\AiSettingsController;
 use App\Http\Controllers\Settings\AnalysisSettingsController;
 use App\Http\Controllers\Settings\SettingsController;
-use App\Http\Controllers\Settings\TranscriptionSettingsController;
 use App\Http\Controllers\Settings\TelegramSettingsController;
+use App\Http\Controllers\Settings\TranscriptionSettingsController;
 use App\Http\Controllers\Settings\UserController as SettingsUserController;
+use App\Http\Controllers\StaffController;
+use App\Http\Controllers\TelegramWebhookController;
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use OwlSolutions\CustomAdminKit\Support\AdminRouteMiddleware;
@@ -30,8 +33,8 @@ use OwlSolutions\CustomAdminKit\Support\AdminRouteMiddleware;
 
 Route::post('/telegram/webhook', TelegramWebhookController::class)
     ->withoutMiddleware([
-        \Illuminate\Foundation\Http\Middleware\PreventRequestForgery::class,
-        \Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class,
+        PreventRequestForgery::class,
+        ValidateCsrfToken::class,
     ])
     ->name('telegram.webhook');
 
@@ -105,7 +108,7 @@ Route::middleware(AdminRouteMiddleware::stack())->group(function () {
     Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar.index');
 
     Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
-    Route::post('/settings/language', [SettingsController::class, 'updateLanguage'])->name('settings.language.update');
+    Route::post('/settings/language', [LocaleController::class, 'update'])->name('settings.language.update');
     Route::post('/settings/users', [SettingsUserController::class, 'store'])->name('settings.users.store');
     Route::patch('/settings/users/{user}', [SettingsUserController::class, 'update'])->name('settings.users.update');
     Route::delete('/settings/users/{user}', [SettingsUserController::class, 'destroy'])->name('settings.users.destroy');
@@ -120,7 +123,7 @@ Route::middleware(AdminRouteMiddleware::stack())->group(function () {
         ->name('settings.telegram.remove-webhook');
 
     Route::get('/app-settings', function () {
-        return redirect()->route('settings.index', ['tab' => 'app']);
+        return redirect()->route('settings.index', ['tab' => 'users']);
     })->name('app-settings.index');
 
     Route::get('/ai-settings', [AiSettingsController::class, 'index'])->name('ai-settings.index');

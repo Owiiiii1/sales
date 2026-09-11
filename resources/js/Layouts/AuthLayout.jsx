@@ -1,7 +1,10 @@
 import { usePage } from '@inertiajs/react';
+import LanguageSwitcher from '@/Components/LanguageSwitcher';
+import { useT } from '@/i18n';
 
 export default function AuthLayout({ children }) {
     const { owlAdmin = {} } = usePage().props;
+    const t = useT();
     const brandName = owlAdmin.brand_name ?? 'Service Admin';
     const logoPath = owlAdmin.logo_path ?? '/images/company-logo.svg';
 
@@ -22,10 +25,10 @@ export default function AuthLayout({ children }) {
 
                     <div className="relative z-10 max-w-md space-y-4">
                         <h1 className="text-5xl font-semibold leading-tight">
-                            Service admin workspace.
+                            {t('login.workspaceTitle')}
                         </h1>
                         <p className="text-base text-slate-300">
-                            Secure access for your administration team.
+                            {t('login.workspaceSubtitle')}
                         </p>
                     </div>
                     <p className="relative z-10 text-xs uppercase tracking-[0.2em] text-slate-400">
@@ -34,6 +37,9 @@ export default function AuthLayout({ children }) {
                 </section>
 
                 <section className="relative flex items-center justify-center p-6 sm:p-10">
+                    <div className="absolute right-6 top-6 sm:right-10 sm:top-10">
+                        <LanguageSwitcher id="auth-language" />
+                    </div>
                     <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
                         {children}
                     </div>

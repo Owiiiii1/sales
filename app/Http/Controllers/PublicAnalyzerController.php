@@ -4,8 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\PublicAnalyzeRequest;
 use App\Models\Call;
+use App\Models\Company;
+use App\Models\Employee;
 use App\Services\Calls\CallUploadService;
 use App\Services\Transcription\ActiveTranscriptionProvider;
+use App\Support\CompanyKnowledgeCompleteness;
 use App\Support\SalesAnalysisPresenter;
 use App\Support\TranscriptPresenter;
 use Illuminate\Http\JsonResponse;
@@ -29,8 +32,9 @@ class PublicAnalyzerController extends Controller
                     ->implode(','),
                 'poll_interval_ms' => 3000,
                 'available' => $available,
-                'unavailable_message' => $available ? null : 'Audio analysis is temporarily unavailable.',
+                'unavailable_message' => $available ? null : __('Audio analysis is temporarily unavailable.'),
             ],
+            ...$this->workspaceOptions(),
         ]);
     }
 
@@ -38,24 +42,21 @@ class PublicAnalyzerController extends Controller
     {
         if (! $transcription->isReady()) {
             return response()->json([
-                'message' => 'Audio analysis is temporarily unavailable.',
+                'message' => __('Audio analysis is temporarily unavailable.'),
             ], 503);
         }
 
         try {
-            $call = $uploads->upload(null, [
-                'company_id' => null,
-                'employee_id' => null,
-                'source' => 'public',
-            ], $request->file('audio'));
+            $call = $uploads->upload(null, $request->payload(), $request->file('audio'));
+            $call->load(['company:id,name', 'employee:id,first_name,last_name']);
         } catch (Throwable $e) {
             report($e);
             Log::error('Public call upload failed.', ['error' => $e->getMessage()]);
 
             return response()->json([
-                'message' => 'The audio file could not be stored. Please try again.',
+                'message' => __('The audio file could not be stored. Please try again.'),
                 'errors' => [
-                    'audio' => ['The audio file could not be stored. Please try again.'],
+                    'audio' => [__('The audio file could not be stored. Please try again.')],
                 ],
             ], 500);
         }
@@ -84,7 +85,7 @@ class PublicAnalyzerController extends Controller
     {
         return Call::query()
             ->where('public_token', $publicToken)
-            ->with(['transcript.segments', 'analysis'])
+            ->with(['transcript.segments', 'analysis', 'company:id,name', 'employee:id,first_name,last_name'])
             ->firstOrFail();
     }
 
@@ -107,18 +108,71 @@ class PublicAnalyzerController extends Controller
             'duration_seconds' => $transcript['duration_seconds'] ?? $call->duration_seconds,
             'transcript' => $transcript,
             'message' => $this->publicMessage($call),
+            'analysis_mode' => $call->company_id === null ? 'generic' : 'company',
+            'company_name' => $call->company?->name,
+            'employee_name' => $call->employee?->full_name,
+        ];
+    }
+
+    /**
+     * @return array{companies: array<int, array{id:int, name:string, knowledge_completeness:int, scorecard_name:?string}>, employees: array<int, array{id:int, company_id:int, name:string}>}
+     */
+    private function workspaceOptions(): array
+    {
+        $completeness = app(CompanyKnowledgeCompleteness::class);
+
+        $companies = Company::query()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->with([
+                'profile',
+                'offerings',
+                'salesScripts',
+                'scorecards' => fn ($query) => $query->where('is_active', true)->orderByDesc('is_default')->orderBy('id'),
+                'scorecards.criteria',
+            ])
+            ->get();
+
+        return [
+            'companies' => $companies
+                ->map(function (Company $company) use ($completeness): array {
+                    $scorecard = $company->scorecards->first(fn ($row): bool => (bool) $row->is_default)
+                        ?? $company->scorecards->first();
+
+                    return [
+                        'id' => $company->id,
+                        'name' => $company->name,
+                        'knowledge_completeness' => $completeness->for($company)['percent'],
+                        'scorecard_name' => $scorecard?->name,
+                    ];
+                })
+                ->values()
+                ->all(),
+            'employees' => Employee::query()
+                ->where('is_active', true)
+                ->whereIn('company_id', $companies->pluck('id'))
+                ->orderBy('first_name')
+                ->orderBy('last_name')
+                ->get()
+                ->map(fn (Employee $employee): array => [
+                    'id' => $employee->id,
+                    'company_id' => $employee->company_id,
+                    'name' => $employee->full_name,
+                ])
+                ->values()
+                ->all(),
         ];
     }
 
     private function publicMessage(Call $call): ?string
     {
         return match ($call->status) {
-            'uploaded' => 'Your call is queued for transcription.',
-            'processing' => 'Transcribing your call…',
-            'transcribed' => 'Transcription complete.',
-            'analysis_pending' => 'Transcription completed, but AI analysis is temporarily unavailable.',
-            'analyzing' => 'Analyzing your sales call…',
-            'completed' => 'Analysis complete.',
+            'uploaded' => __('Your call is queued for transcription.'),
+            'processing' => __('Transcribing your call…'),
+            'transcribed' => __('Transcription complete.'),
+            'analysis_pending' => __('Transcription completed, but AI analysis is temporarily unavailable.'),
+            'analyzing' => __('Analyzing your sales call…'),
+            'completed' => __('Analysis complete.'),
             'failed' => $this->publicError($call),
             default => null,
         };
@@ -131,16 +185,16 @@ class PublicAnalyzerController extends Controller
         }
 
         if ($call->error_message === 'This language is not supported yet.') {
-            return $call->error_message;
+            return __($call->error_message);
         }
 
         if ($call->transcript !== null) {
             return $call->error_message === 'Analysis is not available yet.'
-                ? $call->error_message
-                : 'Analysis failed. Please try again.';
+                ? __($call->error_message)
+                : __('Analysis failed. Please try again.');
         }
 
-        return 'Transcription failed. Please try again.';
+        return __('Transcription failed. Please try again.');
     }
 
     private function reportAvailable(Call $call): bool

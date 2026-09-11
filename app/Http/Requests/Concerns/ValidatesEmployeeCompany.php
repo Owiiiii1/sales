@@ -24,7 +24,7 @@ trait ValidatesEmployeeCompany
         if (! $belongs) {
             $validator->errors()->add(
                 'employee_id',
-                'The selected employee does not belong to the selected company.',
+                __('The selected employee does not belong to the selected company.'),
             );
         }
     }

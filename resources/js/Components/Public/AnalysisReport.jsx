@@ -1,3 +1,5 @@
+import { useT } from '@/i18n';
+
 function Spinner({ label }) {
     return (
         <div className="flex items-center gap-3 text-slate-600">
@@ -14,9 +16,9 @@ function labelize(value) {
     return String(value).replaceAll('_', ' ');
 }
 
-function na(value) {
+function na(value, fallback = 'N/A') {
     if (value === null || value === undefined || value === '') {
-        return 'N/A';
+        return fallback;
     }
     return value;
 }
@@ -61,11 +63,12 @@ function timelineTone(type) {
 }
 
 function ScoreBar({ score, label }) {
+    const t = useT();
     if (score === null || score === undefined) {
         return (
             <div>
                 {label && <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>}
-                <p className="mt-1 text-sm text-slate-500">N/A</p>
+                <p className="mt-1 text-sm text-slate-500">{t('common.na')}</p>
             </div>
         );
     }
@@ -110,8 +113,9 @@ function Meta({ time, speaker, quote }) {
 }
 
 function FindingList({ items }) {
+    const t = useT();
     if (!items?.length) {
-        return <p className="mt-2 text-sm text-slate-500">None noted.</p>;
+        return <p className="mt-2 text-sm text-slate-500">{t('common.noneNoted')}</p>;
     }
 
     return (
@@ -127,8 +131,9 @@ function FindingList({ items }) {
 }
 
 function PracticeList({ items }) {
+    const t = useT();
     if (!items?.length) {
-        return <p className="mt-2 text-sm text-slate-500">None noted.</p>;
+        return <p className="mt-2 text-sm text-slate-500">{t('common.noneNoted')}</p>;
     }
 
     return (
@@ -144,6 +149,7 @@ function PracticeList({ items }) {
 }
 
 function SectionCard({ section }) {
+    const t = useT();
     if (!section) {
         return null;
     }
@@ -153,20 +159,20 @@ function SectionCard({ section }) {
             <div className="flex items-start justify-between gap-3">
                 <h3 className="text-sm font-semibold text-slate-900">{section.title}</h3>
                 {section.applicable === false ? (
-                    <Badge>Not applicable</Badge>
+                    <Badge>{t('common.notApplicable')}</Badge>
                 ) : (
-                    <span className="text-sm font-semibold text-slate-900">{section.score ?? 'N/A'}</span>
+                    <span className="text-sm font-semibold text-slate-900">{section.score ?? t('common.na')}</span>
                 )}
             </div>
             {section.summary && <p className="mt-2 text-sm leading-6 text-slate-700">{section.summary}</p>}
             {section.applicable !== false && (
                 <div className="mt-3 grid gap-4 sm:grid-cols-2">
                     <div>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Strengths</p>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t('report.strengths')}</p>
                         <FindingList items={section.strengths} />
                     </div>
                     <div>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Issues</p>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t('report.issues')}</p>
                         <FindingList items={section.issues} />
                     </div>
                 </div>
@@ -187,6 +193,7 @@ function Collapsible({ title, children, defaultOpen = false }) {
 }
 
 function CallTimeline({ items }) {
+    const t = useT();
     if (!items?.length) {
         return null;
     }
@@ -206,7 +213,7 @@ function CallTimeline({ items }) {
                     }`} />
                     <div className="flex flex-wrap items-center gap-2">
                         {item.timestamp_label && <span className="text-xs text-slate-500">{item.timestamp_label}</span>}
-                        <Badge tone={timelineTone(item.type)}>{labelize(item.type)}</Badge>
+                        <Badge tone={timelineTone(item.type)}>{t.enum('timeline', item.type)}</Badge>
                     </div>
                     <p className="mt-1 text-sm font-medium text-slate-900">{item.title}</p>
                     {item.description && <p className="mt-1 text-sm leading-6 text-slate-700">{item.description}</p>}
@@ -218,23 +225,24 @@ function CallTimeline({ items }) {
 }
 
 function SignalGroups({ signals }) {
+    const t = useT();
     if (!signals) {
-        return <p className="text-sm text-slate-500">None noted.</p>;
+        return <p className="text-sm text-slate-500">{t('common.noneNoted')}</p>;
     }
 
     const groups = [
-        ['positive_signals', 'Positive'],
-        ['buying_signals', 'Buying'],
-        ['trust_signals', 'Trust'],
-        ['hesitation_signals', 'Hesitation'],
-        ['negative_signals', 'Negative'],
-        ['risk_signals', 'Risk'],
+        ['positive_signals', t('report.signalsPositive')],
+        ['buying_signals', t('report.signalsBuying')],
+        ['trust_signals', t('report.signalsTrust')],
+        ['hesitation_signals', t('report.signalsHesitation')],
+        ['negative_signals', t('report.signalsNegative')],
+        ['risk_signals', t('report.signalsRisk')],
     ];
 
     const nonempty = groups.filter(([key]) => signals[key]?.length);
 
     if (!nonempty.length) {
-        return <p className="text-sm text-slate-500">None noted.</p>;
+        return <p className="text-sm text-slate-500">{t('common.noneNoted')}</p>;
     }
 
     return (
@@ -249,17 +257,40 @@ function SignalGroups({ signals }) {
     );
 }
 
-export default function AnalysisReport({ status, report, message, error }) {
+function ModeBadge({ mode, companyName }) {
+    const t = useT();
+
+    if (mode !== 'generic' && mode !== 'company') {
+        return null;
+    }
+
+    return (
+        <p className="mt-2">
+            <Badge tone={mode === 'company' ? 'good' : 'neutral'}>
+                {mode === 'company'
+                    ? t('report.companyBadge', { name: companyName || '' })
+                    : t('report.genericBadge')}
+            </Badge>
+        </p>
+    );
+}
+
+export default function AnalysisReport({ status, report, message, error, analysisMode, companyName }) {
+    const t = useT();
+    const dash = t('common.na');
+    const badge = <ModeBadge mode={analysisMode} companyName={companyName} />;
+
     if (status === 'uploading' || status === 'processing' || status === 'analyzing') {
         const label = {
-            uploading: 'Uploading your call…',
-            processing: 'Transcribing your call…',
-            analyzing: 'Analyzing your sales call…',
+            uploading: t('report.uploading'),
+            processing: t('report.transcribing'),
+            analyzing: t('report.analyzing'),
         }[status];
 
         return (
             <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-                <h2 className="text-lg font-semibold text-slate-900">Analysis report</h2>
+                <h2 className="text-lg font-semibold text-slate-900">{t('report.title')}</h2>
+                {badge}
                 <div className="mt-6">
                     <Spinner label={label} />
                 </div>
@@ -270,9 +301,10 @@ export default function AnalysisReport({ status, report, message, error }) {
     if (status === 'uploaded' && !report) {
         return (
             <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-                <h2 className="text-lg font-semibold text-slate-900">Analysis report</h2>
+                <h2 className="text-lg font-semibold text-slate-900">{t('report.title')}</h2>
+                {badge}
                 <p className="mt-3 text-sm leading-6 text-slate-600">
-                    {message || 'Your call is queued for transcription.'}
+                    {message || t('report.queued')}
                 </p>
             </section>
         );
@@ -281,9 +313,10 @@ export default function AnalysisReport({ status, report, message, error }) {
     if ((status === 'transcribed' || status === 'analysis_pending') && !report) {
         return (
             <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-                <h2 className="text-lg font-semibold text-slate-900">Analysis report</h2>
+                <h2 className="text-lg font-semibold text-slate-900">{t('report.title')}</h2>
+                {badge}
                 <p className="mt-3 text-sm leading-6 text-slate-600">
-                    {message || 'Transcription complete. AI analysis is not configured yet.'}
+                    {message || t('report.transcribed')}
                 </p>
             </section>
         );
@@ -292,8 +325,9 @@ export default function AnalysisReport({ status, report, message, error }) {
     if (status === 'failed') {
         return (
             <section className="rounded-3xl border border-red-100 bg-white p-8 shadow-sm">
-                <h2 className="text-lg font-semibold text-slate-900">Analysis report</h2>
-                <p className="mt-3 text-sm text-red-700">{error || message || 'Something went wrong. Please try again.'}</p>
+                <h2 className="text-lg font-semibold text-slate-900">{t('report.title')}</h2>
+                {badge}
+                <p className="mt-3 text-sm text-red-700">{error || message || t('report.failed')}</p>
             </section>
         );
     }
@@ -309,66 +343,67 @@ export default function AnalysisReport({ status, report, message, error }) {
 
     return (
         <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-            <h2 className="text-lg font-semibold text-slate-900">Analysis report</h2>
+            <h2 className="text-lg font-semibold text-slate-900">{t('report.title')}</h2>
+            {badge}
 
             <div className="mt-6 flex flex-wrap items-end gap-8">
                 <div>
-                    <p className="text-5xl font-semibold tracking-tight text-slate-900">{na(report.overall_score)}</p>
-                    <p className="mt-1 text-sm font-medium text-slate-500">Overall Sales Score</p>
+                    <p className="text-5xl font-semibold tracking-tight text-slate-900">{na(report.overall_score, dash)}</p>
+                    <p className="mt-1 text-sm font-medium text-slate-500">{t('report.overall')}</p>
                 </div>
                 {report.company_scorecard_score !== null && report.company_scorecard_score !== undefined && (
                     <div>
                         <p className="text-5xl font-semibold tracking-tight text-slate-900">{report.company_scorecard_score}</p>
-                        <p className="mt-1 text-sm font-medium text-slate-500">Company Scorecard</p>
+                        <p className="mt-1 text-sm font-medium text-slate-500">{t('report.companyScorecard')}</p>
                     </div>
                 )}
             </div>
 
             {exec ? (
                 <div className="mt-6 space-y-4">
-                    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Executive summary</h3>
+                    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{t('report.executive')}</h3>
                     <p className="text-base leading-7 text-slate-900">{exec.one_sentence}</p>
                     <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 text-sm">
                         <div>
-                            <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Outcome</dt>
-                            <dd className="mt-1 capitalize text-slate-800">{labelize(report.call_outcome)}</dd>
+                            <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t('report.outcome')}</dt>
+                            <dd className="mt-1 text-slate-800">{t.enum('outcome', report.call_outcome)}</dd>
                         </div>
                         <div>
-                            <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Customer intent</dt>
-                            <dd className="mt-1 capitalize text-slate-800">
-                                {labelize(report.customer_intent)}
-                                {report.customer_intent_confidence ? ` · ${report.customer_intent_confidence} confidence` : ''}
+                            <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t('report.intent')}</dt>
+                            <dd className="mt-1 text-slate-800">
+                                {t.enum('intent', report.customer_intent)}
+                                {report.customer_intent_confidence ? ` · ${t('common.confidence', { value: t.enum('confidence', report.customer_intent_confidence) })}` : ''}
                             </dd>
                         </div>
                         <div>
-                            <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Biggest strength</dt>
+                            <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t('report.biggestStrength')}</dt>
                             <dd className="mt-1 text-slate-800">{exec.biggest_strength}</dd>
                         </div>
                         <div>
-                            <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Biggest problem</dt>
+                            <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t('report.biggestProblem')}</dt>
                             <dd className="mt-1 text-slate-800">{exec.biggest_problem}</dd>
                         </div>
                     </dl>
                     <p className="text-sm leading-6 text-slate-700">{exec.what_happened}</p>
                     <p className="text-sm leading-6 text-slate-700">{exec.why_it_ended_this_way}</p>
-                    <p className="text-sm font-medium text-slate-900">Next: {exec.best_next_action}</p>
+                    <p className="text-sm font-medium text-slate-900">{t('report.next', { action: exec.best_next_action })}</p>
                 </div>
             ) : (
                 <>
                     {report.summary && (
                         <div className="mt-6">
-                            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Summary</h3>
+                            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{t('report.summary')}</h3>
                             <p className="mt-2 text-sm leading-6 text-slate-800">{report.summary}</p>
                         </div>
                     )}
                     <dl className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 text-sm">
                         <div>
-                            <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Call outcome</dt>
-                            <dd className="mt-1 capitalize text-slate-800">{labelize(report.call_outcome)}</dd>
+                            <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t('report.callOutcome')}</dt>
+                            <dd className="mt-1 text-slate-800">{t.enum('outcome', report.call_outcome)}</dd>
                         </div>
                         <div>
-                            <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Customer intent</dt>
-                            <dd className="mt-1 capitalize text-slate-800">{labelize(report.customer_intent)}</dd>
+                            <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t('report.intent')}</dt>
+                            <dd className="mt-1 text-slate-800">{t.enum('intent', report.customer_intent)}</dd>
                         </div>
                     </dl>
                 </>
@@ -376,14 +411,14 @@ export default function AnalysisReport({ status, report, message, error }) {
 
             {(metrics.seller_talk_percent !== null && metrics.seller_talk_percent !== undefined) && (
                 <p className="mt-4 text-xs text-slate-500">
-                    Talk balance {metrics.seller_talk_percent}% seller / {metrics.customer_talk_percent}% customer
-                    {metrics.speaker_switches !== null ? ` · ${metrics.speaker_switches} speaker switches` : ''}
+                    {t('report.talkBalance', { seller: metrics.seller_talk_percent, customer: metrics.customer_talk_percent })}
+                    {metrics.speaker_switches !== null ? ` · ${t('report.speakerSwitches', { count: metrics.speaker_switches })}` : ''}
                 </p>
             )}
 
             {report.timeline?.length > 0 && (
                 <div className="mt-8">
-                    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Call timeline</h3>
+                    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{t('report.timeline')}</h3>
                     <div className="mt-4">
                         <CallTimeline items={report.timeline} />
                     </div>
@@ -392,7 +427,7 @@ export default function AnalysisReport({ status, report, message, error }) {
 
             {report.customer_signals && (
                 <div className="mt-8">
-                    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Key signals</h3>
+                    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{t('report.keySignals')}</h3>
                     <div className="mt-3">
                         <SignalGroups signals={report.customer_signals} />
                     </div>
@@ -401,16 +436,16 @@ export default function AnalysisReport({ status, report, message, error }) {
 
             {report.critical_mistakes?.length > 0 && (
                 <div className="mt-8">
-                    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Critical mistakes</h3>
+                    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{t('report.criticalMistakes')}</h3>
                     <ul className="mt-3 space-y-3">
                         {report.critical_mistakes.map((item, index) => (
                             <li key={`${item.mistake}-${index}`} className="rounded-2xl border border-slate-200 p-4">
                                 <div className="flex flex-wrap items-center gap-2">
-                                    <Badge tone="critical">{item.impact} impact</Badge>
+                                    <Badge tone="critical">{t('report.impact', { impact: t.enum('impact', item.impact) })}</Badge>
                                 </div>
                                 <p className="mt-2 text-sm font-medium text-slate-900">{item.mistake}</p>
                                 {item.why && <p className="mt-1 text-sm leading-6 text-slate-700">{item.why}</p>}
-                                {item.better_action && <p className="mt-2 text-sm text-slate-800">Instead: {item.better_action}</p>}
+                                {item.better_action && <p className="mt-2 text-sm text-slate-800">{t('report.instead', { action: item.better_action })}</p>}
                                 {item.example_phrase && <p className="mt-1 text-sm text-slate-600">“{item.example_phrase}”</p>}
                             </li>
                         ))}
@@ -420,42 +455,42 @@ export default function AnalysisReport({ status, report, message, error }) {
 
             {(report.what_to_repeat?.length > 0 || report.strengths?.length > 0) && (
                 <div className="mt-8">
-                    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">What worked</h3>
+                    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{t('report.whatWorked')}</h3>
                     {report.what_to_repeat?.length ? <PracticeList items={report.what_to_repeat} /> : <FindingList items={report.strengths} />}
                 </div>
             )}
 
             <div className="mt-8 space-y-3">
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Deep analysis</h3>
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{t('report.deepAnalysis')}</h3>
                 {report.discovery_depth && (
-                    <Collapsible title="Discovery">
-                        <ScoreBar score={report.discovery_depth.score} label="Discovery depth" />
+                    <Collapsible title={t('report.discovery')}>
+                        <ScoreBar score={report.discovery_depth.score} label={t('report.discoveryDepth')} />
                         <p className="mt-3 text-sm leading-6 text-slate-700">{report.discovery_depth.summary}</p>
-                        <p className="mt-2 text-sm text-slate-700">Needs found: {report.discovery_depth.needs_discovered?.join('; ') || 'none'}</p>
-                        <p className="mt-1 text-sm text-slate-700">Not explored: {report.discovery_depth.needs_not_explored?.join('; ') || 'none'}</p>
+                        <p className="mt-2 text-sm text-slate-700">{t('report.needsFound', { value: report.discovery_depth.needs_discovered?.join('; ') || t('common.none') })}</p>
+                        <p className="mt-1 text-sm text-slate-700">{t('report.notExplored', { value: report.discovery_depth.needs_not_explored?.join('; ') || t('common.none') })}</p>
                     </Collapsible>
                 )}
                 {report.question_analysis && (
-                    <Collapsible title="Questions">
+                    <Collapsible title={t('report.questions')}>
                         <p className="text-sm text-slate-700">{report.question_analysis.summary}</p>
-                        <p className="mt-2 text-xs text-slate-500">Estimated questions: {na(report.question_analysis.total_questions_estimate)}</p>
+                        <p className="mt-2 text-xs text-slate-500">{t('report.estimatedQuestions', { value: na(report.question_analysis.total_questions_estimate, dash) })}</p>
                     </Collapsible>
                 )}
                 {report.listening && (
-                    <Collapsible title="Listening">
-                        <ScoreBar score={report.listening.score} label="Listening" />
+                    <Collapsible title={t('report.listening')}>
+                        <ScoreBar score={report.listening.score} label={t('report.listening')} />
                         <p className="mt-3 text-sm leading-6 text-slate-700">{report.listening.summary}</p>
                         <p className="mt-2 text-sm text-slate-700">{report.listening.paraphrasing_quality}</p>
                     </Collapsible>
                 )}
                 {report.value_communication && (
-                    <Collapsible title="Value">
-                        <ScoreBar score={report.value_communication.score} label="Value communication" />
+                    <Collapsible title={t('report.value')}>
+                        <ScoreBar score={report.value_communication.score} label={t('report.valueCommunication')} />
                         <p className="mt-3 text-sm leading-6 text-slate-700">{report.value_communication.summary}</p>
                     </Collapsible>
                 )}
                 {(report.objection_map?.length > 0 || sections.objections) && (
-                    <Collapsible title="Objections">
+                    <Collapsible title={t('report.objections')}>
                         {report.objection_map?.length ? (
                             <ul className="space-y-3">
                                 {report.objection_map.map((item, index) => (
@@ -471,32 +506,32 @@ export default function AnalysisReport({ status, report, message, error }) {
                     </Collapsible>
                 )}
                 {report.negotiation && (
-                    <Collapsible title="Negotiation">
+                    <Collapsible title={t('report.negotiation')}>
                         {report.negotiation.applicable === false ? (
-                            <p className="text-sm text-slate-500">Not applicable — price was not discussed.</p>
+                            <p className="text-sm text-slate-500">{t('report.negotiationNa')}</p>
                         ) : (
                             <>
-                                <ScoreBar score={report.negotiation.score} label="Negotiation" />
+                                <ScoreBar score={report.negotiation.score} label={t('report.negotiation')} />
                                 <p className="mt-3 text-sm leading-6 text-slate-700">{report.negotiation.summary}</p>
                             </>
                         )}
                     </Collapsible>
                 )}
                 {report.trust_rapport && (
-                    <Collapsible title="Rapport">
-                        <ScoreBar score={report.trust_rapport.score} label="Trust / rapport" />
+                    <Collapsible title={t('report.rapport')}>
+                        <ScoreBar score={report.trust_rapport.score} label={t('report.trustRapport')} />
                         <p className="mt-3 text-sm leading-6 text-slate-700">{report.trust_rapport.summary}</p>
                         <p className="mt-2 text-sm text-slate-600">{report.trust_rapport.tone_assessment}</p>
                     </Collapsible>
                 )}
                 {report.closing && (
-                    <Collapsible title="Closing">
-                        <ScoreBar score={report.closing.score} label="Closing" />
+                    <Collapsible title={t('report.closing')}>
+                        <ScoreBar score={report.closing.score} label={t('report.closing')} />
                         <p className="mt-3 text-sm leading-6 text-slate-700">{report.closing.summary}</p>
                         <p className="mt-2 text-sm text-slate-800">{report.closing.better_closing}</p>
                     </Collapsible>
                 )}
-                <Collapsible title="Section scores">
+                <Collapsible title={t('report.sectionScores')}>
                     <div className="space-y-4">
                         <SectionCard section={sections.opening_rapport} />
                         <SectionCard section={sections.discovery_needs} />
@@ -511,7 +546,7 @@ export default function AnalysisReport({ status, report, message, error }) {
 
             {(report.missed_signals?.length > 0 || report.missed_opportunities?.length > 0) && (
                 <div className="mt-8">
-                    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Missed opportunities</h3>
+                    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{t('report.missed')}</h3>
                     {report.missed_signals?.length ? (
                         <ul className="mt-3 space-y-3">
                             {report.missed_signals.map((item, index) => (
@@ -530,11 +565,11 @@ export default function AnalysisReport({ status, report, message, error }) {
 
             {report.better_phrases?.length > 0 && (
                 <div className="mt-8">
-                    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Better phrases</h3>
+                    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{t('report.betterPhrases')}</h3>
                     <ul className="mt-2 space-y-3">
                         {report.better_phrases.map((phrase, index) => (
                             <li key={`${phrase.better || phrase.suggested}-${index}`} className="text-sm leading-6 text-slate-800">
-                                {phrase.original && <p className="text-slate-500">Instead of: {phrase.original}</p>}
+                                {phrase.original && <p className="text-slate-500">{t('report.insteadOf', { original: phrase.original })}</p>}
                                 <p>{phrase.better || phrase.suggested}</p>
                                 {(phrase.why_better || phrase.reason) && <p className="text-xs text-slate-500">{phrase.why_better || phrase.reason}</p>}
                             </li>
@@ -545,15 +580,15 @@ export default function AnalysisReport({ status, report, message, error }) {
 
             {report.coaching_priorities?.length > 0 && (
                 <div className="mt-8">
-                    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Coaching priorities</h3>
+                    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{t('report.coaching')}</h3>
                     <ol className="mt-3 space-y-3">
                         {report.coaching_priorities.map((item) => (
                             <li key={item.priority} className="rounded-2xl border border-slate-200 p-4">
-                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Priority {item.priority}</p>
+                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t('report.priority', { n: item.priority })}</p>
                                 <p className="mt-1 text-sm font-semibold text-slate-900">{item.skill}</p>
                                 <p className="mt-1 text-sm leading-6 text-slate-700">{item.why}</p>
                                 <p className="mt-2 text-sm text-slate-800">{item.practice}</p>
-                                {item.success_criteria && <p className="mt-1 text-xs text-slate-500">Done when: {item.success_criteria}</p>}
+                                {item.success_criteria && <p className="mt-1 text-xs text-slate-500">{t('report.doneWhen', { value: item.success_criteria })}</p>}
                             </li>
                         ))}
                     </ol>
@@ -562,11 +597,11 @@ export default function AnalysisReport({ status, report, message, error }) {
 
             {report.next_call_playbook && (
                 <div className="mt-8">
-                    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Next call playbook</h3>
+                    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{t('report.playbook')}</h3>
                     <div className="mt-3 grid gap-4 sm:grid-cols-2 text-sm">
                         {['before_call', 'during_call', 'closing', 'follow_up'].map((key) => (
                             <div key={key}>
-                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{labelize(key)}</p>
+                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t.enum('playbook', key)}</p>
                                 <ul className="mt-2 list-disc space-y-1 ps-4 text-slate-800">
                                     {(report.next_call_playbook[key] || []).map((line) => (
                                         <li key={line}>{line}</li>
@@ -580,7 +615,7 @@ export default function AnalysisReport({ status, report, message, error }) {
 
             {report.alternative_path && (
                 <div className="mt-8">
-                    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Alternative path</h3>
+                    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{t('report.alternative')}</h3>
                     <p className="mt-2 text-sm leading-6 text-slate-800">{report.alternative_path.summary}</p>
                     <ol className="mt-3 space-y-2">
                         {(report.alternative_path.steps || []).map((step, index) => (
@@ -596,11 +631,11 @@ export default function AnalysisReport({ status, report, message, error }) {
             {(report.what_to_stop?.length > 0 || report.what_to_start?.length > 0) && (
                 <div className="mt-8 grid gap-6 sm:grid-cols-2">
                     <div>
-                        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">What to stop</h3>
+                        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{t('report.whatToStop')}</h3>
                         <PracticeList items={report.what_to_stop} />
                     </div>
                     <div>
-                        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">What to start</h3>
+                        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{t('report.whatToStart')}</h3>
                         <PracticeList items={report.what_to_start} />
                     </div>
                 </div>
@@ -609,20 +644,20 @@ export default function AnalysisReport({ status, report, message, error }) {
             {!isDeep && (
                 <>
                     <div className="mt-8">
-                        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Strengths</h3>
+                        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{t('report.strengths')}</h3>
                         <FindingList items={report.strengths} />
                     </div>
                     <div className="mt-6">
-                        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Weaknesses</h3>
+                        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{t('report.weaknesses')}</h3>
                         <FindingList items={report.weaknesses} />
                     </div>
                     <div className="mt-6">
-                        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Recommendations</h3>
+                        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{t('report.recommendations')}</h3>
                         <FindingList items={report.recommendations} />
                     </div>
                     {report.next_step && (
                         <div className="mt-6">
-                            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Next step</h3>
+                            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{t('report.nextStep')}</h3>
                             <p className="mt-2 text-sm leading-6 text-slate-800">{report.next_step}</p>
                         </div>
                     )}
@@ -637,6 +672,7 @@ export default function AnalysisReport({ status, report, message, error }) {
 }
 
 function CompanySpecific({ specific }) {
+    const t = useT();
     const asked = specific.mandatory_questions?.asked || [];
     const missed = specific.mandatory_questions?.missed || [];
     const violations = specific.forbidden_claims?.violations || [];
@@ -646,14 +682,14 @@ function CompanySpecific({ specific }) {
 
     return (
         <div className="mt-8 space-y-6">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Company-specific analysis</h3>
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{t('report.companySpecific')}</h3>
             {specific.script_adherence && (
                 <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Script adherence</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t('report.scriptAdherence')}</p>
                     <p className="mt-1 text-sm text-slate-800">
                         {specific.script_adherence.applicable === false
-                            ? 'Not applicable'
-                            : `Score ${specific.script_adherence.score ?? 'N/A'}`}
+                            ? t('common.notApplicable')
+                            : t('report.scoreNa', { score: specific.script_adherence.score ?? t('common.na') })}
                     </p>
                     {specific.script_adherence.summary && (
                         <p className="mt-1 text-sm leading-6 text-slate-700">{specific.script_adherence.summary}</p>
@@ -662,41 +698,43 @@ function CompanySpecific({ specific }) {
                 </div>
             )}
             <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Mandatory questions</p>
-                <p className="mt-2 text-sm text-slate-800">Asked: {asked.length ? asked.join(', ') : 'none noted'}</p>
-                <p className="mt-1 text-sm text-slate-800">Missed: {missed.length ? missed.join(', ') : 'none noted'}</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t('analytics.mandatoryQuestions')}</p>
+                <p className="mt-2 text-sm text-slate-800">{t('report.asked', { value: asked.length ? asked.join(', ') : t('report.noneNotedLower') })}</p>
+                <p className="mt-1 text-sm text-slate-800">{t('report.missedList', { value: missed.length ? missed.join(', ') : t('report.noneNotedLower') })}</p>
             </div>
             <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Forbidden claims</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t('report.forbiddenClaims')}</p>
                 <FindingList items={violations} />
             </div>
             <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Objection handling</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t('report.objectionHandling')}</p>
                 {matched.length ? (
                     <ul className="mt-2 space-y-2 text-sm text-slate-800">
                         {matched.map((item, index) => (
                             <li key={`${item.objection}-${index}`}>
-                                {item.objection}{item.handled === false ? ' — not handled as expected' : ''}
+                                {item.objection}{item.handled === false ? t('report.notHandled') : ''}
                                 {item.summary ? ` · ${item.summary}` : ''}
                             </li>
                         ))}
                     </ul>
                 ) : (
-                    <p className="mt-2 text-sm text-slate-500">None noted.</p>
+                    <p className="mt-2 text-sm text-slate-500">{t('common.noneNoted')}</p>
                 )}
             </div>
             <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Offering accuracy</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t('report.offeringAccuracy')}</p>
                 <FindingList items={offeringIssues} />
             </div>
             {criteria.length > 0 && (
                 <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Company scorecard criteria</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t('report.scorecardCriteria')}</p>
                     <ul className="mt-2 space-y-3">
                         {criteria.map((item) => (
                             <li key={item.key} className="text-sm text-slate-800">
                                 <p className="font-medium">
-                                    {item.key}: {item.applicable === false ? 'not applicable' : `${item.score ?? 'N/A'} / ${item.max_score ?? 100}`}
+                                    {item.applicable === false
+                                        ? t('report.criterionNa', { key: item.key })
+                                        : t('report.criterionScore', { key: item.key, score: item.score ?? t('common.na'), max: item.max_score ?? 100 })}
                                 </p>
                                 {item.summary && <p className="mt-1 text-slate-700">{item.summary}</p>}
                             </li>

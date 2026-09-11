@@ -2,7 +2,10 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\AiProviderSetting;
+use App\Services\Transcription\ActiveTranscriptionProvider;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -42,7 +45,7 @@ class HandleInertiaRequests extends Middleware
                 'user' => $request->user(),
             ],
 
-            'locale' => $request->session()->get('locale', config('app.locale', 'en')),
+            'locale' => app()->getLocale(),
 
             'owlAdmin' => fn () => [
                 ...config('owl-admin.branding', [
@@ -59,15 +62,15 @@ class HandleInertiaRequests extends Middleware
                     ];
 
                     try {
-                        if (! class_exists(\App\Models\AiProviderSetting::class)) {
+                        if (! class_exists(AiProviderSetting::class)) {
                             return $fallback;
                         }
 
-                        if (! \Illuminate\Support\Facades\Schema::hasTable('ai_provider_settings')) {
+                        if (! Schema::hasTable('ai_provider_settings')) {
                             return $fallback;
                         }
 
-                        $active = \App\Models\AiProviderSetting::query()
+                        $active = AiProviderSetting::query()
                             ->where('is_active', true)
                             ->where('is_connected', true)
                             ->first();
@@ -93,52 +96,40 @@ class HandleInertiaRequests extends Middleware
                         return $fallback;
                     }
                 })(),
-                'telegram' => (function (): array {
+                'transcription' => (function (): array {
                     $fallback = [
-                        'configured' => false,
                         'connected' => false,
-                        'webhook_set' => false,
-                        'bot_username' => null,
-                        'status' => 'not_connected',
-                        'status_label' => 'Bot: not connected',
+                        'provider' => 'elevenlabs',
+                        'provider_label' => 'ElevenLabs',
+                        'model' => null,
+                        'status_label' => 'ElevenLabs: not connected',
                     ];
 
                     try {
-                        if (! class_exists(\App\Models\TelegramBotSetting::class)) {
+                        if (! class_exists(ActiveTranscriptionProvider::class)) {
                             return $fallback;
                         }
 
-                        if (! \Illuminate\Support\Facades\Schema::hasTable('telegram_bot_settings')) {
+                        if (! Schema::hasTable('transcription_provider_settings')) {
                             return $fallback;
                         }
 
-                        $setting = \App\Models\TelegramBotSetting::query()->first();
-                        if ($setting === null || ! filled($setting->bot_token)) {
+                        $active = app(ActiveTranscriptionProvider::class);
+                        $current = $active->current();
+                        $ready = $active->isReady();
+                        $model = $current?->model ?: null;
+                        $modelLabel = $model === 'scribe_v2' ? 'Scribe v2' : ($model ?: 'unknown');
+
+                        if (! $ready) {
                             return $fallback;
-                        }
-
-                        $username = $setting->bot_username;
-                        $connected = (bool) $setting->is_connected;
-                        $webhookSet = (bool) $setting->is_webhook_set;
-
-                        if ($connected && $webhookSet && filled($username)) {
-                            return [
-                                'configured' => true,
-                                'connected' => true,
-                                'webhook_set' => true,
-                                'bot_username' => $username,
-                                'status' => 'connected',
-                                'status_label' => sprintf('Bot: connected — @%s', $username),
-                            ];
                         }
 
                         return [
-                            'configured' => true,
-                            'connected' => $connected,
-                            'webhook_set' => $webhookSet,
-                            'bot_username' => $username,
-                            'status' => 'incomplete',
-                            'status_label' => 'Bot: incomplete',
+                            'connected' => true,
+                            'provider' => $current?->provider ?: 'elevenlabs',
+                            'provider_label' => $current?->label ?: 'ElevenLabs',
+                            'model' => $model,
+                            'status_label' => sprintf('ElevenLabs: connected — %s', $modelLabel),
                         ];
                     } catch (\Throwable) {
                         return $fallback;

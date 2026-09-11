@@ -1,6 +1,8 @@
 import AdminLayout from '@/Layouts/AdminLayout';
-import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
+import { Plus } from 'lucide-react';
 import { useState } from 'react';
+import { useT } from '@/i18n';
 
 const DEFAULT_FORM = {
     company_id: '',
@@ -14,10 +16,27 @@ const DEFAULT_FORM = {
 };
 
 export default function EmployeesIndex({ employees = [], companies = [], filters = {} }) {
+    const t = useT();
     const { errors } = usePage().props;
+    const [creating, setCreating] = useState(false);
     const [editing, setEditing] = useState(null);
     const createForm = useForm({ ...DEFAULT_FORM });
     const editForm = useForm({ ...DEFAULT_FORM });
+
+    const openCreate = () => {
+        createForm.setData({
+            ...DEFAULT_FORM,
+            company_id: filters.company_id ?? '',
+        });
+        createForm.clearErrors();
+        setCreating(true);
+    };
+
+    const closeCreate = () => {
+        setCreating(false);
+        createForm.setData({ ...DEFAULT_FORM });
+        createForm.clearErrors();
+    };
 
     const startEdit = (employee) => {
         setEditing(employee);
@@ -35,21 +54,111 @@ export default function EmployeesIndex({ employees = [], companies = [], filters
     };
 
     return (
-        <AdminLayout title="Employees">
-            <Head title="Employees" />
+        <AdminLayout title={t('employees.title')}>
+            <Head title={t('employees.title')} />
 
             <div className="space-y-6">
                 {errors?.employee && <p className="text-sm text-red-600">{errors.employee}</p>}
 
                 <section className="app-widget p-4">
-                    <h2 className="text-base font-semibold text-slate-900">Create employee</h2>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <h2 className="text-base font-semibold text-slate-900">{t('employees.title')}</h2>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <select
+                                value={filters.company_id ?? ''}
+                                onChange={(e) => {
+                                    const value = e.target.value;
+                                    router.get(route('employees.index'), value ? { company_id: value } : {}, {
+                                        preserveState: true,
+                                        preserveScroll: true,
+                                    });
+                                }}
+                                className="h-10 rounded-lg border border-slate-300 px-3 text-sm"
+                            >
+                                <option value="">{t('companies.allCompanies')}</option>
+                                {companies.map((company) => (
+                                    <option key={company.id} value={company.id}>{company.name}</option>
+                                ))}
+                            </select>
+                            <button
+                                type="button"
+                                onClick={openCreate}
+                                className="inline-flex h-10 items-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700"
+                            >
+                                <Plus className="h-4 w-4" />
+                                {t('common.create')}
+                            </button>
+                        </div>
+                    </div>
+                    <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                        <table className="min-w-full divide-y divide-slate-200 text-sm">
+                            <thead className="bg-slate-50">
+                                <tr>
+                                    <Th>{t('common.name')}</Th>
+                                    <Th>{t('common.company')}</Th>
+                                    <Th>{t('common.position')}</Th>
+                                    <Th>{t('common.email')}</Th>
+                                    <Th>{t('common.status')}</Th>
+                                    <Th>{t('common.actions')}</Th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {employees.map((employee) => (
+                                    <tr
+                                        key={employee.id}
+                                        className="cursor-pointer hover:bg-slate-50/80"
+                                        onClick={() => router.visit(route('employees.show', employee.id))}
+                                    >
+                                        <Td>{employee.full_name}</Td>
+                                        <Td>{employee.company_name || t('common.dash')}</Td>
+                                        <Td>{employee.position || t('common.dash')}</Td>
+                                        <Td>{employee.email || t('common.dash')}</Td>
+                                        <Td>{employee.is_active ? t('common.active') : t('common.inactive')}</Td>
+                                        <Td>
+                                            <div className="flex flex-wrap gap-3" onClick={(event) => event.stopPropagation()}>
+                                                <button type="button" className="text-indigo-700" onClick={() => startEdit(employee)}>{t('common.edit')}</button>
+                                                <button
+                                                    type="button"
+                                                    className="text-slate-700"
+                                                    onClick={() => router.patch(route('employees.toggle', employee.id), {}, { preserveScroll: true })}
+                                                >
+                                                    {employee.is_active ? t('common.deactivate') : t('common.activate')}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="text-red-700"
+                                                    onClick={() => {
+                                                        if (window.confirm(t('employees.deleteConfirm'))) {
+                                                            router.delete(route('employees.destroy', employee.id), { preserveScroll: true });
+                                                        }
+                                                    }}
+                                                >
+                                                    {t('common.delete')}
+                                                </button>
+                                            </div>
+                                        </Td>
+                                    </tr>
+                                ))}
+                                {employees.length === 0 && (
+                                    <tr>
+                                        <td className="px-4 py-5 text-slate-500" colSpan={6}>{t('employees.empty')}</td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            {creating && (
+                <Modal title={t('employees.createTitle')} onClose={closeCreate}>
                     <form
-                        className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2"
+                        className="grid grid-cols-1 gap-3 md:grid-cols-2"
                         onSubmit={(e) => {
                             e.preventDefault();
                             createForm.post(route('employees.store'), {
                                 preserveScroll: true,
-                                onSuccess: () => createForm.setData({ ...DEFAULT_FORM }),
+                                onSuccess: closeCreate,
                             });
                         }}
                     >
@@ -59,97 +168,22 @@ export default function EmployeesIndex({ employees = [], companies = [], filters
                             error={createForm.errors.company_id}
                             onChange={(v) => createForm.setData('company_id', v)}
                         />
-                        <Field label="First name" value={createForm.data.first_name} onChange={(v) => createForm.setData('first_name', v)} error={createForm.errors.first_name} />
-                        <Field label="Last name" value={createForm.data.last_name} onChange={(v) => createForm.setData('last_name', v)} error={createForm.errors.last_name} />
-                        <Field label="Email" value={createForm.data.email} onChange={(v) => createForm.setData('email', v)} error={createForm.errors.email} type="email" />
-                        <Field label="Phone" value={createForm.data.phone} onChange={(v) => createForm.setData('phone', v)} error={createForm.errors.phone} />
-                        <Field label="Position" value={createForm.data.position} onChange={(v) => createForm.setData('position', v)} error={createForm.errors.position} />
-                        <Field label="External ID" value={createForm.data.external_id} onChange={(v) => createForm.setData('external_id', v)} error={createForm.errors.external_id} />
-                        <div className="md:col-span-2 flex justify-end">
-                            <button type="submit" className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">Save</button>
+                        <Field label={t('employees.firstName')} value={createForm.data.first_name} onChange={(v) => createForm.setData('first_name', v)} error={createForm.errors.first_name} />
+                        <Field label={t('employees.lastName')} value={createForm.data.last_name} onChange={(v) => createForm.setData('last_name', v)} error={createForm.errors.last_name} />
+                        <Field label={t('common.email')} value={createForm.data.email} onChange={(v) => createForm.setData('email', v)} error={createForm.errors.email} type="email" />
+                        <Field label={t('common.phone')} value={createForm.data.phone} onChange={(v) => createForm.setData('phone', v)} error={createForm.errors.phone} />
+                        <Field label={t('common.position')} value={createForm.data.position} onChange={(v) => createForm.setData('position', v)} error={createForm.errors.position} />
+                        <Field label={t('employees.externalId')} value={createForm.data.external_id} onChange={(v) => createForm.setData('external_id', v)} error={createForm.errors.external_id} />
+                        <div className="md:col-span-2 flex justify-end gap-2">
+                            <button type="button" onClick={closeCreate} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700">{t('common.cancel')}</button>
+                            <button type="submit" disabled={createForm.processing} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">{t('common.create')}</button>
                         </div>
                     </form>
-                </section>
-
-                <section className="app-widget p-4">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <h2 className="text-base font-semibold text-slate-900">Employees list</h2>
-                        <select
-                            value={filters.company_id ?? ''}
-                            onChange={(e) => {
-                                const value = e.target.value;
-                                router.get(route('employees.index'), value ? { company_id: value } : {}, {
-                                    preserveState: true,
-                                    preserveScroll: true,
-                                });
-                            }}
-                            className="h-10 rounded-lg border border-slate-300 px-3 text-sm"
-                        >
-                            <option value="">All companies</option>
-                            {companies.map((company) => (
-                                <option key={company.id} value={company.id}>{company.name}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200 bg-white">
-                        <table className="min-w-full divide-y divide-slate-200 text-sm">
-                            <thead className="bg-slate-50">
-                                <tr>
-                                    <Th>Name</Th>
-                                    <Th>Company</Th>
-                                    <Th>Position</Th>
-                                    <Th>Email</Th>
-                                    <Th>Status</Th>
-                                    <Th>Actions</Th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {employees.map((employee) => (
-                                    <tr key={employee.id}>
-                                        <Td>{employee.full_name}</Td>
-                                        <Td>{employee.company_name || '—'}</Td>
-                                        <Td>{employee.position || '—'}</Td>
-                                        <Td>{employee.email || '—'}</Td>
-                                        <Td>{employee.is_active ? 'active' : 'inactive'}</Td>
-                                        <Td>
-                                            <div className="flex flex-wrap gap-3">
-                                                <Link href={route('employees.show', employee.id)} className="text-indigo-700">View</Link>
-                                                <button type="button" className="text-indigo-700" onClick={() => startEdit(employee)}>Edit</button>
-                                                <button
-                                                    type="button"
-                                                    className="text-slate-700"
-                                                    onClick={() => router.patch(route('employees.toggle', employee.id), {}, { preserveScroll: true })}
-                                                >
-                                                    {employee.is_active ? 'Deactivate' : 'Activate'}
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    className="text-red-700"
-                                                    onClick={() => {
-                                                        if (window.confirm('Delete employee?')) {
-                                                            router.delete(route('employees.destroy', employee.id), { preserveScroll: true });
-                                                        }
-                                                    }}
-                                                >
-                                                    Delete
-                                                </button>
-                                            </div>
-                                        </Td>
-                                    </tr>
-                                ))}
-                                {employees.length === 0 && (
-                                    <tr>
-                                        <td className="px-4 py-5 text-slate-500" colSpan={6}>No employees yet.</td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </section>
-            </div>
+                </Modal>
+            )}
 
             {editing && (
-                <Modal title="Edit employee" onClose={() => setEditing(null)}>
+                <Modal title={t('employees.editTitle')} onClose={() => setEditing(null)}>
                     <form
                         className="grid grid-cols-1 gap-3 md:grid-cols-2"
                         onSubmit={(e) => {
@@ -166,26 +200,26 @@ export default function EmployeesIndex({ employees = [], companies = [], filters
                             error={editForm.errors.company_id}
                             onChange={(v) => editForm.setData('company_id', v)}
                         />
-                        <Field label="First name" value={editForm.data.first_name} onChange={(v) => editForm.setData('first_name', v)} error={editForm.errors.first_name} />
-                        <Field label="Last name" value={editForm.data.last_name} onChange={(v) => editForm.setData('last_name', v)} error={editForm.errors.last_name} />
-                        <Field label="Email" value={editForm.data.email} onChange={(v) => editForm.setData('email', v)} error={editForm.errors.email} type="email" />
-                        <Field label="Phone" value={editForm.data.phone} onChange={(v) => editForm.setData('phone', v)} error={editForm.errors.phone} />
-                        <Field label="Position" value={editForm.data.position} onChange={(v) => editForm.setData('position', v)} error={editForm.errors.position} />
-                        <Field label="External ID" value={editForm.data.external_id} onChange={(v) => editForm.setData('external_id', v)} error={editForm.errors.external_id} />
+                        <Field label={t('employees.firstName')} value={editForm.data.first_name} onChange={(v) => editForm.setData('first_name', v)} error={editForm.errors.first_name} />
+                        <Field label={t('employees.lastName')} value={editForm.data.last_name} onChange={(v) => editForm.setData('last_name', v)} error={editForm.errors.last_name} />
+                        <Field label={t('common.email')} value={editForm.data.email} onChange={(v) => editForm.setData('email', v)} error={editForm.errors.email} type="email" />
+                        <Field label={t('common.phone')} value={editForm.data.phone} onChange={(v) => editForm.setData('phone', v)} error={editForm.errors.phone} />
+                        <Field label={t('common.position')} value={editForm.data.position} onChange={(v) => editForm.setData('position', v)} error={editForm.errors.position} />
+                        <Field label={t('employees.externalId')} value={editForm.data.external_id} onChange={(v) => editForm.setData('external_id', v)} error={editForm.errors.external_id} />
                         <div>
-                            <label className="mb-1 block text-sm font-medium text-slate-600">Status</label>
+                            <label className="mb-1 block text-sm font-medium text-slate-600">{t('common.status')}</label>
                             <select
                                 value={editForm.data.is_active ? '1' : '0'}
                                 onChange={(e) => editForm.setData('is_active', e.target.value === '1')}
                                 className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm"
                             >
-                                <option value="1">active</option>
-                                <option value="0">inactive</option>
+                                <option value="1">{t('common.active')}</option>
+                                <option value="0">{t('common.inactive')}</option>
                             </select>
                         </div>
                         <div className="md:col-span-2 flex justify-end gap-2">
-                            <button type="button" onClick={() => setEditing(null)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700">Cancel</button>
-                            <button type="submit" className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">Update</button>
+                            <button type="button" onClick={() => setEditing(null)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700">{t('common.cancel')}</button>
+                            <button type="submit" className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">{t('common.update')}</button>
                         </div>
                     </form>
                 </Modal>
@@ -195,15 +229,16 @@ export default function EmployeesIndex({ employees = [], companies = [], filters
 }
 
 function CompanySelect({ value, companies, onChange, error }) {
+    const t = useT();
     return (
         <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">Company</label>
+            <label className="mb-1 block text-sm font-medium text-slate-600">{t('common.company')}</label>
             <select
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
                 className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm"
             >
-                <option value="">Select company</option>
+                <option value="">{t('companies.selectCompany')}</option>
                 {companies.map((company) => (
                     <option key={company.id} value={company.id}>{company.name}</option>
                 ))}
@@ -214,12 +249,13 @@ function CompanySelect({ value, companies, onChange, error }) {
 }
 
 function Modal({ title, children, onClose }) {
+    const t = useT();
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
             <div className="w-full max-w-3xl rounded-xl border border-slate-200 bg-white p-6 shadow-xl">
                 <div className="mb-4 flex items-center justify-between">
                     <h3 className="text-base font-semibold text-slate-900">{title}</h3>
-                    <button type="button" className="text-sm text-slate-500" onClick={onClose}>Close</button>
+                    <button type="button" className="text-sm text-slate-500" onClick={onClose}>{t('common.close')}</button>
                 </div>
                 {children}
             </div>

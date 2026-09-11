@@ -47,11 +47,11 @@ Remaining later: object storage, processing UI beyond stubs, public analysis eng
 
 **Status: COMPLETED**
 
-* `/` is the public analyzer homepage (no auth)
+* `/` is the main analyzer workspace (no auth required technically)
 * `/login` is admin login; guests on admin routes redirect to `/login`
-* public `POST /analyze` reuses private audio storage
-* `calls.company_id` nullable for public uploads
-* opaque `public_token` for anonymous status/report
+* analyzer `POST /analyze` reuses private audio storage
+* `calls.company_id` nullable for generic analyzer uploads
+* opaque `public_token` for status/report
 * polling UI prepared; no fake AI results
 * no public audio streaming
 
@@ -138,15 +138,26 @@ Scorecard builder already shipped with Phase 5. This phase adds management analy
 * workers pick up DB keys without restart (DEC-056)
 * live provider verification deferred (DEC-035)
 
+## Phase 7.2 — Main Analyzer Company Selection
+
+**Status: COMPLETED**
+
+* Company select on `/` (optional; default generic)
+* Employee select depends on Company (optional)
+* `POST /analyze` validates active company/employee ownership
+* existing `AnalysisContextBuilder` used as-is
+* DEC-057 accepted; DEC-040 superseded
+* live provider verification deferred (DEC-035)
+
 ## Phase 8 — User Product
 
-**Status: Planned** (public upload shell shipped in Phase 2.1)
+**Status: Planned** (analyzer workspace shipped in Phase 2.1 / 7.2)
 
 * accounts;
 * personal cabinet;
 * history.
 
-The anonymous upload/status/report shell is live. Remaining work is persistence of a user’s own analyses behind an account.
+The analyzer upload/status/report shell is live. Remaining work is persistence of a user’s own analyses behind an account.
 
 ## Phase 9 — Deeper coaching analytics
 

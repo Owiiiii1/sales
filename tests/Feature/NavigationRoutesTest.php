@@ -43,13 +43,19 @@ class NavigationRoutesTest extends TestCase
                 ->has('filters')
                 ->has('analytics')
                 ->has('analytics.kpis')
-                ->has('analytics.recent_calls'));
+                ->has('analytics.recent_calls')
+                ->where('owlAdmin.transcription.provider_label', 'ElevenLabs')
+                ->has('owlAdmin.transcription.status_label')
+                ->missing('owlAdmin.telegram'));
 
         $this->actingAs($user)->get('/companies')->assertOk();
         $this->actingAs($user)->get('/employees')->assertOk();
         $this->actingAs($user)->get('/calls')->assertOk();
         $this->actingAs($user)->get('/calls/create')->assertOk();
-        $this->actingAs($user)->get('/settings')->assertOk();
+        $this->actingAs($user)->get('/settings')->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Settings/Index', false)
+                ->where('tab', 'users'));
         $this->actingAs($user)->get('/login')->assertRedirect('/dashboard');
     }
 

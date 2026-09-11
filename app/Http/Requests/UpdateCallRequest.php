@@ -42,7 +42,7 @@ class UpdateCallRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'company_id.required' => 'Please select a company.',
+            'company_id.required' => __('Please select a company.'),
         ];
     }
 

@@ -1,6 +1,7 @@
 import { router, usePage } from '@inertiajs/react';
 import { CheckCircle2, KeyRound, Loader2, PlugZap, Power } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { useT } from '@/i18n';
 
 const PROVIDERS = [
     { provider: 'openai', title: 'ChatGPT / OpenAI' },
@@ -9,62 +10,11 @@ const PROVIDERS = [
 ];
 
 export default function AiPanel() {
-    const { providers = [], locale = 'en', errors = {} } = usePage().props;
+    const t = useT();
+    const { providers = [], errors = {} } = usePage().props;
     const [processingProvider, setProcessingProvider] = useState(null);
     const [apiKeys, setApiKeys] = useState({});
     const [selectedModels, setSelectedModels] = useState({});
-
-    const text = {
-        en: {
-            subtitle: 'Connect one provider and activate one model at a time.',
-            apiKey: 'API key',
-            saveKey: 'Save key',
-            check: 'Check connection',
-            activate: 'Activate',
-            deactivate: 'Deactivate all',
-            activeModel: 'Active model',
-            modelSelect: 'Available models',
-            noModels: 'No models loaded yet',
-            notConnected: 'Not connected',
-            connected: 'Connected',
-            active: 'Active',
-            error: 'Error',
-            savedMask: 'Saved key',
-        },
-        ru: {
-            subtitle: 'Connect one provider and activate one model at a time.',
-            apiKey: 'API key',
-            saveKey: 'Save key',
-            check: 'Check connection',
-            activate: 'Activate',
-            deactivate: 'Deactivate all',
-            activeModel: 'Active model',
-            modelSelect: 'Available models',
-            noModels: 'No models loaded yet',
-            notConnected: 'Not connected',
-            connected: 'Connected',
-            active: 'Active',
-            error: 'Error',
-            savedMask: 'Saved key',
-        },
-        uk: {
-            subtitle: 'Connect one provider and activate one model at a time.',
-            apiKey: 'API key',
-            saveKey: 'Save key',
-            check: 'Check connection',
-            activate: 'Activate',
-            deactivate: 'Deactivate all',
-            activeModel: 'Active model',
-            modelSelect: 'Available models',
-            noModels: 'No models loaded yet',
-            notConnected: 'Not connected',
-            connected: 'Connected',
-            active: 'Active',
-            error: 'Error',
-            savedMask: 'Saved key',
-        },
-    };
-    const t = text[locale] ?? text.en;
 
     const providerMap = useMemo(
         () => Object.fromEntries(providers.map((item) => [item.provider, item])),
@@ -73,16 +23,16 @@ export default function AiPanel() {
 
     const statusChip = (item) => {
         if (item?.is_active && item?.is_connected) {
-            return { label: t.active, className: 'bg-emerald-100 text-emerald-700' };
+            return { label: t('settings.active'), className: 'bg-emerald-100 text-emerald-700' };
         }
         if (item?.is_connected) {
-            return { label: t.connected, className: 'bg-indigo-100 text-indigo-700' };
+            return { label: t('settings.connected'), className: 'bg-indigo-100 text-indigo-700' };
         }
         if (item?.last_error) {
-            return { label: t.error, className: 'bg-red-100 text-red-700' };
+            return { label: t('settings.error'), className: 'bg-red-100 text-red-700' };
         }
 
-        return { label: t.notConnected, className: 'bg-slate-100 text-slate-700' };
+        return { label: t('settings.notConnected'), className: 'bg-slate-100 text-slate-700' };
     };
 
     const submitWithLock = (provider, callback) => {
@@ -96,7 +46,7 @@ export default function AiPanel() {
     return (
         <div className="space-y-6">
             <div className="app-widget p-4">
-                <p className="text-sm text-slate-600">{t.subtitle}</p>
+                <p className="text-sm text-slate-600">{t('settings.aiSubtitle')}</p>
                 <button
                     type="button"
                     onClick={() =>
@@ -105,7 +55,7 @@ export default function AiPanel() {
                     className="mt-3 inline-flex h-9 items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 text-sm font-medium text-red-700 transition hover:bg-red-100"
                 >
                     <Power className="h-4 w-4" />
-                    {t.deactivate}
+                    {t('settings.deactivateAll')}
                 </button>
             </div>
 
@@ -127,7 +77,7 @@ export default function AiPanel() {
                             </div>
 
                             <div className="mt-4 space-y-3">
-                                <label className="block text-sm font-medium text-slate-700">{t.apiKey}</label>
+                                <label className="block text-sm font-medium text-slate-700">{t('settings.llmApiKey')}</label>
                                 <input
                                     type="password"
                                     placeholder={item.has_api_key ? '••••••••' : ''}
@@ -139,7 +89,7 @@ export default function AiPanel() {
                                 />
                                 {item.api_key_masked && (
                                     <p className="text-xs text-slate-500">
-                                        {t.savedMask}: <span className="font-medium">{item.api_key_masked}</span>
+                                        {t('settings.savedMask')}: <span className="font-medium">{item.api_key_masked}</span>
                                     </p>
                                 )}
 
@@ -169,7 +119,7 @@ export default function AiPanel() {
                                         className="inline-flex h-9 items-center gap-2 rounded-lg bg-indigo-600 px-3 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-60"
                                     >
                                         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
-                                        {t.saveKey}
+                                        {t('settings.saveKey')}
                                     </button>
                                     <button
                                         type="button"
@@ -186,12 +136,12 @@ export default function AiPanel() {
                                         className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
                                     >
                                         <PlugZap className="h-4 w-4" />
-                                        {t.check}
+                                        {t('settings.checkConnection')}
                                     </button>
                                 </div>
 
                                 <div className="space-y-2 pt-1">
-                                    <label className="block text-sm font-medium text-slate-700">{t.modelSelect}</label>
+                                    <label className="block text-sm font-medium text-slate-700">{t('settings.availableModels')}</label>
                                     <select
                                         value={selectedModel}
                                         onChange={(e) =>
@@ -203,7 +153,7 @@ export default function AiPanel() {
                                         className="block h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
                                         disabled={models.length === 0 || busy}
                                     >
-                                        <option value="">{t.noModels}</option>
+                                        <option value="">{t('settings.noModels')}</option>
                                         {models.map((model) => (
                                             <option key={model.id} value={model.id}>
                                                 {model.name ?? model.id}
@@ -230,12 +180,12 @@ export default function AiPanel() {
                                     className="inline-flex h-9 items-center gap-2 rounded-lg bg-emerald-600 px-3 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:opacity-60"
                                 >
                                     <CheckCircle2 className="h-4 w-4" />
-                                    {t.activate}
+                                    {t('common.activate')}
                                 </button>
 
                                 {item.active_model && (
                                     <p className="text-xs text-slate-500">
-                                        {t.activeModel}:{' '}
+                                        {t('settings.activeModel')}:{' '}
                                         <span className="font-medium text-slate-700">{item.active_model}</span>
                                     </p>
                                 )}

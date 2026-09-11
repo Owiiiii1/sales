@@ -7,7 +7,6 @@ use App\Models\TelegramBotSetting;
 use App\Models\User;
 use App\Services\Pipeline\AnalysisPipelineHealth;
 use App\Support\SecretMask;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
@@ -28,10 +27,10 @@ class SettingsController extends Controller
             ])
             ->all();
 
-        $allowedTabs = ['general', 'users', 'transcription', 'ai', 'app', 'telegram'];
-        $tab = (string) $request->query('tab', 'general');
+        $allowedTabs = ['users', 'transcription', 'ai', 'telegram'];
+        $tab = (string) $request->query('tab', 'users');
         if (! in_array($tab, $allowedTabs, true)) {
-            $tab = 'general';
+            $tab = 'users';
         }
 
         /** @var AiSettingsController $aiSettings */
@@ -46,17 +45,6 @@ class SettingsController extends Controller
             'telegram' => $this->telegramPayload(),
             'tab' => $tab,
         ]);
-    }
-
-    public function updateLanguage(Request $request): RedirectResponse
-    {
-        $validated = $request->validate([
-            'locale' => ['required', 'in:en,ru,uk'],
-        ]);
-
-        $request->session()->put('locale', $validated['locale']);
-
-        return back();
     }
 
     /**

@@ -1,25 +1,45 @@
 import AnalysisReport from '@/Components/Public/AnalysisReport';
 import CallTranscript from '@/Components/Public/CallTranscript';
 import PublicLayout from '@/Layouts/PublicLayout';
-import { Head } from '@inertiajs/react';
-import { useEffect, useRef, useState } from 'react';
+import { Head, Link, usePage } from '@inertiajs/react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useT } from '@/i18n';
 
 const csrfToken = () => document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
 
-export default function PublicHome({ upload = {} }) {
+export default function PublicHome({ upload = {}, companies = [], employees = [] }) {
+    const t = useT();
+    const { auth } = usePage().props;
     const maxMb = upload.max_audio_size_mb ?? 200;
     const accept = upload.accept ?? '.mp3,.wav,.m4a,.mp4,.ogg,.webm';
     const pollInterval = upload.poll_interval_ms ?? 3000;
     const uploadAvailable = upload.available !== false;
-    const unavailableMessage = upload.unavailable_message ?? 'Audio analysis is temporarily unavailable.';
+    const unavailableMessage = upload.unavailable_message ?? t('home.unavailable');
     const inputRef = useRef(null);
     const pollRef = useRef(null);
+    const companyIdRef = useRef('');
+    const employeeIdRef = useRef('');
 
     const [dragOver, setDragOver] = useState(false);
     const [file, setFile] = useState(null);
     const [uiStatus, setUiStatus] = useState('idle');
     const [error, setError] = useState('');
     const [result, setResult] = useState(null);
+    const [companyId, setCompanyId] = useState('');
+    const [employeeId, setEmployeeId] = useState('');
+
+    companyIdRef.current = companyId;
+    employeeIdRef.current = employeeId;
+
+    const selectedCompany = useMemo(
+        () => companies.find((company) => String(company.id) === String(companyId)) ?? null,
+        [companies, companyId],
+    );
+
+    const employeesForCompany = useMemo(
+        () => employees.filter((employee) => String(employee.company_id) === String(companyId)),
+        [employees, companyId],
+    );
 
     const stopPolling = () => {
         if (pollRef.current) {
@@ -36,6 +56,11 @@ export default function PublicHome({ upload = {} }) {
         setResult(null);
         setUiStatus('idle');
         stopPolling();
+    };
+
+    const changeCompany = (value) => {
+        setCompanyId(value);
+        setEmployeeId('');
     };
 
     const startPolling = (token) => {
@@ -74,12 +99,18 @@ export default function PublicHome({ upload = {} }) {
     const submit = async (nextFile) => {
         const audio = nextFile ?? file;
         if (!audio) {
-            setError('Please choose an audio file.');
+            setError(t('home.chooseAudio'));
             return;
         }
 
         const data = new FormData();
         data.append('audio', audio);
+        if (companyIdRef.current) {
+            data.append('company_id', companyIdRef.current);
+            if (employeeIdRef.current) {
+                data.append('employee_id', employeeIdRef.current);
+            }
+        }
 
         setError('');
         setUiStatus('uploading');
@@ -99,7 +130,11 @@ export default function PublicHome({ upload = {} }) {
             const payload = await response.json().catch(() => ({}));
 
             if (!response.ok) {
-                const message = payload.errors?.audio?.[0] || payload.message || 'Upload failed. Please try again.';
+                const message = payload.errors?.audio?.[0]
+                    || payload.errors?.company_id?.[0]
+                    || payload.errors?.employee_id?.[0]
+                    || payload.message
+                    || t('home.uploadFailed');
                 setError(message);
                 setUiStatus('failed');
                 return;
@@ -113,113 +148,165 @@ export default function PublicHome({ upload = {} }) {
                 startPolling(payload.public_token);
             }
         } catch {
-            setError('Upload failed. Please try again.');
+            setError(t('home.uploadFailed'));
             setUiStatus('failed');
         }
     };
 
-    const statusLabel = {
-        uploading: 'Uploading',
-        uploaded: 'Queued',
-        processing: 'Transcribing',
-        transcribed: 'Transcribed',
-        analysis_pending: 'Analysis pending',
-        analyzing: 'Analyzing',
-        completed: 'Completed',
-        failed: 'Failed',
-    }[uiStatus] ?? '';
+    const statusLabel = t.status(uiStatus);
+    const companySelected = Boolean(selectedCompany);
 
     return (
         <PublicLayout>
-            <Head title="Analyze your sales call" />
+            <Head title={t('home.title')} />
 
             <div className="mx-auto max-w-5xl px-6 py-16 sm:py-20">
                 <section className="text-center">
-                    <p className="text-sm font-semibold uppercase tracking-[0.2em] text-indigo-600">Sales Analyzer</p>
+                    <p className="text-sm font-semibold uppercase tracking-[0.2em] text-indigo-600">{t('home.kicker')}</p>
                     <h1 className="mt-4 text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl">
-                        Analyze your sales call
+                        {t('home.title')}
                     </h1>
                     <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-slate-600">
-                        Upload a recording of the conversation and get an AI analysis of how the sale was conducted.
+                        {t('home.subtitle')}
                     </p>
                 </section>
 
-                <section
-                    className={`mt-12 rounded-3xl border-2 border-dashed bg-white p-8 shadow-sm transition sm:p-12 ${
-                        dragOver && uploadAvailable ? 'border-indigo-400 bg-indigo-50/60' : 'border-slate-200'
-                    }`}
-                    onDragOver={(event) => {
-                        event.preventDefault();
-                        if (!uploadAvailable) {
-                            return;
-                        }
-                        setDragOver(true);
-                    }}
-                    onDragLeave={() => setDragOver(false)}
-                    onDrop={(event) => {
-                        event.preventDefault();
-                        setDragOver(false);
-                        if (!uploadAvailable) {
-                            return;
-                        }
-                        const dropped = event.dataTransfer.files?.[0];
-                        if (dropped) {
-                            assignFile(dropped);
-                        }
-                    }}
-                >
-                    {uiStatus === 'uploading' || uiStatus === 'processing' || uiStatus === 'analyzing' ? (
-                        <div className="flex flex-col items-center gap-4 py-6 text-center">
-                            <span className="h-12 w-12 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600" />
-                            <div>
-                                <p className="text-lg font-semibold text-slate-900">{statusLabel}</p>
-                                <p className="mt-1 text-sm text-slate-500">{file?.name || result?.original_filename}</p>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="flex flex-col items-center text-center">
-                            <p className="text-lg font-semibold text-slate-900">
-                                {uploadAvailable ? 'Drop your audio file here' : unavailableMessage}
-                            </p>
-                            <p className="mt-2 text-sm text-slate-500">
-                                {uploadAvailable
-                                    ? `MP3, WAV, M4A, MP4, OGG or WEBM. Maximum ${maxMb} MB.`
-                                    : 'Please try again later.'}
-                            </p>
-                            {file && (
-                                <p className="mt-3 text-sm font-medium text-slate-700">{file.name}</p>
+                <section className="mt-12 rounded-3xl border border-slate-200 bg-white p-8 shadow-sm sm:p-12">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <label className="block text-left">
+                            <span className="mb-1.5 block text-sm font-semibold text-slate-800">{t('home.company')}</span>
+                            <select
+                                value={companyId}
+                                onChange={(event) => changeCompany(event.target.value)}
+                                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900"
+                            >
+                                <option value="">{t('home.genericOption')}</option>
+                                {companies.map((company) => (
+                                    <option key={company.id} value={company.id}>{company.name}</option>
+                                ))}
+                            </select>
+                            {auth?.user && (
+                                <Link href={route('companies.index')} className="mt-2 inline-block text-xs font-medium text-indigo-700 hover:text-indigo-500">
+                                    {t('home.manageCompanies')}
+                                </Link>
                             )}
-                            {uiStatus !== 'idle' && uiStatus !== 'failed' && (
-                                <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-indigo-600">{statusLabel}</p>
-                            )}
-                            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-                                <button
-                                    type="button"
-                                    disabled={!uploadAvailable}
-                                    onClick={() => inputRef.current?.click()}
-                                    className="rounded-full border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                    Choose file
-                                </button>
-                                <button
-                                    type="button"
-                                    disabled={!uploadAvailable}
-                                    onClick={() => submit()}
-                                    className="rounded-full bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                    Analyze call
-                                </button>
+                        </label>
+                        <label className="block text-left">
+                            <span className="mb-1.5 block text-sm font-semibold text-slate-800">{t('home.employee')}</span>
+                            <select
+                                value={employeeId}
+                                disabled={!companyId}
+                                onChange={(event) => setEmployeeId(event.target.value)}
+                                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
+                            >
+                                <option value="">{t('home.noEmployee')}</option>
+                                {employeesForCompany.map((employee) => (
+                                    <option key={employee.id} value={employee.id}>{employee.name}</option>
+                                ))}
+                            </select>
+                        </label>
+                    </div>
+
+                    <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left">
+                        {companySelected ? (
+                            <>
+                                <p className="text-sm font-semibold text-slate-900">{t('home.companyMode')}</p>
+                                <p className="mt-1 text-sm leading-6 text-slate-600">{t('home.companyHint')}</p>
+                                <p className="mt-2 text-xs text-slate-500">
+                                    {t('home.companyContext', { name: selectedCompany.name })}
+                                    {selectedCompany.knowledge_completeness !== null && selectedCompany.knowledge_completeness !== undefined
+                                        ? ` · ${t('home.knowledge', { percent: selectedCompany.knowledge_completeness })}`
+                                        : ''}
+                                    {selectedCompany.scorecard_name
+                                        ? ` · ${t('home.scorecardName', { name: selectedCompany.scorecard_name })}`
+                                        : ''}
+                                </p>
+                            </>
+                        ) : (
+                            <>
+                                <p className="text-sm font-semibold text-slate-900">{t('home.genericMode')}</p>
+                                <p className="mt-1 text-sm leading-6 text-slate-600">{t('home.genericHint')}</p>
+                            </>
+                        )}
+                    </div>
+
+                    <div
+                        className={`mt-6 rounded-2xl border-2 border-dashed p-6 transition sm:p-8 ${
+                            dragOver && uploadAvailable ? 'border-indigo-400 bg-indigo-50/60' : 'border-slate-200'
+                        }`}
+                        onDragOver={(event) => {
+                            event.preventDefault();
+                            if (!uploadAvailable) {
+                                return;
+                            }
+                            setDragOver(true);
+                        }}
+                        onDragLeave={() => setDragOver(false)}
+                        onDrop={(event) => {
+                            event.preventDefault();
+                            setDragOver(false);
+                            if (!uploadAvailable) {
+                                return;
+                            }
+                            const dropped = event.dataTransfer.files?.[0];
+                            if (dropped) {
+                                assignFile(dropped);
+                            }
+                        }}
+                    >
+                        {uiStatus === 'uploading' || uiStatus === 'processing' || uiStatus === 'analyzing' ? (
+                            <div className="flex flex-col items-center gap-4 py-6 text-center">
+                                <span className="h-12 w-12 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600" />
+                                <div>
+                                    <p className="text-lg font-semibold text-slate-900">{statusLabel}</p>
+                                    <p className="mt-1 text-sm text-slate-500">{file?.name || result?.original_filename}</p>
+                                </div>
                             </div>
-                            <input
-                                ref={inputRef}
-                                type="file"
-                                accept={accept}
-                                className="hidden"
-                                onChange={(event) => assignFile(event.target.files?.[0] ?? null)}
-                            />
-                            {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
-                        </div>
-                    )}
+                        ) : (
+                            <div className="flex flex-col items-center text-center">
+                                <p className="text-lg font-semibold text-slate-900">
+                                    {uploadAvailable ? t('home.drop') : unavailableMessage}
+                                </p>
+                                <p className="mt-2 text-sm text-slate-500">
+                                    {uploadAvailable
+                                        ? t('home.formats', { mb: maxMb })
+                                        : t('home.tryLater')}
+                                </p>
+                                {file && (
+                                    <p className="mt-3 text-sm font-medium text-slate-700">{file.name}</p>
+                                )}
+                                {uiStatus !== 'idle' && uiStatus !== 'failed' && (
+                                    <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-indigo-600">{statusLabel}</p>
+                                )}
+                                <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+                                    <button
+                                        type="button"
+                                        disabled={!uploadAvailable}
+                                        onClick={() => inputRef.current?.click()}
+                                        className="rounded-full border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        {t('home.chooseFile')}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        disabled={!uploadAvailable}
+                                        onClick={() => submit()}
+                                        className="rounded-full bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        {t('home.analyze')}
+                                    </button>
+                                </div>
+                                <input
+                                    ref={inputRef}
+                                    type="file"
+                                    accept={accept}
+                                    className="hidden"
+                                    onChange={(event) => assignFile(event.target.files?.[0] ?? null)}
+                                />
+                                {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+                            </div>
+                        )}
+                    </div>
                 </section>
 
                 <div className="mt-10 space-y-6">
@@ -228,9 +315,11 @@ export default function PublicHome({ upload = {} }) {
                         report={result?.report}
                         message={result?.message}
                         error={result?.error}
+                        analysisMode={result?.analysis_mode}
+                        companyName={result?.company_name}
                     />
                     {(uiStatus === 'transcribed' || uiStatus === 'analysis_pending' || uiStatus === 'analyzing' || uiStatus === 'completed' || uiStatus === 'failed') && result?.transcript && (
-                        <CallTranscript transcript={result.transcript} />
+                        <CallTranscript transcript={result.transcript} heading={t('calls.transcript')} />
                     )}
                 </div>
             </div>

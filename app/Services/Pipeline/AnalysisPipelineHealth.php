@@ -51,7 +51,7 @@ class AnalysisPipelineHealth
                 'ready' => false,
                 'provider' => ActiveTranscriptionProvider::PROVIDER,
                 'model' => $row->active_model,
-                'message' => 'API key missing',
+                'message' => __('API key missing'),
                 'source' => 'not_configured',
             ];
         }
@@ -61,7 +61,7 @@ class AnalysisPipelineHealth
                 'ready' => false,
                 'provider' => $current->provider,
                 'model' => null,
-                'message' => 'Model missing',
+                'message' => __('Model missing'),
                 'source' => $current->source,
             ];
         }
@@ -71,7 +71,7 @@ class AnalysisPipelineHealth
                 'ready' => false,
                 'provider' => $current->provider,
                 'model' => $current->model,
-                'message' => filled($row->last_error) ? 'Connection failed' : 'Connection not checked',
+                'message' => filled($row->last_error) ? __('Connection failed') : __('Connection not checked'),
                 'source' => 'database',
             ];
         }
@@ -81,7 +81,7 @@ class AnalysisPipelineHealth
                 'ready' => false,
                 'provider' => $current->provider,
                 'model' => $current->model,
-                'message' => 'Not active',
+                'message' => __('Not active'),
                 'source' => 'database',
             ];
         }
@@ -90,7 +90,7 @@ class AnalysisPipelineHealth
             'ready' => true,
             'provider' => $current->provider,
             'model' => $current->model,
-            'message' => 'Ready',
+            'message' => __('Ready'),
             'source' => $current->source,
         ];
     }
@@ -107,7 +107,7 @@ class AnalysisPipelineHealth
                 'ready' => true,
                 'provider' => $active->provider,
                 'model' => $active->active_model,
-                'message' => 'Ready',
+                'message' => __('Ready'),
             ];
         }
 
@@ -118,7 +118,7 @@ class AnalysisPipelineHealth
                 'ready' => false,
                 'provider' => null,
                 'model' => null,
-                'message' => 'API key missing',
+                'message' => __('API key missing'),
             ];
         }
 
@@ -129,7 +129,7 @@ class AnalysisPipelineHealth
                 'ready' => false,
                 'provider' => $withKey->first()?->provider,
                 'model' => $withKey->first()?->active_model,
-                'message' => 'Connection failed',
+                'message' => __('Connection failed'),
             ];
         }
 
@@ -138,7 +138,7 @@ class AnalysisPipelineHealth
                 'ready' => false,
                 'provider' => $connected->provider,
                 'model' => null,
-                'message' => 'Model missing',
+                'message' => __('Model missing'),
             ];
         }
 
@@ -146,7 +146,7 @@ class AnalysisPipelineHealth
             'ready' => false,
             'provider' => $connected->provider,
             'model' => $connected->active_model,
-            'message' => 'No active provider',
+            'message' => __('No active provider'),
         ];
     }
 }

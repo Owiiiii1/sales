@@ -51,7 +51,7 @@ Each arrow may be one or more jobs. Failures should be visible as call status, n
 
 STT and diarization are one ElevenLabs Scribe v2 call (`diarize=true`, word timestamps). Speakers are stored as integers and shown as `Speaker 1`, `Speaker 2`. Seller vs customer is assigned in analysis JSON `speaker_roles` (DEC-034), not by mutating transcript rows.
 
-Transcription credentials come from `ActiveTranscriptionProvider` (database first, `ELEVENLABS_API_KEY` / `config('sales-analyzer.transcription.api_key')` as fallback). The supported model list is application-side (`scribe_v2`); there is no fake ElevenLabs STT model discovery. Connection check is `GET /v1/user` with the stored key — no audio, no transcription.
+Transcription credentials come from `ActiveTranscriptionProvider` (database first, `ELEVENLABS_API_KEY` / `config('sales-analyzer.transcription.api_key')` as fallback). The supported model list is application-side (`scribe_v2`); there is no fake ElevenLabs STT model discovery. Connection check is `POST /v1/speech-to-text` with the stored key and no audio. A validation error (missing file) means the key is accepted. Restricted keys must include the `speech_to_text` permission.
 
 Application analysis settings (`analysis_settings`) apply to every LLM provider:
 
@@ -60,7 +60,7 @@ Application analysis settings (`analysis_settings`) apply to every LLM provider:
 
 Temperature is **not** a Settings field. Adapters keep `temperature = 0.2` so structured JSON stays stable. A user-facing temperature control would trade reliability for creativity on schema v3.
 
-Phase 4 added **one** structured LLM call with `SalesAnalysisPromptBuilder` for generic sales methodology (DEC-031). Phase 5 still used one LLM call. Phase 7 keeps **one** pass for schema v3 (DEC-047). A second coaching pass was considered and not shipped: collection limits keep the JSON bounded; two calls would duplicate transcript + company context and double latency/failure. `ConversationMetricsCalculator` fills talk-time metrics from transcript segments after speaker-role mapping (DEC-049). Public calls get full generic v3 analysis (DEC-040 still: no company knowledge). Company calls keep the v2 `company_specific` block plus v3 coaching.
+Phase 4 added **one** structured LLM call with `SalesAnalysisPromptBuilder` for generic sales methodology (DEC-031). Phase 5 still used one LLM call. Phase 7 keeps **one** pass for schema v3 (DEC-047). A second coaching pass was considered and not shipped: collection limits keep the JSON bounded; two calls would duplicate transcript + company context and double latency/failure. `ConversationMetricsCalculator` fills talk-time metrics from transcript segments after speaker-role mapping (DEC-049). Analyzer calls without a Company get full generic v3 analysis. Analyzer calls with a selected Company use that company’s knowledge and scorecard (DEC-057). Company calls keep the v2 `company_specific` block plus v3 coaching.
 
 Prompt layout:
 
@@ -158,7 +158,7 @@ Prompt version, model, scorecard version, and context version must be stored wit
 
 ## Company knowledge
 
-Before analysis, `AnalysisContextBuilder` loads relevant knowledge for that Call’s Company (if any). Public calls skip this. Context is packed with a 24,000-character budget (config `sales-analyzer.analysis.context_budget_characters`). Truncation logs a warning and does not fail.
+Before analysis, `AnalysisContextBuilder` loads relevant knowledge for that Call’s Company (if any). Generic analyzer calls (`company_id` null) skip this. Context is packed with a 24,000-character budget (config `sales-analyzer.analysis.context_budget_characters`). Truncation logs a warning and does not fail.
 
 Schema v3 keeps that `company_specific` block and adds deep generic coaching on the same result JSON.
 
@@ -193,7 +193,7 @@ Fine-tuning is not a substitute for this knowledge in v1.
 
 There must **not** be only one universal sales score.
 
-A company can **create** a scorecard in admin. Public calls keep the generic seven-section methodology. When a company has an active default scorecard, the model evaluates each criterion; Laravel computes the weighted total. Generic `overall_score` and company scorecard score are stored separately and are not mixed into one number.
+A company can **create** a scorecard in admin. Generic analyzer calls keep the generic seven-section methodology. When a company has an active default scorecard, the model evaluates each criterion; Laravel computes the weighted total. Generic `overall_score` and company scorecard score are stored separately and are not mixed into one number.
 
 Each analysis stores `scorecard_snapshot` and `context_snapshot` so later knowledge edits do not rewrite history.
 

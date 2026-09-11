@@ -1,20 +1,14 @@
 import AdminLayout from '@/Layouts/AdminLayout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
+import { useT } from '@/i18n';
 
-function formatDuration(seconds) {
+function formatDuration(seconds, t) {
     if (seconds === null || seconds === undefined) {
-        return '—';
+        return t('common.dash');
     }
     const mins = Math.floor(Number(seconds) / 60);
     const secs = Number(seconds) % 60;
     return `${mins}:${String(secs).padStart(2, '0')}`;
-}
-
-function formatDate(value) {
-    if (!value) {
-        return '—';
-    }
-    return new Date(value).toLocaleString();
 }
 
 function statusClass(status) {
@@ -32,6 +26,7 @@ export default function CallsIndex({
     statuses = [],
     filters = {},
 }) {
+    const t = useT();
     const { errors } = usePage().props;
     const employeesForFilter = employees.filter((employee) => (
         !filters.company_id || String(employee.company_id) === String(filters.company_id)
@@ -49,8 +44,8 @@ export default function CallsIndex({
     };
 
     return (
-        <AdminLayout title="Calls">
-            <Head title="Calls" />
+        <AdminLayout title={t('calls.title')}>
+            <Head title={t('calls.title')} />
 
             <div className="space-y-6">
                 {errors?.call && <p className="text-sm text-red-600">{errors.call}</p>}
@@ -58,14 +53,14 @@ export default function CallsIndex({
                 <section className="app-widget p-4">
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                         <div>
-                            <h2 className="text-base font-semibold text-slate-900">Calls</h2>
-                            <p className="mt-1 text-sm text-slate-500">Upload audio to transcribe and analyze a sales call.</p>
+                            <h2 className="text-base font-semibold text-slate-900">{t('calls.title')}</h2>
+                            <p className="mt-1 text-sm text-slate-500">{t('calls.subtitle')}</p>
                         </div>
                         <Link
                             href={route('calls.create')}
                             className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white"
                         >
-                            Upload Call
+                            {t('calls.upload')}
                         </Link>
                     </div>
 
@@ -75,7 +70,7 @@ export default function CallsIndex({
                             onChange={(e) => applyFilters({ ...filters, company_id: e.target.value, employee_id: '' })}
                             className="h-10 rounded-lg border border-slate-300 px-3 text-sm"
                         >
-                            <option value="">All companies</option>
+                            <option value="">{t('companies.allCompanies')}</option>
                             {companies.map((company) => (
                                 <option key={company.id} value={company.id}>{company.name}</option>
                             ))}
@@ -85,7 +80,7 @@ export default function CallsIndex({
                             onChange={(e) => applyFilters({ ...filters, employee_id: e.target.value })}
                             className="h-10 rounded-lg border border-slate-300 px-3 text-sm"
                         >
-                            <option value="">All employees</option>
+                            <option value="">{t('employees.allEmployees')}</option>
                             {employeesForFilter.map((employee) => (
                                 <option key={employee.id} value={employee.id}>{employee.full_name}</option>
                             ))}
@@ -95,9 +90,9 @@ export default function CallsIndex({
                             onChange={(e) => applyFilters({ ...filters, status: e.target.value })}
                             className="h-10 rounded-lg border border-slate-300 px-3 text-sm"
                         >
-                            <option value="">All statuses</option>
+                            <option value="">{t('calls.allStatuses')}</option>
                             {statuses.map((status) => (
-                                <option key={status} value={status}>{status}</option>
+                                <option key={status} value={status}>{t.status(status)}</option>
                             ))}
                         </select>
                     </div>
@@ -106,47 +101,47 @@ export default function CallsIndex({
                         <table className="min-w-full divide-y divide-slate-200 text-sm">
                             <thead className="bg-slate-50">
                                 <tr>
-                                    <Th>ID</Th>
-                                    <Th>Company</Th>
-                                    <Th>Employee</Th>
-                                    <Th>Filename</Th>
-                                    <Th>Status</Th>
-                                    <Th>Duration</Th>
-                                    <Th>File size</Th>
-                                    <Th>Recorded</Th>
-                                    <Th>Created</Th>
-                                    <Th>Actions</Th>
+                                    <Th>{t('common.id')}</Th>
+                                    <Th>{t('common.company')}</Th>
+                                    <Th>{t('common.employee')}</Th>
+                                    <Th>{t('common.filename')}</Th>
+                                    <Th>{t('common.status')}</Th>
+                                    <Th>{t('common.duration')}</Th>
+                                    <Th>{t('calls.fileSizeCol')}</Th>
+                                    <Th>{t('calls.recorded')}</Th>
+                                    <Th>{t('calls.created')}</Th>
+                                    <Th>{t('common.actions')}</Th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                                 {calls.map((call) => (
                                     <tr key={call.id} className="hover:bg-slate-50">
                                         <Td>{call.id}</Td>
-                                        <Td>{call.company_name || '—'}</Td>
-                                        <Td>{call.employee_name || '—'}</Td>
-                                        <Td>{call.original_filename || '—'}</Td>
+                                        <Td>{call.company_name || t('common.dash')}</Td>
+                                        <Td>{call.employee_name || t('common.dash')}</Td>
+                                        <Td>{call.original_filename || t('common.dash')}</Td>
                                         <Td>
-                                            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold capitalize ${statusClass(call.status)}`}>
-                                                {call.status}
+                                            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${statusClass(call.status)}`}>
+                                                {t.status(call.status)}
                                             </span>
                                         </Td>
-                                        <Td>{formatDuration(call.duration_seconds)}</Td>
-                                        <Td>{call.file_size_label || '—'}</Td>
-                                        <Td>{formatDate(call.recorded_at)}</Td>
-                                        <Td>{formatDate(call.created_at)}</Td>
+                                        <Td>{formatDuration(call.duration_seconds, t)}</Td>
+                                        <Td>{call.file_size_label || t('common.dash')}</Td>
+                                        <Td>{t.date(call.recorded_at)}</Td>
+                                        <Td>{t.date(call.created_at)}</Td>
                                         <Td>
                                             <div className="flex gap-3">
-                                                <Link href={route('calls.show', call.id)} className="text-indigo-700">View</Link>
+                                                <Link href={route('calls.show', call.id)} className="text-indigo-700">{t('common.view')}</Link>
                                                 <button
                                                     type="button"
                                                     className="text-red-700"
                                                     onClick={() => {
-                                                        if (window.confirm('Delete this call and its audio file?')) {
+                                                        if (window.confirm(t('calls.deleteConfirm'))) {
                                                             router.delete(route('calls.destroy', call.id), { preserveScroll: true });
                                                         }
                                                     }}
                                                 >
-                                                    Delete
+                                                    {t('common.delete')}
                                                 </button>
                                             </div>
                                         </Td>
@@ -155,7 +150,7 @@ export default function CallsIndex({
                                 {calls.length === 0 && (
                                     <tr>
                                         <td className="px-4 py-8 text-center text-slate-500" colSpan={10}>
-                                            No calls uploaded yet
+                                            {t('calls.empty')}
                                         </td>
                                     </tr>
                                 )}

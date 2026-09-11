@@ -2,21 +2,15 @@ import AdminLayout from '@/Layouts/AdminLayout';
 import AnalysisReport from '@/Components/Public/AnalysisReport';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
+import { useT } from '@/i18n';
 
-function formatDuration(seconds) {
+function formatDuration(seconds, t) {
     if (seconds === null || seconds === undefined) {
-        return '—';
+        return t('common.dash');
     }
     const mins = Math.floor(Number(seconds) / 60);
     const secs = Number(seconds) % 60;
     return `${mins}:${String(secs).padStart(2, '0')}`;
-}
-
-function formatDate(value) {
-    if (!value) {
-        return '—';
-    }
-    return new Date(value).toLocaleString();
 }
 
 function statusClass(status) {
@@ -28,6 +22,7 @@ function statusClass(status) {
 }
 
 export default function CallsShow({ call, companies = [], employees = [] }) {
+    const t = useT();
     const { errors = {} } = usePage().props;
     const form = useForm({
         company_id: call.company_id ?? '',
@@ -42,26 +37,26 @@ export default function CallsShow({ call, companies = [], employees = [] }) {
     );
 
     return (
-        <AdminLayout title={`Call #${call.id}`}>
-            <Head title={`Call #${call.id}`} />
+        <AdminLayout title={t('calls.callTitle', { id: call.id })}>
+            <Head title={t('calls.callTitle', { id: call.id })} />
 
             <div className="space-y-6">
                 <section className="app-widget p-4">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div>
-                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Call ID</p>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t('calls.callId')}</p>
                             <h2 className="mt-1 text-xl font-semibold text-slate-900">#{call.id}</h2>
-                            <span className={`mt-2 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold capitalize ${statusClass(call.status)}`}>
-                                {call.status}
+                            <span className={`mt-2 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${statusClass(call.status)}`}>
+                                {t.status(call.status)}
                             </span>
                         </div>
                         <div className="flex flex-wrap gap-2">
                             <Link href={route('calls.index')} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700">
-                                Back to calls
+                                {t('calls.back')}
                             </Link>
                             {call.download_url && (
                                 <a href={call.download_url} className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white">
-                                    Download
+                                    {t('calls.download')}
                                 </a>
                             )}
                             {call.can_retry_transcription && (
@@ -70,7 +65,7 @@ export default function CallsShow({ call, companies = [], employees = [] }) {
                                     className="rounded-lg border border-indigo-200 px-3 py-2 text-sm font-medium text-indigo-700"
                                     onClick={() => router.post(route('calls.transcribe', call.id))}
                                 >
-                                    Retry transcription
+                                    {t('calls.retryTranscription')}
                                 </button>
                             )}
                             {call.can_run_analysis && (
@@ -86,7 +81,7 @@ export default function CallsShow({ call, companies = [], employees = [] }) {
                                         router.post(route('calls.analyze', call.id));
                                     }}
                                 >
-                                    Run analysis
+                                    {t('calls.runAnalysis')}
                                 </button>
                             )}
                             {call.can_rerun_analysis && (
@@ -102,19 +97,19 @@ export default function CallsShow({ call, companies = [], employees = [] }) {
                                         router.post(route('calls.analyze', call.id));
                                     }}
                                 >
-                                    Re-run analysis
+                                    {t('calls.rerunAnalysis')}
                                 </button>
                             )}
                             <button
                                 type="button"
                                 className="rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-700"
                                 onClick={() => {
-                                    if (window.confirm('Delete this call and its audio file?')) {
+                                    if (window.confirm(t('calls.deleteConfirm'))) {
                                         router.delete(route('calls.destroy', call.id));
                                     }
                                 }}
                             >
-                                Delete
+                                {t('common.delete')}
                             </button>
                         </div>
                     </div>
@@ -125,18 +120,18 @@ export default function CallsShow({ call, companies = [], employees = [] }) {
                     {errors.call ? <p className="mt-3 text-sm text-red-600">{errors.call}</p> : null}
 
                     <dl className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 text-sm">
-                        <Item label="Company" value={call.company_name} />
-                        <Item label="Employee" value={call.employee_name} />
-                        <Item label="Source" value={call.source} />
-                        <Item label="Original filename" value={call.original_filename} />
-                        <Item label="MIME type" value={call.mime_type} />
-                        <Item label="File size" value={call.file_size_label} />
-                        <Item label="Duration" value={formatDuration(call.duration_seconds)} />
-                        <Item label="Recorded at" value={formatDate(call.recorded_at)} />
-                        <Item label="Uploaded at" value={formatDate(call.created_at)} />
-                        <Item label="Uploaded by" value={call.uploaded_by_name} />
-                        <Item label="Processing started" value={formatDate(call.processing_started_at)} />
-                        <Item label="Processing completed" value={formatDate(call.processing_completed_at)} />
+                        <Item label={t('common.company')} value={call.company_name} />
+                        <Item label={t('common.employee')} value={call.employee_name} />
+                        <Item label={t('calls.source')} value={call.source} />
+                        <Item label={t('common.filename')} value={call.original_filename} />
+                        <Item label={t('calls.mime')} value={call.mime_type} />
+                        <Item label={t('calls.fileSize')} value={call.file_size_label} />
+                        <Item label={t('common.duration')} value={formatDuration(call.duration_seconds, t)} />
+                        <Item label={t('calls.recordedAt')} value={t.date(call.recorded_at)} />
+                        <Item label={t('calls.uploadedAt')} value={t.date(call.created_at)} />
+                        <Item label={t('calls.uploadedBy')} value={call.uploaded_by_name} />
+                        <Item label={t('calls.processingStarted')} value={t.date(call.processing_started_at)} />
+                        <Item label={t('calls.processingCompleted')} value={t.date(call.processing_completed_at)} />
                     </dl>
 
                     {call.status === 'failed' && call.error_message && (
@@ -145,19 +140,19 @@ export default function CallsShow({ call, companies = [], employees = [] }) {
                 </section>
 
                 <section className="app-widget p-4">
-                    <h3 className="text-base font-semibold text-slate-900">Audio</h3>
+                    <h3 className="text-base font-semibold text-slate-900">{t('calls.audio')}</h3>
                     {call.has_audio ? (
                         <audio className="mt-4 w-full" controls preload="metadata" src={call.audio_url}>
-                            Your browser does not support audio playback.
+                            {t('calls.audioUnsupported')}
                         </audio>
                     ) : (
-                        <p className="mt-3 text-sm text-slate-500">Audio file is not available.</p>
+                        <p className="mt-3 text-sm text-slate-500">{t('calls.audioMissing')}</p>
                     )}
                 </section>
 
                 <section className="app-widget p-4">
-                    <h3 className="text-base font-semibold text-slate-900">Edit details</h3>
-                    <p className="mt-1 text-sm text-slate-500">Company, employee, and recorded time can be updated. Audio cannot be replaced; delete the call and upload a new file instead.</p>
+                    <h3 className="text-base font-semibold text-slate-900">{t('calls.editDetails')}</h3>
+                    <p className="mt-1 text-sm text-slate-500">{t('calls.editHint')}</p>
                     <form
                         className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2"
                         onSubmit={(e) => {
@@ -166,21 +161,21 @@ export default function CallsShow({ call, companies = [], employees = [] }) {
                         }}
                     >
                         <Select
-                            label="Company"
+                            label={t('common.company')}
                             value={form.data.company_id}
                             error={form.errors.company_id}
                             onChange={(value) => form.setData({ ...form.data, company_id: value, employee_id: '' })}
-                            options={[{ value: '', label: 'Select company' }, ...companies.map((company) => ({ value: company.id, label: company.name }))]}
+                            options={[{ value: '', label: t('companies.selectCompany') }, ...companies.map((company) => ({ value: company.id, label: company.name }))]}
                         />
                         <Select
-                            label="Employee"
+                            label={t('common.employee')}
                             value={form.data.employee_id}
                             error={form.errors.employee_id}
                             onChange={(value) => form.setData('employee_id', value)}
-                            options={[{ value: '', label: 'No employee' }, ...employeesForCompany.map((employee) => ({ value: employee.id, label: employee.full_name }))]}
+                            options={[{ value: '', label: t('calls.noEmployee') }, ...employeesForCompany.map((employee) => ({ value: employee.id, label: employee.full_name }))]}
                         />
                         <div>
-                            <label className="mb-1 block text-sm font-medium text-slate-600">Recorded at</label>
+                            <label className="mb-1 block text-sm font-medium text-slate-600">{t('calls.recordedAt')}</label>
                             <input
                                 type="datetime-local"
                                 value={form.data.recorded_at}
@@ -191,33 +186,33 @@ export default function CallsShow({ call, companies = [], employees = [] }) {
                         </div>
                         <div className="md:col-span-2 flex justify-end">
                             <button type="submit" disabled={form.processing} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
-                                Save changes
+                                {t('common.saveChanges')}
                             </button>
                         </div>
                     </form>
                 </section>
 
                 <section className="app-widget p-4">
-                    <h3 className="text-base font-semibold text-slate-900">Transcript</h3>
+                    <h3 className="text-base font-semibold text-slate-900">{t('calls.transcript')}</h3>
                     {call.status === 'processing' && (
                         <div className="mt-4 flex items-center gap-3 text-sm text-slate-600">
                             <span className="h-5 w-5 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600" />
-                            Transcribing this call…
+                            {t('calls.transcribing')}
                         </div>
                     )}
                     {call.status === 'uploaded' && !call.transcript && (
-                        <p className="mt-3 text-sm text-slate-500">Queued for transcription.</p>
+                        <p className="mt-3 text-sm text-slate-500">{t('calls.queued')}</p>
                     )}
                     {call.status === 'failed' && !call.transcript && (
-                        <p className="mt-3 text-sm text-red-700">{call.error_message || 'Transcription failed. Please try again.'}</p>
+                        <p className="mt-3 text-sm text-red-700">{call.error_message || t('calls.transcriptionFailed')}</p>
                     )}
                     {call.transcript && (
                         <div className="mt-4 space-y-4">
                             <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 text-sm">
-                                <Item label="Provider" value={call.transcript.provider_label} />
-                                <Item label="Model" value={call.transcript.model_label} />
-                                <Item label="Detected language" value={call.transcript.language ? call.transcript.language.toUpperCase() : null} />
-                                <Item label="Duration" value={formatDuration(call.transcript.duration_seconds)} />
+                                <Item label={t('calls.provider')} value={call.transcript.provider_label} />
+                                <Item label={t('calls.model')} value={call.transcript.model_label} />
+                                <Item label={t('calls.detectedLanguage')} value={call.transcript.language ? call.transcript.language.toUpperCase() : null} />
+                                <Item label={t('common.duration')} value={formatDuration(call.transcript.duration_seconds, t)} />
                             </dl>
                             {call.transcript.segments?.length > 0 ? (
                                 <div className="space-y-3">
@@ -238,42 +233,42 @@ export default function CallsShow({ call, companies = [], employees = [] }) {
                 </section>
 
                 <section className="app-widget p-4">
-                    <h3 className="text-base font-semibold text-slate-900">AI Analysis</h3>
+                    <h3 className="text-base font-semibold text-slate-900">{t('calls.analysis')}</h3>
                     {call.status === 'analyzing' && (
                         <div className="mt-4 flex items-center gap-3 text-sm text-slate-600">
                             <span className="h-5 w-5 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600" />
-                            Analyzing this sales call…
+                            {t('calls.analyzing')}
                         </div>
                     )}
                     {call.status === 'analysis_pending' && !call.analysis && (
-                        <p className="mt-3 text-sm text-slate-600">Transcription complete. AI analysis is not configured yet.</p>
+                        <p className="mt-3 text-sm text-slate-600">{t('calls.analysisNotConfigured')}</p>
                     )}
                     {call.status === 'transcribed' && !call.analysis && (
-                        <p className="mt-3 text-sm text-slate-600">Transcript is ready. Analysis has not started yet.</p>
+                        <p className="mt-3 text-sm text-slate-600">{t('calls.transcriptReady')}</p>
                     )}
                     {call.analysis && (
                         <div className="mt-4 space-y-4">
                             <div>
-                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Analysis context</p>
+                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t('calls.analysisContext')}</p>
                                 <dl className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 text-sm">
-                                    <Item label="Company" value={call.analysis_context?.company} />
-                                    <Item label="Scorecard" value={call.analysis_context?.scorecard_name} />
-                                    <Item label="Schema version" value={call.analysis_context?.schema_version} />
-                                    <Item label="Company context used" value={call.analysis_context?.company_context_used ? 'yes' : 'no'} />
+                                    <Item label={t('common.company')} value={call.analysis_context?.company} />
+                                    <Item label={t('companies.scorecard')} value={call.analysis_context?.scorecard_name} />
+                                    <Item label={t('calls.schemaVersion')} value={call.analysis_context?.schema_version} />
+                                    <Item label={t('calls.companyContextUsed')} value={call.analysis_context?.company_context_used ? t('common.yes') : t('common.no')} />
                                 </dl>
                             </div>
                             <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 text-sm">
-                                <Item label="Provider" value={call.analysis.provider_label} />
-                                <Item label="Model" value={call.analysis.model} />
-                                <Item label="Schema version" value={call.analysis.schema_version} />
-                                <Item label="Completed" value={formatDate(call.analysis.completed_at)} />
+                                <Item label={t('calls.provider')} value={call.analysis.provider_label} />
+                                <Item label={t('calls.model')} value={call.analysis.model} />
+                                <Item label={t('calls.schemaVersion')} value={call.analysis.schema_version} />
+                                <Item label={t('calls.completed')} value={t.date(call.analysis.completed_at)} />
                             </dl>
                             {call.analysis.speaker_roles?.length > 0 && (
                                 <div>
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Speaker roles</p>
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t('calls.speakerRoles')}</p>
                                     <ul className="mt-2 text-sm text-slate-800">
                                         {call.analysis.speaker_roles.map((role) => (
-                                            <li key={role.speaker}>{role.speaker_label}: {role.role}</li>
+                                            <li key={role.speaker}>{role.speaker_label}: {t.enum('role', role.role)}</li>
                                         ))}
                                     </ul>
                                 </div>
@@ -282,7 +277,7 @@ export default function CallsShow({ call, companies = [], employees = [] }) {
                             {call.analysis.context_snapshot && (
                                 <div className="rounded-xl border border-slate-200 p-4">
                                     <button type="button" className="text-sm font-medium text-indigo-700" onClick={() => setShowSnapshot((open) => !open)}>
-                                        {showSnapshot ? 'Hide context snapshot' : 'Show context snapshot'}
+                                        {showSnapshot ? t('calls.hideSnapshot') : t('calls.showSnapshot')}
                                     </button>
                                     {showSnapshot && (
                                         <pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap text-xs text-slate-700">
@@ -300,10 +295,11 @@ export default function CallsShow({ call, companies = [], employees = [] }) {
 }
 
 function Item({ label, value }) {
+    const t = useT();
     return (
         <div>
             <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</dt>
-            <dd className="mt-1 text-slate-800">{value || '—'}</dd>
+            <dd className="mt-1 text-slate-800">{value || t('common.dash')}</dd>
         </div>
     );
 }

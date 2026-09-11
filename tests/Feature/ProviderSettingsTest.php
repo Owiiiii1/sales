@@ -127,7 +127,12 @@ class ProviderSettingsTest extends TestCase
         $this->saveDatabaseKey($this->secret);
 
         Http::fake([
-            'https://api.elevenlabs.io/v1/user' => Http::response(['subscription' => ['tier' => 'starter']], 200),
+            'https://api.elevenlabs.io/v1/speech-to-text' => Http::response([
+                'detail' => [
+                    'status' => 'invalid_request',
+                    'message' => 'A file or source_url is required.',
+                ],
+            ], 422),
         ]);
 
         $this->actingAs($user)
@@ -141,9 +146,8 @@ class ProviderSettingsTest extends TestCase
         $this->assertNotNull($row->last_checked_at);
         $this->assertTrue(app(ActiveTranscriptionProvider::class)->isReady());
 
-        Http::assertSent(fn ($request): bool => $request->url() === 'https://api.elevenlabs.io/v1/user'
-            && $request->method() === 'GET'
-            && ! str_contains($request->url(), 'speech-to-text'));
+        Http::assertSent(fn ($request): bool => str_contains($request->url(), 'speech-to-text')
+            && $request->method() === 'POST');
     }
 
     public function test_check_connection_failure_is_sanitized(): void
@@ -152,7 +156,7 @@ class ProviderSettingsTest extends TestCase
         $this->saveDatabaseKey($this->secret);
 
         Http::fake([
-            'https://api.elevenlabs.io/v1/user' => Http::response(['detail' => $this->secret], 401),
+            'https://api.elevenlabs.io/v1/speech-to-text' => Http::response(['detail' => $this->secret], 401),
         ]);
 
         $this->actingAs($user)
@@ -166,6 +170,32 @@ class ProviderSettingsTest extends TestCase
         $this->assertNotNull($row->last_error);
         $this->assertStringNotContainsString($this->secret, (string) $row->last_error);
         $this->assertFalse(app(ActiveTranscriptionProvider::class)->isReady());
+    }
+
+    public function test_check_connection_reports_missing_speech_to_text_permission(): void
+    {
+        $user = User::factory()->create();
+        $this->saveDatabaseKey($this->secret);
+
+        Http::fake([
+            'https://api.elevenlabs.io/v1/speech-to-text' => Http::response([
+                'detail' => [
+                    'status' => 'missing_permissions',
+                    'message' => 'The API key you used is missing the permission speech_to_text to execute this operation.',
+                ],
+            ], 401),
+        ]);
+
+        $this->actingAs($user)
+            ->from('/settings?tab=transcription')
+            ->post('/settings/transcription/check')
+            ->assertRedirect('/settings?tab=transcription')
+            ->assertSessionHasErrors('transcription');
+
+        $row = TranscriptionProviderSetting::query()->first();
+        $this->assertFalse($row->is_connected);
+        $this->assertStringContainsString('speech_to_text', (string) $row->last_error);
+        $this->assertStringNotContainsString($this->secret, (string) $row->last_error);
     }
 
     public function test_analysis_settings_are_saved_and_validated(): void

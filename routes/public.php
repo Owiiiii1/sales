@@ -1,9 +1,11 @@
 <?php
 
+use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\PublicAnalyzerController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [PublicAnalyzerController::class, 'home'])->name('home');
+Route::post('/locale', [LocaleController::class, 'update'])->name('locale.update');
 
 Route::middleware('throttle:public-analyze')->group(function () {
     Route::post('/analyze', [PublicAnalyzerController::class, 'store'])->name('analyze.store');

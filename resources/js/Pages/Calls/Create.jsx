@@ -1,8 +1,10 @@
 import AdminLayout from '@/Layouts/AdminLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { useMemo } from 'react';
+import { useT } from '@/i18n';
 
 export default function CallsCreate({ companies = [], employees = [], upload = {} }) {
+    const t = useT();
     const form = useForm({
         company_id: '',
         employee_id: '',
@@ -17,20 +19,21 @@ export default function CallsCreate({ companies = [], employees = [], upload = {
 
     const maxMb = upload.max_audio_size_mb ?? 200;
     const accept = upload.accept ?? '.mp3,.wav,.m4a,.mp4,.ogg,.webm';
+    const formats = (upload.allowed_extensions || ['mp3', 'wav', 'm4a', 'mp4', 'ogg', 'webm']).join(', ');
 
     return (
-        <AdminLayout title="Upload Call">
-            <Head title="Upload Call" />
+        <AdminLayout title={t('calls.upload')}>
+            <Head title={t('calls.upload')} />
 
             <section className="app-widget p-4">
                 <div className="flex items-center justify-between gap-3">
                     <div>
-                        <h2 className="text-base font-semibold text-slate-900">Upload Call</h2>
+                        <h2 className="text-base font-semibold text-slate-900">{t('calls.upload')}</h2>
                         <p className="mt-1 text-sm text-slate-500">
-                            Audio is stored privately. Transcription and AI analysis are not started yet.
+                            {t('calls.uploadHint')}
                         </p>
                     </div>
-                    <Link href={route('calls.index')} className="text-sm font-medium text-indigo-700">Back to calls</Link>
+                    <Link href={route('calls.index')} className="text-sm font-medium text-indigo-700">{t('calls.back')}</Link>
                 </div>
 
                 <form
@@ -43,21 +46,21 @@ export default function CallsCreate({ companies = [], employees = [], upload = {
                     }}
                 >
                     <Select
-                        label="Company"
+                        label={t('common.company')}
                         value={form.data.company_id}
                         error={form.errors.company_id}
                         onChange={(value) => form.setData({ ...form.data, company_id: value, employee_id: '' })}
-                        options={[{ value: '', label: 'Select company' }, ...companies.map((company) => ({ value: company.id, label: company.name }))]}
+                        options={[{ value: '', label: t('companies.selectCompany') }, ...companies.map((company) => ({ value: company.id, label: company.name }))]}
                     />
                     <Select
-                        label="Employee (optional)"
+                        label={t('calls.employeeOptional')}
                         value={form.data.employee_id}
                         error={form.errors.employee_id}
                         onChange={(value) => form.setData('employee_id', value)}
-                        options={[{ value: '', label: 'No employee' }, ...employeesForCompany.map((employee) => ({ value: employee.id, label: employee.full_name }))]}
+                        options={[{ value: '', label: t('calls.noEmployee') }, ...employeesForCompany.map((employee) => ({ value: employee.id, label: employee.full_name }))]}
                     />
                     <div>
-                        <label className="mb-1 block text-sm font-medium text-slate-600">Audio file</label>
+                        <label className="mb-1 block text-sm font-medium text-slate-600">{t('calls.audioFile')}</label>
                         <input
                             type="file"
                             accept={accept}
@@ -65,12 +68,12 @@ export default function CallsCreate({ companies = [], employees = [], upload = {
                             className="block w-full text-sm text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-indigo-700"
                         />
                         <p className="mt-1 text-xs text-slate-500">
-                            Allowed: {(upload.allowed_extensions || ['mp3', 'wav', 'm4a', 'mp4', 'ogg', 'webm']).join(', ')}. Max {maxMb} MB.
+                            {t('calls.allowed', { formats, mb: maxMb })}
                         </p>
                         {form.errors.audio && <p className="mt-1 text-sm text-red-600">{form.errors.audio}</p>}
                     </div>
                     <div>
-                        <label className="mb-1 block text-sm font-medium text-slate-600">Recorded at (optional)</label>
+                        <label className="mb-1 block text-sm font-medium text-slate-600">{t('calls.recordedOptional')}</label>
                         <input
                             type="datetime-local"
                             value={form.data.recorded_at}
@@ -85,7 +88,7 @@ export default function CallsCreate({ companies = [], employees = [], upload = {
                             disabled={form.processing}
                             className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
                         >
-                            {form.processing ? 'Uploading…' : 'Save'}
+                            {form.processing ? t('common.uploading') : t('common.save')}
                         </button>
                     </div>
                 </form>

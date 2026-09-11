@@ -264,11 +264,11 @@ Status values: `Accepted` | `Open` | `Superseded` | `Rejected`.
 **Status:** Accepted  
 **Date:** 2026-09-09
 
-**Decision:** `calls.company_id` is nullable. Anonymous/public uploads store `company_id = null`, `employee_id = null`, `uploaded_by = null`. Admin uploads still require a Company.
+**Decision:** `calls.company_id` is nullable. Generic analyzer uploads store `company_id = null`, `employee_id = null`, `uploaded_by = null`. The main analyzer may also attach an explicit Company and optional Employee (DEC-057). Admin uploads still require a Company.
 
 **Reason:** Public users are not tenants. Inventing a dummy “Public” company would pollute the admin company list.
 
-**Consequences:** Public audio is stored under `public/{year}/{month}/` on the private disk. Admin UI still requires company on create.
+**Consequences:** Generic analyzer audio is stored under `public/{year}/{month}/` on the private disk. Analyzer uploads with a Company use `{company_id}/{year}/{month}/`. Admin UI still requires company on create.
 
 ---
 
@@ -520,7 +520,7 @@ Status values: `Accepted` | `Open` | `Superseded` | `Rejected`.
 
 **Reason:** Company knowledge is a domain, not a company metadata dump. Generic analysis must keep working when `company_id` is null.
 
-**Consequences:** `AnalysisContextBuilder` loads active knowledge for a Call’s Company. Public calls skip this layer. RAG/embeddings remain later.
+**Consequences:** `AnalysisContextBuilder` loads active knowledge for a Call’s Company. Generic analyzer calls (`company_id` null) skip this layer. RAG/embeddings remain later.
 
 ---
 
@@ -569,14 +569,15 @@ Status values: `Accepted` | `Open` | `Superseded` | `Rejected`.
 ## DEC-040
 
 **Title:** Public calls use generic analysis only  
-**Status:** Accepted  
-**Date:** 2026-09-10
+**Status:** Superseded  
+**Date:** 2026-09-10  
+**Superseded by:** DEC-057
 
 **Decision:** Anonymous public uploads keep `company_id` null, `company_context_used=false`, and generic methodology. The public form does not ask for company knowledge.
 
 **Reason:** Guests have no company. Inventing one would hallucinate.
 
-**Consequences:** Company-specific fields in schema v2 are empty/not applicable for public calls.
+**Consequences:** Company-specific fields in schema v2 are empty/not applicable for public calls. Replaced by explicit Company selection on the main analyzer (DEC-057). Generic mode remains available when no Company is selected.
 
 ---
 
@@ -628,7 +629,7 @@ Status values: `Accepted` | `Open` | `Superseded` | `Rejected`.
 **Status:** Accepted  
 **Date:** 2026-09-10
 
-**Decision:** Anonymous public calls (`company_id` null) never appear in employee or company analytics. The global dashboard may include them in overall totals and a Public Analyses card.
+**Decision:** Generic analyzer calls (`company_id` null) never appear in employee or company analytics. The global dashboard may include them in overall totals and a Public Analyses card. Analyzer calls that selected a Company are company-bound and **do** appear in that company’s (and employee’s) analytics.
 
 **Reason:** They have no employee and no company knowledge.
 
@@ -804,10 +805,24 @@ Status values: `Accepted` | `Open` | `Superseded` | `Rejected`.
 
 ---
 
+## DEC-057
+
+**Title:** Main analyzer explicitly selects company context  
+**Status:** Accepted  
+**Date:** 2026-09-11
+
+**Decision:** Main analyzer allows explicit Company and optional Employee selection before upload. Generic analysis remains available by selecting no Company. The system never guesses Company from audio or transcript.
+
+**Reason:** Sales Analyzer is an operator workspace, not an anonymous SaaS upload. Company knowledge already exists in Admin; the analyzer must be able to use it on demand. Guessing a company from audio would hallucinate context.
+
+**Consequences:** `POST /analyze` accepts nullable `company_id` and `employee_id` with backend validation (active company, active employee belonging to that company, employee requires company). `source` stays `public`. Generic uploads keep `company_id` null and use `AnalysisContextBuilder::generic()`. Company uploads reuse existing Phase 5 company-specific analysis. Frontend receives only selector metadata (id, name, completeness %, scorecard name), never scripts, forbidden claims, or scorecard instructions.
+
+---
+
 ## Template for new entries
 
 ```
-## DEC-057
+## DEC-058
 
 **Title:**  
 **Status:** Open | Accepted  

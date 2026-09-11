@@ -122,9 +122,9 @@ An uploaded or imported conversation.
 
 * id
 * public_token unique UUID (DEC-019) — public status/report identifier
-* company_id → companies nullable (DEC-018); **required** for admin uploads, **null** for public uploads
-* employee_id → employees nullable (restrict)
-* source string (`manual` for admin, `public` for anonymous upload)
+* company_id → companies nullable (DEC-018); **required** for admin uploads; analyzer uploads are null (generic) or the selected company (DEC-057)
+* employee_id → employees nullable (restrict); analyzer may set it only with a matching company
+* source string (`manual` for admin, `public` for analyzer workspace uploads)
 * external_id nullable
 * original_filename — client name only; not used as the physical filename
 * storage_path — relative path on the private `calls` disk
@@ -132,13 +132,13 @@ An uploaded or imported conversation.
 * duration_seconds nullable (ffprobe is not installed; WAV headers may be parsed)
 * status string: `pending` → `uploaded` → `processing` (STT) → `transcribed` → `analysis_pending` or `analyzing` → `completed`. `failed` on error.
 * recorded_at nullable
-* uploaded_by → users nullable (`nullOnDelete`); null for public uploads
+* uploaded_by → users nullable (`nullOnDelete`); null for analyzer uploads
 * processing_started_at, processing_completed_at, error_message nullable
 * timestamps
 
 Physical files live on disk `calls` (`storage/app/private/calls`), never under `public/`. Admin stream/download remain authenticated. There is **no** public audio URL (DEC-020). Deleting a Call deletes its file after the DB row is removed (DEC-016). Transcripts cascade-delete with the Call.
 
-A call’s employee must belong to the selected company when both are present. Public JSON never includes `storage_path` or internal ids.
+A call’s employee must belong to the selected company when both are present. Analyzer JSON never includes `storage_path`, internal ids, or company knowledge secrets.
 
 ## Transcript
 
@@ -232,7 +232,7 @@ Implemented as `transcript_segments` rows (see Transcript). Speaker identity map
 
 Result of analyzing one call. **Must support versioning** (`schema_version`).
 
-Implemented as `sales_analyses` with JSON `result` as the structured report. Generic methodology scores stay in `overall_score`. Company scorecard totals are `company_scorecard_score` (DEC-038). Public calls keep `company_context_used=false` (DEC-040).
+Implemented as `sales_analyses` with JSON `result` as the structured report. Generic methodology scores stay in `overall_score`. Company scorecard totals are `company_scorecard_score` (DEC-038). Generic analyzer calls keep `company_context_used=false`. Company analyzer calls use `AnalysisContextBuilder` company context (DEC-057).
 
 A call may be re-analyzed when prompts, models, scorecards, or company context change.
 
@@ -333,7 +333,7 @@ Admin dashboard / company / employee analytics read `calls` + `sales_analyses` (
 * Date: `recorded_at` if set, else `created_at` (DEC-045), grouped in `config('app.timezone')`.
 * Generic average uses `overall_score`. Company average uses `company_scorecard_score` (DEC-046). Nulls are N/A, never a fake 0.
 * Scorecard history uses `scorecard_snapshot` + `result.company_specific.scorecard` (DEC-043), not the live scorecard rows.
-* Public calls (`company_id` null) are excluded from employee and company analytics (DEC-044). They may appear on the global dashboard, with a separate Public Analyses count.
+* Generic analyzer calls (`company_id` null) are excluded from employee and company analytics (DEC-044). They may appear on the global dashboard, with a separate Public Analyses count. Analyzer calls with a Company are included in that company’s analytics.
 
 ## What we will not do yet
 
