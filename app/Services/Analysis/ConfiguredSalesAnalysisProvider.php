@@ -51,11 +51,60 @@ class ConfiguredSalesAnalysisProvider implements SalesAnalysisProvider
             $this->analysisSettings->maxOutputTokensFor((string) $setting->provider),
         );
 
+        if ((string) $setting->provider === 'gemini') {
+            $payload = $this->alignGeminiCompanyCriteria($payload, $context);
+        }
+
         return $this->validator->validate(
             $payload,
             (string) $setting->provider,
             (string) $setting->active_model,
             $context,
         );
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function alignGeminiCompanyCriteria(array $payload, AnalysisContext $context): array
+    {
+        $expected = [];
+        foreach ($context->scorecardSnapshot['criteria'] ?? [] as $criterion) {
+            $expected[] = (string) $criterion['key'];
+        }
+
+        $criteria = $payload['company_specific']['scorecard']['criteria'] ?? null;
+        if ($expected === [] || ! is_array($criteria)) {
+            if ($context->companyContextUsed) {
+                $payload['company_context_used'] = true;
+            }
+
+            return $payload;
+        }
+
+        foreach ($criteria as $index => $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+
+            if (! isset($item['key']) && isset($expected[$index])) {
+                $item['key'] = $expected[$index];
+            }
+
+            if (! isset($item['summary']) && isset($item['text']) && is_string($item['text'])) {
+                $item['summary'] = $item['text'];
+            }
+
+            $criteria[$index] = $item;
+        }
+
+        $payload['company_specific']['scorecard']['criteria'] = $criteria;
+
+        if ($context->companyContextUsed) {
+            $payload['company_context_used'] = true;
+        }
+
+        return $payload;
     }
 }

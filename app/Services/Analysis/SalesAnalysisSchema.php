@@ -249,7 +249,7 @@ final class SalesAnalysisSchema
         return [
             'type' => 'object',
             'additionalProperties' => false,
-            'required' => array_merge([
+            'required' => array_values(array_unique(array_merge([
                 'overall_score',
                 'summary',
                 'call_outcome',
@@ -267,7 +267,7 @@ final class SalesAnalysisSchema
                 'next_step',
                 'company_context_used',
                 'company_specific',
-            ], self::V3_REQUIRED),
+            ], self::V3_REQUIRED))),
             'properties' => [
                 'overall_score' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 100],
                 'summary' => ['type' => 'string'],

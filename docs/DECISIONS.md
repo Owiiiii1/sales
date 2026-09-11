@@ -917,10 +917,38 @@ Status values: `Accepted` | `Open` | `Superseded` | `Rejected`.
 
 ---
 
+## DEC-065
+
+**Title:** Gemini structured output uses JSON Schema (`responseJsonSchema`)  
+**Status:** Accepted  
+**Date:** 2026-09-11
+
+**Decision:** Gemini structured output uses JSON Schema wire format (`responseJsonSchema`) rather than legacy OpenAPI `responseSchema`. The client keeps `POST /v1beta/models/{model}:generateContent` with `generationConfig.responseMimeType = application/json`. Schema v3 is not reduced or converted to OpenAPI, and the domain schema stays provider-neutral. Gemini’s generateContent compiler cannot ingest the full nested v3 graph (duplicate `required`, nullable-union volume, nested complexity). The Gemini adapter therefore sends a shallow JSON Schema projection of v3 required keys/types as `responseJsonSchema`, attaches the complete schema in the prompt, and validates the result with `SalesAnalysisResultValidator`.
+
+**Reason:** Schema v3 is JSON Schema (`additionalProperties`, nullable unions such as `["integer","null"]`). Sending it as legacy `responseSchema` produced Gemini HTTP 400 `INVALID_ARGUMENT`. OpenAI and Anthropic keep their own wrappers; Gemini adapts at the client boundary.
+
+**Consequences:** Gemini errors are parsed from `error.message` and `error.status`, never from numeric `error.code` as the human-readable text. Public analyzer copy stays `Analysis failed. Please try again.` Provider internals stay in logs/admin debug only.
+
+---
+
+## DEC-066
+
+**Title:** Logging failures must never prevent call state transitions  
+**Status:** Accepted  
+**Date:** 2026-09-11
+
+**Decision:** Logging failures must never prevent call state transitions. `TranscribeCall` and `AnalyzeCall` persist `failed` (or leave `cancelled`/`completed` untouched) before attempting to write logs. Logger exceptions are swallowed. `config/logging.php` stack channel uses `ignore_exceptions => true`. Stuck `processing`/`analyzing` calls whose queue job is gone can be marked failed with `php artisan sales:recover-stuck-calls` (optional `--retry` / `--sync`; no cron auto-retry).
+
+**Reason:** A `storage/logs` permission error previously blocked `markFailed`, leaving Call #4 in `analyzing` with an empty queue after Gemini HTTP 400.
+
+**Consequences:** Production `storage/logs` is owned `deploy:www-data` with ACL `user:www-data:rwx` (file `user:www-data:rw`), not mode 777. Worker PHP changes still require `sales-worker.service` recycle (`--max-time=3600` or `sudo systemctl restart sales-worker.service`).
+
+---
+
 ## Template for new entries
 
 ```
-## DEC-065
+## DEC-067
 
 **Title:**  
 **Status:** Open | Accepted  

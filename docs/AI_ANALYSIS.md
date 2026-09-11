@@ -53,6 +53,8 @@ STT and diarization are one ElevenLabs Scribe v2 call (`diarize=true`, word time
 
 Transcription credentials come from `ActiveTranscriptionProvider` (database first, `ELEVENLABS_API_KEY` / `config('sales-analyzer.transcription.api_key')` as fallback). The supported model list is application-side (`scribe_v2`); there is no fake ElevenLabs STT model discovery. Connection check is `POST /v1/speech-to-text` with the stored key and no audio. A validation error (missing file) means the key is accepted. Restricted keys must include the `speech_to_text` permission.
 
+Gemini uses the existing `generativelanguage.googleapis.com/v1beta` `generateContent` endpoint. Structured output is `generationConfig.responseMimeType = application/json` plus `generationConfig.responseJsonSchema`. Legacy OpenAPI `responseSchema` is not used (DEC-065). Gemini cannot compile the full nested v3 graph, so the adapter sends a shallow JSON Schema projection of v3 required keys and types, attaches the complete schema in the prompt, and validates in Laravel. OpenAI keeps `response_format.json_schema`. Anthropic keeps JSON-in-prompt plus application validation.
+
 Application analysis settings (`analysis_settings`) apply to every LLM provider:
 
 * `report_language_mode = same_as_call` globally. A company profile may set `report_language` to `same_as_call`, `en`, `ru`, or `uk` (DEC-061). Quotes stay in the original transcript language.

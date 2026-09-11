@@ -201,8 +201,8 @@ class SalesAnalysisResultValidator
         $normalized = [];
 
         foreach (array_values($items) as $index => $item) {
-            if (! is_array($item) || ! isset($item['key'])) {
-                throw new PermanentAnalysisException("company_specific.scorecard.criteria.{$index} must include a key.");
+            if (! is_array($item) || ! filled($item['key'] ?? null)) {
+                continue;
             }
 
             $key = $this->string($item['key'], "company_specific.scorecard.criteria.{$index}.key");

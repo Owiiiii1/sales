@@ -142,6 +142,15 @@ class AnalyzeCall implements ShouldBeUniqueUntilProcessing, ShouldQueue
             return;
         }
 
+        Call::query()
+            ->whereKey($call->id)
+            ->whereNotIn('status', [Call::STATUS_CANCELLED, 'completed'])
+            ->update([
+                'status' => 'failed',
+                'processing_completed_at' => now(),
+                'error_message' => $exception->publicMessage(),
+            ]);
+
         try {
             Log::error('Call sales analysis failed.', [
                 'call_id' => $call->id,
@@ -150,14 +159,5 @@ class AnalyzeCall implements ShouldBeUniqueUntilProcessing, ShouldQueue
         } catch (Throwable) {
             // Logging must not leave the call stuck in analyzing.
         }
-
-        Call::query()
-            ->whereKey($call->id)
-            ->where('status', '!=', Call::STATUS_CANCELLED)
-            ->update([
-                'status' => 'failed',
-                'processing_completed_at' => now(),
-                'error_message' => $exception->publicMessage(),
-            ]);
     }
 }

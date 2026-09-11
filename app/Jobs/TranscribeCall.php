@@ -138,6 +138,21 @@ class TranscribeCall implements ShouldBeUniqueUntilProcessing, ShouldQueue
             return;
         }
 
+        Call::query()
+            ->whereKey($call->id)
+            ->whereNotIn('status', [
+                Call::STATUS_CANCELLED,
+                'transcribed',
+                'analysis_pending',
+                'analyzing',
+                'completed',
+            ])
+            ->update([
+                'status' => 'failed',
+                'processing_completed_at' => now(),
+                'error_message' => $exception->publicMessage(),
+            ]);
+
         try {
             Log::error('Call transcription failed.', [
                 'call_id' => $call->id,
@@ -145,19 +160,6 @@ class TranscribeCall implements ShouldBeUniqueUntilProcessing, ShouldQueue
             ]);
         } catch (Throwable) {
             // Logging must not leave the call stuck in processing.
-        }
-
-        $updated = Call::query()
-            ->whereKey($call->id)
-            ->where('status', '!=', Call::STATUS_CANCELLED)
-            ->update([
-                'status' => 'failed',
-                'processing_completed_at' => now(),
-                'error_message' => $exception->publicMessage(),
-            ]);
-
-        if ($updated === 0) {
-            return;
         }
     }
 }

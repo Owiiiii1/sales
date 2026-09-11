@@ -187,6 +187,105 @@ class SalesAnalysisTest extends TestCase
         $this->assertSame(0, SalesAnalysis::query()->count());
     }
 
+    public function test_gemini_http_400_fails_the_call_without_leaking_provider_error(): void
+    {
+        $call = $this->transcribedCall();
+        $this->activateGemini();
+        Http::fake([
+            'generativelanguage.googleapis.com/*' => Http::response([
+                'error' => [
+                    'code' => 400,
+                    'message' => 'Invalid JSON schema',
+                    'status' => 'INVALID_ARGUMENT',
+                ],
+            ], 400),
+        ]);
+
+        $this->runAnalyze($call);
+
+        $call->refresh();
+        $this->assertSame('failed', $call->status);
+        $this->assertSame('Analysis failed. Please try again.', $call->error_message);
+        $this->assertSame(0, SalesAnalysis::query()->count());
+
+        $response = $this->getJson('/analysis/'.$call->public_token)
+            ->assertOk()
+            ->assertJsonPath('status', 'failed')
+            ->assertJsonPath('message', 'Analysis failed. Please try again.');
+
+        $encoded = (string) json_encode($response->json());
+        $this->assertStringNotContainsString('INVALID_ARGUMENT', $encoded);
+        $this->assertStringNotContainsString('Invalid JSON schema', $encoded);
+        $this->assertStringNotContainsString('test-key', $encoded);
+    }
+
+    public function test_failed_analyze_job_callback_does_not_leave_call_analyzing(): void
+    {
+        $call = $this->transcribedCall();
+        $call->forceFill(['status' => 'analyzing'])->save();
+
+        $job = new AnalyzeCall($call->id);
+        $job->failed(new PermanentAnalysisException(
+            'Gemini HTTP 400 INVALID_ARGUMENT: Invalid JSON schema',
+        ));
+
+        $call->refresh();
+        $this->assertSame('failed', $call->status);
+        $this->assertSame('Analysis failed. Please try again.', $call->error_message);
+    }
+
+    public function test_failed_analyze_job_callback_does_not_resurrect_completed_call(): void
+    {
+        $call = $this->completedCall();
+
+        $job = new AnalyzeCall($call->id);
+        $job->failed(new PermanentAnalysisException(
+            'Gemini HTTP 400 INVALID_ARGUMENT: Invalid JSON schema',
+        ));
+
+        $call->refresh();
+        $this->assertSame('completed', $call->status);
+        $this->assertNotNull($call->analysis);
+        $this->assertSame(72, $call->analysis->overall_score);
+    }
+
+    public function test_failed_transcribed_call_can_complete_after_provider_is_fixed(): void
+    {
+        $call = $this->transcribedCall();
+        $this->activateGemini();
+        Http::fake([
+            'generativelanguage.googleapis.com/*' => Http::sequence()
+                ->push([
+                    'error' => [
+                        'code' => 400,
+                        'message' => 'Invalid JSON schema',
+                        'status' => 'INVALID_ARGUMENT',
+                    ],
+                ], 400)
+                ->push([
+                    'candidates' => [
+                        [
+                            'content' => [
+                                'parts' => [['text' => json_encode(SalesAnalysisFactory::validPayload())]],
+                            ],
+                        ],
+                    ],
+                ], 200),
+        ]);
+
+        $this->runAnalyze($call);
+        $this->assertSame('failed', $call->fresh()->status);
+        $this->assertSame(0, SalesAnalysis::query()->count());
+
+        $this->runAnalyze($call->fresh());
+
+        $call->refresh();
+        $this->assertSame('completed', $call->status);
+        $this->assertNotNull($call->analysis);
+        $this->assertSame(SalesAnalysisSchema::VERSION, $call->analysis->schema_version);
+        $this->assertNull($call->error_message);
+    }
+
     public function test_invalid_speaker_role_is_rejected(): void
     {
         $call = $this->transcribedCall();
@@ -736,6 +835,19 @@ class SalesAnalysisTest extends TestCase
             'is_active' => true,
             'active_model' => 'gpt-4o-mini',
             'available_models' => [['id' => 'gpt-4o-mini', 'name' => 'gpt-4o-mini']],
+        ]);
+    }
+
+    private function activateGemini(): void
+    {
+        AiProviderSetting::query()->create([
+            'provider' => 'gemini',
+            'label' => 'Gemini',
+            'api_key' => 'test-key',
+            'is_connected' => true,
+            'is_active' => true,
+            'active_model' => 'gemini-3.7-flash',
+            'available_models' => [['id' => 'gemini-3.7-flash', 'name' => 'gemini-3.7-flash']],
         ]);
     }
 

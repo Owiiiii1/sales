@@ -17,6 +17,7 @@ Factual state of the running project. Update this file when reality changes.
 * **Phase 7.1 — Provider settings completion:** COMPLETED (application code + mocked tests). Live ElevenLabs / LLM verification deferred by Project Manager.
 * **Phase 7.2 — Main analyzer company selection:** COMPLETED (application code + mocked tests). Explicit context selection required before upload (DEC-063).
 * **Phase 7.3 — Methodology alignment & context reliability:** COMPLETED (application code + mocked tests).
+* **Production fix — Gemini structured output & failure reliability:** COMPLETED. Live Gemini analysis of Call #4 completed on `gemini-3.7-flash` (schema v3, overall_score 48). `responseJsonSchema` is used instead of OpenAPI `responseSchema` (DEC-065). Call status transitions do not depend on the logger (DEC-066). Stuck processing/analyzing calls can be recovered with `php artisan sales:recover-stuck-calls`.
 * **Next planned work:** Phase 8 user product (accounts / personal cabinet), unless the roadmap is reordered.
 
 ## Product vs running app
@@ -64,12 +65,14 @@ Admins sign in at `/login`. `/dashboard` is the sales analytics view (Last 30 da
 | `POST /calls/{call}/transcribe` | auth | retry STT job |
 | `POST /calls/{call}/analyze` | auth | run / re-run analysis job (rejected if AI is not configured) |
 | `POST /calls/{call}/cancel` | auth | stop in-flight processing |
+| `php artisan sales:recover-stuck-calls` | ops | mark stuck processing/analyzing calls failed; `--retry` / `--sync` re-run missing jobs |
 | `/settings?tab=transcription` | auth | ElevenLabs STT settings |
 | `/settings?tab=ai` | auth | LLM providers + analysis behavior |
 
 ## Known issues (non-critical)
 
-* Live ElevenLabs and live LLM verification deferred by Project Manager.
+* Live ElevenLabs verification deferred by Project Manager. Live Gemini structured analysis verified on Call #4 (`gemini-3.7-flash`, HTTP 200, schema v3, status `completed`).
+* `sales-worker.service` uses `--max-time=3600`. PHP job/client changes need a worker recycle (`sudo systemctl restart sales-worker.service`); the deploy user cannot sudo without a password. The unit auto-recycled at 13:23 CEST (PID 3056249); a further restart is needed to pick up the Gemini adapter committed after that recycle.
 * Without an active AI provider, analysis stays `analysis_pending`.
 * Analyzer upload requires a ready transcription provider (DB key + connection check, or env fallback).
 * ffprobe/ffmpeg not installed; duration often comes from STT.

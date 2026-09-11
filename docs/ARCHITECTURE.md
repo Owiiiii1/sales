@@ -92,7 +92,7 @@ Upload
   → report ready
 ```
 
-Status values for a call: `uploaded` → `processing` → `transcribed` → `analysis_pending` or `analyzing` → `completed`, or `failed`.
+Status values for a call: `uploaded` → `processing` → `transcribed` → `analysis_pending` or `analyzing` → `completed`, or `failed` / `cancelled`.
 
 Queues: production uses `QUEUE_CONNECTION=database` and systemd unit `/etc/systemd/system/sales-worker.service`.
 
@@ -106,7 +106,9 @@ Resolution order for transcription credentials:
 DB configured provider → env fallback (`config('sales-analyzer.transcription.api_key')`) → not configured
 ```
 
-`ActiveTranscriptionProvider` is the only resolver. `ElevenLabsTranscriptionClient` does not read `env()` for secrets. Analysis HTTP uses the stored LLM key/model plus application `max_output_tokens` (`ConfiguredSalesAnalysisProvider`).
+`ActiveTranscriptionProvider` is the only resolver. `ElevenLabsTranscriptionClient` does not read `env()` for secrets. Analysis HTTP uses the stored LLM key/model plus application `max_output_tokens` (`ConfiguredSalesAnalysisProvider`). Gemini uses `responseJsonSchema` rather than OpenAPI `responseSchema`; the full v3 schema is prompt-attached because generateContent cannot compile the whole graph (DEC-065). Domain schema stays provider-neutral. Job `markFailed` persists call status before logging so a logger exception cannot leave a call `analyzing` (DEC-066). `php artisan sales:recover-stuck-calls` marks orphaned `processing`/`analyzing` rows failed when no matching `jobs` row exists.
+
+Production log directory `/var/www/sales/storage/logs` is `deploy:www-data` with ACL `user:www-data:rwx` (and default ACL for new files). `laravel.log` has ACL `user:www-data:rw`. Mode is not 777. Queue worker: `/etc/systemd/system/sales-worker.service` (`User=www-data`, `queue:work database --timeout=300 --max-time=3600`). Recycle with `sudo systemctl restart sales-worker.service`.
 
 ### Open choices
 

@@ -28,9 +28,38 @@ class ProviderHttpTest extends TestCase
             ProviderHttp::throwForStatus($response, 'gemini');
             $this->fail('HTTP 400 should be a permanent analysis failure.');
         } catch (PermanentAnalysisException $e) {
-            $this->assertStringContainsString('HTTP 400', $e->getMessage());
-            $this->assertStringContainsString('additionalProperties', $e->getMessage());
+            $this->assertSame(
+                'Gemini HTTP 400 INVALID_ARGUMENT: Unknown name "additionalProperties" at generation_config.response_schema',
+                $e->getMessage(),
+            );
             $this->assertStringNotContainsString('(400)', $e->getMessage());
+            $this->assertSame('Analysis failed. Please try again.', $e->publicMessage());
+        }
+    }
+
+    public function test_gemini_invalid_json_schema_error_includes_status_and_message(): void
+    {
+        $response = new Response(new PsrResponse(
+            400,
+            ['Content-Type' => 'application/json'],
+            json_encode([
+                'error' => [
+                    'code' => 400,
+                    'message' => 'Invalid JSON schema',
+                    'status' => 'INVALID_ARGUMENT',
+                ],
+            ]),
+        ));
+
+        try {
+            ProviderHttp::throwForStatus($response, 'gemini');
+            $this->fail('HTTP 400 should be a permanent analysis failure.');
+        } catch (PermanentAnalysisException $e) {
+            $this->assertStringContainsString('INVALID_ARGUMENT', $e->getMessage());
+            $this->assertStringContainsString('Invalid JSON schema', $e->getMessage());
+            $this->assertStringContainsString('HTTP 400', $e->getMessage());
+            $this->assertDoesNotMatchRegularExpression('/\(400\)/', $e->getMessage());
+            $this->assertSame('Analysis failed. Please try again.', $e->publicMessage());
         }
     }
 }
